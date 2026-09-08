@@ -1,0 +1,14 @@
+{
+  "name": "runq",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RUNQ. - Run your quest. 大会を選ぶ。目標を決める。あとはrunQ.と走る。",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "npm run build && node scripts/dev-server.js",
+    "start": "npm run dev"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
