@@ -79,6 +79,33 @@ function seedPlan() {
   return { plan, profile };
 }
 
+function nextMondayIso(date) {
+  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const offset = (8 - result.getDay()) % 7; // 月曜は0、火曜〜日曜は次の月曜へ
+  result.setDate(result.getDate() + offset);
+  return [
+    result.getFullYear(),
+    String(result.getMonth() + 1).padStart(2, '0'),
+    String(result.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+async function createPlan(page, { name, startDate, raceDate }) {
+  if (await page.locator('#gen-form').count() === 0) {
+    await page.locator('[data-action="tab"][data-tab="create"]').first().click({ force: true });
+    await page.locator('#gen-form').waitFor({ state: 'visible', timeout: 10000 });
+  }
+  await page.locator('#f_name').fill(name);
+  await page.locator('#f_startDate').fill(startDate);
+  await page.locator('#f_raceDate').fill(raceDate);
+  await page.locator('#gen-form button[type="submit"]').click();
+  await page.waitForTimeout(150);
+  return page.evaluate((planName) => {
+    const plans = JSON.parse(localStorage.getItem('paceplan.plans') || '[]');
+    return plans.find((plan) => plan.meta && plan.meta.name === planName);
+  }, name);
+}
+
 async function main() {
   if (!fs.existsSync(DIST_INDEX)) {
     console.error('dist/index.html が見つかりません。先に `npm run build` を実行してください。');
@@ -281,6 +308,44 @@ async function main() {
       check('[12] Claude Artifact内ではClaudeArtifactProvider(sample capability)が使われる', sampleCalled);
       check('[12] Claude Artifact内では /api/coach へは一切リクエストされない', !coachApiHit);
       check('[12] Claude Artifact版の応答がそのままチャットに表示される(既存動作維持)', threadText.includes('Claude Artifact経由のテスト応答'));
+
+      await context.close();
+    }
+
+    console.log('=== scenario 3: プラン週境界(月曜始まり) ===');
+    {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto(baseUrl + '/', { waitUntil: 'load' });
+      await page.waitForTimeout(300);
+
+      // デフォルト開始日は、月曜なら当日、それ以外なら次の月曜。
+      await page.locator('[data-action="tab"][data-tab="create"]').first().click({ force: true });
+      const defaultStart = await page.locator('#f_startDate').evaluate((element) => element.value);
+      check('[日付] 新規プランの開始日初期値は次の月曜日', defaultStart === nextMondayIso(new Date()));
+
+      const mondayPlan = await createPlan(page, { name: '月曜開始テスト', startDate: '2026-09-14', raceDate: '2026-10-04' });
+      const mondayWeek1Dates = mondayPlan.weeks[0].items.map((item) => item.date).filter(Boolean);
+      check('[日付] 月曜開始: Week 1は月曜〜日曜の表示期間', mondayPlan.weeks[0].dateRange === '9/14〜9/20');
+      check('[日付] 月曜開始: Week 1の曜日メニューが正しい日付に並ぶ', JSON.stringify(mondayWeek1Dates) === JSON.stringify(['2026-09-14', '2026-09-16', '2026-09-19', '2026-09-20']));
+
+      const midweekPlan = await createPlan(page, { name: '水曜開始テスト', startDate: '2026-09-09', raceDate: '2026-09-27' });
+      const midweekWeek1Dates = midweekPlan.weeks[0].items.map((item) => item.date).filter(Boolean);
+      const midweekWeek2Dates = midweekPlan.weeks[1].items.map((item) => item.date).filter(Boolean);
+      check('[日付] 水曜開始: 初週は開始日を含む月曜〜日曜', midweekPlan.weeks[0].dateRange === '9/7〜9/13');
+      check('[日付] 水曜開始: 開始日前の月曜メニューを生成しない', JSON.stringify(midweekWeek1Dates) === JSON.stringify(['2026-09-09', '2026-09-12', '2026-09-13']));
+      check('[日付] 水曜開始: 翌月曜のMP走はWeek 2に入る', midweekPlan.weeks[1].dateRange === '9/14〜9/20' && midweekWeek2Dates[0] === '2026-09-14');
+
+      const monthPlan = await createPlan(page, { name: '月またぎテスト', startDate: '2026-09-30', raceDate: '2026-10-18' });
+      const monthWeek1Dates = monthPlan.weeks[0].items.map((item) => item.date).filter(Boolean);
+      check('[日付] 月またぎ: Week 1の表示期間は月曜〜日曜をまたぐ', monthPlan.weeks[0].dateRange === '9/28〜10/4');
+      check('[日付] 月またぎ: 開始日以降の水・土・日だけを生成する', JSON.stringify(monthWeek1Dates) === JSON.stringify(['2026-09-30', '2026-10-03', '2026-10-04']));
+
+      const racePlan = await createPlan(page, { name: 'レース週テスト', startDate: '2026-09-14', raceDate: '2026-09-23' });
+      const raceWeek = racePlan.weeks[racePlan.weeks.length - 1];
+      const datedRaceItems = raceWeek.items.map((item) => item.date).filter(Boolean);
+      check('[日付] レース週: 表示期間はレース後も含む月曜〜日曜', raceWeek.dateRange === '9/21〜9/27');
+      check('[日付] レース週: レース日をまたぐトレーニングを生成しない', datedRaceItems.every((date) => date <= '2026-09-23') && datedRaceItems.includes('2026-09-23'));
 
       await context.close();
     }

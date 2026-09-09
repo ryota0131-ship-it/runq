@@ -1335,6 +1335,19 @@
     return addDays(weekStart, offset);
   }
 
+  // プランの週は常に月曜始まり・日曜終わり。開始日が週の途中なら、Week 1はその日以降だけを使う。
+  function mondayOfWeek(date){
+    return addDays(date, -((date.getDay()+6)%7));
+  }
+  function nextMonday(date){
+    const monday = mondayOfWeek(date);
+    return date.getDay()===1 ? monday : addDays(monday, 7);
+  }
+  function isPlanItemDate(date, weekStart, cfg){
+    const weekEnd = addDays(weekStart, 6);
+    return date >= cfg.startDate && date <= cfg.raceDate && date >= weekStart && date <= weekEnd;
+  }
+
   function generatePlan(cfg){
     // cfg: {name, distanceLabel, distanceKm, raceDate(Date), startDate(Date), targetSec, longRunStart, heelCaution,
     //       injuryNote, courseNote, constitutionNote, scheduleNote, mpWeekday, easyWeekday, longWeekday}
@@ -1342,8 +1355,9 @@
     const conf = TIER_CONF[tier];
     const mpTemplates = MP_TEMPLATE_SETS[tier];
     const band = paceBandFromTarget(cfg.targetSec, cfg.distanceKm, conf.gapMult);
-    const totalDays = daysBetween(cfg.startDate, cfg.raceDate);
-    const weeksTotal = Math.max(1, Math.ceil((totalDays+1)/7));
+    const firstWeekStart = mondayOfWeek(cfg.startDate);
+    const raceWeekStart = mondayOfWeek(cfg.raceDate);
+    const weeksTotal = Math.max(1, Math.floor(daysBetween(firstWeekStart, raceWeekStart)/7)+1);
     const taperWeeks = weeksTotal>=8 ? 2 : (weeksTotal>=5 ? 1 : 0);
     const buildWeeks = Math.max(1, weeksTotal-taperWeeks);
     const baseCount = Math.ceil(buildWeeks/2);
@@ -1361,8 +1375,8 @@
     const weeks = [];
 
     for(let w=0; w<weeksTotal; w++){
-      const weekStart = addDays(cfg.startDate, w*7);
-      const isRaceWeek = (w===weeksTotal-1);
+      const weekStart = addDays(firstWeekStart, w*7);
+      const isRaceWeek = toISO(weekStart)===toISO(raceWeekStart);
       const isTaperOnly = !isRaceWeek && (w>=buildWeeks);
       let phase;
       if(isRaceWeek) phase = 'レース週';
@@ -1379,10 +1393,10 @@
         const easyDate = addDays(raceDate,-3);
         const preDate = addDays(raceDate,-1);
         const tpl = {reps:2, dist:conf.raceDist, jog:0, light:true};
-        items.push({type:'mp', day:WEEKDAY_JA[mpDate.getDay()], date:toISO(mpDate), title:'MP走', desc:'(軽め) '+mpDesc(tpl, band.mpLabel)});
-        items.push({type:'easy', day:WEEKDAY_JA[easyDate.getDay()], date:toISO(easyDate), title:'イージー', desc:formatKm(Math.max(conf.easyFloor,Math.round(longRun*0.18)))+'('+band.easyLabel+')、流し(スピード刺激)を2〜3本'});
-        items.push({type:'rest', day:'レース前', date:null, title:'完全休養', desc:'or 軽いウォーク'});
-        items.push({type:'preRace', day:WEEKDAY_JA[preDate.getDay()], date:toISO(preDate), title:'前日調整', desc:'20〜30分の超軽いジョグ or 完全休養、カーボローディング開始'});
+        if(isPlanItemDate(mpDate, weekStart, cfg)) items.push({type:'mp', day:WEEKDAY_JA[mpDate.getDay()], date:toISO(mpDate), title:'MP走', desc:'(軽め) '+mpDesc(tpl, band.mpLabel)});
+        if(isPlanItemDate(easyDate, weekStart, cfg)) items.push({type:'easy', day:WEEKDAY_JA[easyDate.getDay()], date:toISO(easyDate), title:'イージー', desc:formatKm(Math.max(conf.easyFloor,Math.round(longRun*0.18)))+'('+band.easyLabel+')、流し(スピード刺激)を2〜3本'});
+        if(daysBetween(weekStart, raceDate)>0) items.push({type:'rest', day:'レース前', date:null, title:'完全休養', desc:'or 軽いウォーク'});
+        if(isPlanItemDate(preDate, weekStart, cfg)) items.push({type:'preRace', day:WEEKDAY_JA[preDate.getDay()], date:toISO(preDate), title:'前日調整', desc:'20〜30分の超軽いジョグ or 完全休養、カーボローディング開始'});
         items.push({type:'race', day:WEEKDAY_JA[raceDate.getDay()], date:toISO(raceDate), title:'レース本番', desc:cfg.name+' — 目標 '+cfg.targetLabel});
       } else {
         const mpDate = dateForWeekday(weekStart, mpWeekday);
@@ -1424,13 +1438,13 @@
         const mpTpl = isTaperOnly ? {reps:2, dist:conf.taperDist, jog:3} : mpTemplates[Math.min(w, mpTemplates.length-1)];
         const easyDist = Math.max(conf.easyFloor, Math.round(longDist*conf.easyRatio));
 
-        items.push({type:'mp', day:WEEKDAY_JA[mpDate.getDay()], date:toISO(mpDate), title:'MP走', desc:mpDesc(mpTpl, band.mpLabel)});
-        items.push({type:'easy', day:WEEKDAY_JA[easyDate.getDay()], date:toISO(easyDate), title:'イージー', desc:formatKm(easyDist)+'('+band.easyLabel+')'});
-        items.push({type:'long', day:WEEKDAY_JA[longDate.getDay()], date:toISO(longDate), title:'ロング走', desc:longDesc, flag: flag?flag.kind:null, flagText: flag?flag.text:null, peak: w===peakWeekIndex});
-        items.push({type:'rest', day:WEEKDAY_JA[restDate.getDay()], date:toISO(restDate), title:'完全休養', desc:''});
+        if(isPlanItemDate(mpDate, weekStart, cfg)) items.push({type:'mp', day:WEEKDAY_JA[mpDate.getDay()], date:toISO(mpDate), title:'MP走', desc:mpDesc(mpTpl, band.mpLabel)});
+        if(isPlanItemDate(easyDate, weekStart, cfg)) items.push({type:'easy', day:WEEKDAY_JA[easyDate.getDay()], date:toISO(easyDate), title:'イージー', desc:formatKm(easyDist)+'('+band.easyLabel+')'});
+        if(isPlanItemDate(longDate, weekStart, cfg)) items.push({type:'long', day:WEEKDAY_JA[longDate.getDay()], date:toISO(longDate), title:'ロング走', desc:longDesc, flag: flag?flag.kind:null, flagText: flag?flag.text:null, peak: w===peakWeekIndex});
+        if(isPlanItemDate(restDate, weekStart, cfg)) items.push({type:'rest', day:WEEKDAY_JA[restDate.getDay()], date:toISO(restDate), title:'完全休養', desc:''});
       }
 
-      const rangeStart = weekStart, rangeEnd = isRaceWeek ? cfg.raceDate : addDays(weekStart,6);
+      const rangeStart = weekStart, rangeEnd = addDays(weekStart,6);
       weeks.push({ label:'Week '+(w+1), phase, dateRange:fmtMD(rangeStart)+'〜'+fmtMD(rangeEnd), items });
     }
 
@@ -3435,7 +3449,7 @@
         + '</select></div>'
       + (state.plans.length ? '<div class="field" style="grid-column:1/-1;"><label for="f_linkedFrom">前の大会からの続き(任意)</label><select id="f_linkedFrom" name="linkedFrom"><option value="">なし(新しい目標として開始)</option>'+linkOptions+'</select><span class="hint">選ぶと、そのレース後の回復を考慮して開始日・現在の走力を自動入力します</span></div>' : '')
       + fld('raceDate','レース日','date','required')
-      + fld('startDate','プラン開始日','date','value="'+todayISO()+'" required')
+      + fld('startDate','プラン開始日','date','value="'+toISO(nextMonday(todayLocal()))+'" required')
       + timeField('target','目標タイム','時間・分・秒をそれぞれ選んでください',4,0,0)
       + (function(){
           const defaultDistanceKm = 42.195, defaultTargetSec = 4*3600;
