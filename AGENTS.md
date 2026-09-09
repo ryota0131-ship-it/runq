@@ -24,3 +24,17 @@
 - `app/runq.html`はClaude Artifactへ公開する形式(`<!doctype>`等を持たない断片)のまま維持する。`npm run build`で`dist/index.html`にラップする処理(`scripts/build.js`)を書き換える場合以外、この断片形式自体を変える必要はない。
 - 秘密情報(APIキー等)を絶対にコードへ直接埋め込まない。必要になった場合は環境変数化し、`.env.example`に変数名だけを追記する(値は書かない)。
 - 大きな設計判断(データモデルの変更、AI Providerの切り替え実装等)を行った場合は、`docs/architecture.md`を更新する。
+
+## AI Coach(Coach Service / LLM Provider)を触る場合のルール
+
+詳細は[docs/architecture.md §4](./docs/architecture.md#4-ai-coach-の構成coach-service--llm-provider抽象化openai-api対応済み)を参照。
+
+1. **UI側(`runAdjust`/`runLogFeedback`等)は必ず`CoachService.request(prompt, opts)`を呼ぶ**。`sampleFn`や`fetch('/api/coach', ...)`を個別の呼び出し箇所から直接叩かない。
+2. **Provider選択ロジックは`selectCoachProvider()`の1箇所に集約する**。新しいProviderを追加する場合もここだけを変更すれば済む構造を維持する。
+3. **APIキー(`OPENAI_API_KEY`等)は絶対にクライアント側コード(`app/runq.html`)・ブラウザ・Capacitorアプリに埋め込まない**。サーバー側(`api/coach.js`)の`process.env`からのみ読み込む。
+4. **レスポンス形式(`{mode, summary, risk, options[].{label,summary,plan}}`)を勝手に変えない**。新しいProvider・モデルを追加する場合も、この既存形式に合わせて出力させること(独自形式を新設しない)。
+5. **プラン変更はAIに直接適用させない**。AIは`options[].plan`としてJSON提案を返すだけで、実際にTraining Planへ適用するのは既存の`applyPlanChange()`(ユーザーが選択肢を選んだ後)。
+6. **RACE FORECAST・PACE CALCULATOR・RACE TIME PREDICTOR・トレーニングプランの基礎数値・距離や日程等、決定論的に算出できる値をAIに計算させない**。これらは既存の純粋関数(`estimateRacePerformance()`等)に任せ、AIは説明・評価・質問応答・アドバイス・プラン変更提案のみを担当する。
+7. **モデルのデフォルト値は1箇所(`api/coach.js`の`DEFAULT_MODEL`)でのみ管理する**。切り替えは環境変数`OPENAI_MODEL`で行い、V1では単一モデル運用(tier別モデルの作り込みはしない)。
+8. **ユーザー入力をシステム指示として扱わない**。`api/coach.js`は`prompt`を常に`user`ロールのメッセージとして渡し、`SYSTEM_INSTRUCTION`(役割・出力形式の指示)を上書きできないようにしている。この分離を崩さない。
+9. **画像OCR(`extractFromImage`)は現時点で`CoachService`の対象外**。引き続き`sampleFn`を直接使う(Claude Artifact限定)。将来OpenAIの画像入力へ移行する場合も、既存のOCR呼び出し箇所を壊さないよう別途検討すること。

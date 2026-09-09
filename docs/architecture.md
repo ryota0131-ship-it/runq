@@ -100,45 +100,77 @@ AI Coach / Plan Change Proposal (coachLog/{planId}、および実行時のstate)
  └─ Plan変更確定時は Training Plan (plans/{planId}) を更新し、history[]に追記
 ```
 
-## 4. AI Coach の現在の構成と将来方針
+## 4. AI Coach の構成(Coach Service / LLM Provider抽象化。OpenAI API対応済み)
 
-### 現在
-
-```
-UI(コーチタブ / 記録直後フィードバック)
-        │
-        ▼
-buildAdjustPrompt() / planContextLines()   … プロンプト組み立て(PB・シューズ・FORECAST・直近ログ要約等を含む)
-        │
-        ▼
-window.claude.use('sample')  … Claude Artifact capability
-        │
-        ▼
-sampleFn.json(prompt, opts)  … JSON構造化応答(advice or options)を取得
-```
-
-- `sample` capability自体がAnthropicのモデルに紐づく前提のため、現状はモデル・プロバイダの切り替えは考慮していない。
-- 数値計算(プラン生成・RACE FORECAST等)は`estimateRacePerformance()`等の独立した純粋関数が担当し、AIは説明文・提案・対話のみを担当する設計を既に徹底している(重要な数値をAIの生成任せにしない、という原則は今後も維持する)。
-
-### 将来方針(今回は実装しない。段階的対応のための設計メモ)
-
-AI Coachを将来的にOpenAI/Anthropic等、複数のLLMプロバイダから選択・比較できるようにしたい場合の理想構造:
+### 全体像
 
 ```
 Application (UI / state)
+   コーチタブ / 記録直後フィードバック / プラン変更提案
         │
         ▼
-Coach Service          … buildAdjustPrompt()相当のプロンプト組み立て + レスポンス解釈(advice/options判定)は
-        │                 現状のロジックをほぼそのまま抽象化の内側に据え置ける
+buildAdjustPrompt() / planContextLines()   … プロンプト組み立て(Quest・目標タイム・Training Plan・
+        │                                     Runner Profile・PB・シューズ・直近Workout・RPE・pain・
+        │                                     RACE FORECAST・直近コーチ会話 等を含む。変更なし)
         ▼
-LLM Provider (interface)
-        ├─ ClaudeArtifactProvider  … 現状の `window.claude.use('sample')` をそのままラップ
-        ├─ AnthropicProvider       … Anthropic APIを直接呼ぶ場合(要 ANTHROPIC_API_KEY)
-        └─ OpenAIProvider          … OpenAI APIを直接呼ぶ場合(要 OPENAI_API_KEY)
+CoachService.request(prompt, opts)   … 呼び出し口はこの1関数のみ。UI側は下記どちらのProviderが
+        │                              実際にAIを呼んでいるか意識しない(sampleFn.json(prompt, opts)と
+        │                              同じ入出力シグネチャを維持)
+        ▼
+selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/runq.html内)
+        │
+        ├─ ClaudeArtifactProvider   … `window.claude.use('sample')` が使える場合はこちらを使う
+        │                             (Claude Artifactとして開いている場合。既存動作を完全維持)
+        │
+        └─ OpenAIProvider          … 上記が使えない場合(ローカル起動・Vercel等)はこちら
+                │                     ブラウザから直接OpenAIは呼ばない。必ずサーバー側 /api/coach を経由する
+                ▼
+           fetch('/api/coach', { prompt, modelTier })
+                │
+                ▼
+           runQ Backend: api/coach.js (Vercel Serverless Function / ローカルはdev-server.jsが橋渡し)
+                │  OPENAI_API_KEY はここだけで保持し、レスポンスにもクライアントにも含めない
+                ▼
+           OpenAI Responses API (https://api.openai.com/v1/responses)
+                │  Structured Outputs (text.format: json_schema) で
+                │  既存の { mode, summary, risk, options[].{label,summary,plan} } 形式を強制
+                ▼
+           api/coach.js が結果をそのままクライアントへ返す(新しい独自形式は作っていない)
 ```
 
-- 現在の実装を無理に全面変更する必要はない。まずは`sampleFn.json(prompt, opts)`相当のシグネチャ(プロンプト文字列 → JSON構造化応答)を持つ関数として`Coach Service`の呼び出し口を明示的に切り出し、その内部実装を`ClaudeArtifactProvider`とすることから始めると、既存コードへの影響を最小化しつつ将来の切り替えに備えられる。
-- 環境変数(`OPENAI_API_KEY` / `ANTHROPIC_API_KEY`等)が必要になるのは、`AnthropicProvider` / `OpenAIProvider`を実際に実装する段階から。
+- **Provider選択は`selectCoachProvider()`の1箇所のみ**(`app/runq.html`)。`ClaudeArtifactProvider.available()`(=`window.claude.use('sample')`が使えるか)を優先し、使えない場合のみ`OpenAIProvider`にフォールバックする。Claude Artifactとして開いている限り、この移行前と挙動は変わらない。
+- **レスポンス形式は既存のまま**: `{mode:'advice'|'options', summary, risk, options[].{label,summary,plan}}`。新しい独自スキーマを作るのではなく、Claude Artifact版が既に返していた形式をOpenAI側にも合わせている。下流(`buildAdjustPrompt`の解釈・`applyPlanChange`等)は無変更で動く。
+- **画像OCR(`extractFromImage`、Garminスクリーンショット等の読み取り)は今回のスコープ外**。引き続き`window.claude.use('sample')`(`sampleFn`)を直接使い、`CoachService`/`OpenAIProvider`経由にはしていない。将来Capacitor化後、OpenAIの画像入力でOCRも移行する想定(§4.3)。
+- 数値計算(プラン生成・RACE FORECAST・PACE CALCULATOR・RACE TIME PREDICTOR等)は`estimateRacePerformance()`等の独立した純粋関数が担当し、AIは説明文・提案・対話のみを担当する設計を維持している(この原則はOpenAI移行後も変えていない)。
+- プラン変更は「GPT/Claudeが`options[].plan`としてJSON提案 → UIが選択肢を提示 → ユーザーが選択 → 既存の`applyPlanChange()`がTraining Planへ適用」という流れを維持。AIが直接Training Planを書き換えることはない。
+
+### 4.1 Coach Service / Provider(実装箇所)
+
+`app/runq.html`内、`planContextLines()`の直前に配置。主要なオブジェクト:
+
+- `ClaudeArtifactProvider` — `sampleFn.json(prompt, opts)`をそのままラップ。
+- `OpenAIProvider` — `fetch('/api/coach', {method:'POST', body:{prompt, modelTier}})`。ネットワークエラー・非200・不正JSONをそれぞれ`{code:'coach_unreachable'|'rate_limited'|'invalid_json'|'cancelled'}`という例外に正規化し、呼び出し元(`runAdjust`/`runLogFeedback`)の既存のcatch節・`adjustErrorMessage(code)`にそのまま渡せるようにしている。
+- `selectCoachProvider()` — 上記2つからどちらを使うか決定する唯一の箇所。
+- `CoachService.request(prompt, opts)` — UI側の唯一の呼び出し口。
+
+将来`ClaudeArtifactProvider`を削除する場合も、`selectCoachProvider()`の中身を変えるだけで済む構造にしている。
+
+### 4.2 /api/coach (サーバー側)
+
+`api/coach.js`(Vercel Serverless Function規約。フレームワーク・追加依存パッケージなし、Node18+のグローバル`fetch`のみ使用):
+
+- リクエスト: `POST { prompt: string, modelTier?: string }`。`prompt`が空・非文字列・上限(60,000文字)超過の場合は400/413を返す。
+- 環境変数: `OPENAI_API_KEY`(必須。未設定時は500 `coach_unavailable`)、`OPENAI_MODEL`(省略可。デフォルト値`api/coach.js`内の`DEFAULT_MODEL`定数の1箇所のみで管理)。
+- OpenAI呼び出し: Responses API (`POST https://api.openai.com/v1/responses`)。`text.format`にJSON Schema(`RESPONSE_SCHEMA`、既存の`{mode,summary,risk,options[]}`形式)を指定し、Structured Outputsとして構造化された応答を要求(`strict:false`。`options[].plan`はトレーニングプラン全体を含む複雑な構造のため、既存のクライアント側`normalizeAdjustedPlan()`による正規化・検証を安全網としている)。
+- OpenAI APIキーはレスポンスにもエラーメッセージにも一切含めない。OpenAI側のエラー詳細(内部メッセージ等)もクライアントへそのまま流さず、`{error:'coach_unavailable'|'rate_limited'|'invalid_request'|'prompt_too_large'|'invalid_json'|'method_not_allowed'}`という限られたコードのみ返す。
+- ユーザー入力(`prompt`)はOpenAIへの`user`メッセージとして渡すのみで、システム指示(`SYSTEM_INSTRUCTION`)を上書きできないよう分離している。
+- テスト容易性のため、`apiKey`/`model`/`fetchImpl`を第3引数`opts`で差し替え可能にしている(`module.exports.handler`等もexport)。
+
+### 4.3 Capacitor化を見据えた設計
+
+- APIキーはCapacitorアプリ内にも一切埋め込まない。アプリは常にHTTPS経由で`/api/coach`(または将来`RUNQ_API_BASE_URL`のような設定でホスト先を切り替え)を呼ぶ想定。
+- 画像入力(Garmin等のスクリーンショットOCR)をOpenAIの画像入力APIへ移行する場合も、`OpenAIProvider`と同様に`/api/coach`側で処理し、キーをクライアントに渡さない構造を踏襲する。今回は着手しない。
+- 開発・本番でのAPI URL切り替え・CORS等は、現時点では過剰に作り込まず、必要になった段階で最小限の設定を追加する方針とする。
 
 ## 5. 将来の Activity Import(Garmin / Apple Health / Strava等)を見据えた設計
 
@@ -174,10 +206,11 @@ LLM Provider (interface)
 
 ## 6. 秘密情報・環境変数
 
-現時点で`app/runq.html`にAPIキー等の秘密情報はハードコードされていない(確認済み)。外部ネットワーク呼び出しはGoogle Fontsの読み込みのみで、それ以外の外部API呼び出しは無い(AIはClaude Artifactの`sample` capability経由、DBは`db` capability経由のため、コード側で秘密情報を保持する必要がない)。`.env.example`および README の「環境変数」を参照。
+`app/runq.html`(クライアント側)にAPIキー等の秘密情報はハードコードされていない(確認済み)。`OPENAI_API_KEY`は`api/coach.js`(サーバー側)からのみ`process.env.OPENAI_API_KEY`として読み込まれ、クライアントへ返すレスポンス・エラーメッセージのいずれにも含めていない。外部ネットワーク呼び出しはGoogle Fontsの読み込みと、サーバー側からの`https://api.openai.com/v1/responses`呼び出しのみ。`.env.example`および README の「環境変数」を参照。
 
 ## 7. デプロイ
 
-- **現状**: Claude Artifactとして公開(`app/runq.html`の内容をArtifactツールで公開)。ユーザーが実際に使っているのはこちら。
+- **現状**: Claude Artifactとして公開(`app/runq.html`の内容をArtifactツールで公開)。ユーザーが実際に使っているのはこちら。この経路では`ClaudeArtifactProvider`が使われ、`OPENAI_API_KEY`等は一切関与しない。
 - **今回のGitHub移行後**: `app/runq.html`をGitHub上の正本として管理し、Claude Artifactへの公開は引き続きこのファイルの内容をそのまま使う運用とする。
-- **将来**: Vercel等への静的ホスティングへ切り替える場合、`npm run build`で生成される`dist/index.html`をデプロイ対象にできる。ただしその場合、`db`/`sample` capabilityが使えなくなる(localStorageへのフォールバック・AIコーチ非表示)ため、クロスデバイス同期・AIコーチを維持するには、DB(§2)・AI Provider(§4)の実装が別途必要になる。
+- **Vercel等への静的+サーバーレスデプロイ**: `npm run build`で生成される`dist/index.html`(静的ファイル)と`api/coach.js`(Vercel Serverless Function)を組み合わせてデプロイできる。`db`/`sample` capabilityは使えないため、データ保存は引き続き`localStorage`フォールバックとなるが、AI Coachは環境変数`OPENAI_API_KEY`(必須)・`OPENAI_MODEL`(省略可)を設定すれば`OpenAIProvider`経由で利用できる(未設定の場合はAI Coachのみ`coach_unavailable`エラーとなり、Plan/Workout/Forecast/Shoes等の他機能は引き続き利用可能)。
+- **ローカル開発**: `npm run dev`で起動する`scripts/dev-server.js`が`/api/coach`を`api/coach.js`へ橋渡しする(依存パッケージなしの最小実装)。ルート直下に`.env`を置けば`OPENAI_API_KEY`/`OPENAI_MODEL`を自動で読み込む。

@@ -2528,7 +2528,10 @@
     if(!plan){
       return '<div class="info-card">まだクエストがありません。「ホーム」から「＋ NEW QUEST」でクエストを作成すると、AIコーチに相談できるようになります。</div>';
     }
-    if(!sampleFn || state.adjust.hidden){
+    // state.adjust.hiddenは、Claude Artifact上でsample capability自体が使えない場合のみtrueになる
+    // (boot()参照)。それ以外(OpenAIProvider経由)の場合はコーチタブを常に表示し、
+    // 個々のリクエストが失敗した場合はチャット内のエラー吹き出しで案内する
+    if(state.adjust.hidden){
       return '<div class="info-card"><h3>AIコーチ</h3><div class="li-sub">この環境ではAIコーチ機能は利用できません。</div></div>';
     }
     return coachChatHTML();
@@ -2670,6 +2673,73 @@
     if(painDates.length) lines.push('直近の痛み・違和感の申告: '+painDates.join('、'));
     return lines;
   }
+
+  /* ============================================================
+     Coach Service — LLM Providerの抽象化(GitHub移行後、OpenAI API対応で追加)
+     UI側(runAdjust/runLogFeedback)は CoachService.request(prompt, opts) だけを呼び、
+     どちらのProviderが実際にAIを呼んでいるかを意識しない。
+     Provider選択は selectCoachProvider() の1箇所に集約する。
+     どちらのProviderも sampleFn.json(prompt, opts) と同じ入出力(prompt文字列 → JSONオブジェクト)を
+     守るので、呼び出し側(buildAdjustPrompt/advice-optionsの解釈/applyPlanChange等)は無変更で流用できる。
+     画像OCR(extractFromImage、Garminスクリーンショット等の読み取り)は今回のスコープ外とし、
+     引き続きClaude Artifactの`sample` capabilityを直接使う(このCoachService経由にはしない)。
+  ============================================================ */
+
+  // Claude Artifact上で動いている場合、既存通り window.claude.use('sample') をそのまま使う。
+  // ここでの変更は無し(既存のClaude Artifact版の挙動を一切壊さないため)。
+  const ClaudeArtifactProvider = {
+    name: 'claude-artifact',
+    available(){ return !!sampleFn; },
+    request(prompt, opts){
+      return sampleFn.json(prompt, opts || {});
+    }
+  };
+
+  // Claude Artifact以外(ローカル起動・Vercel等)で動いている場合に使う。
+  // OpenAI APIキーはブラウザ側に一切持たせず、サーバー側の /api/coach 経由でのみ呼び出す。
+  const OpenAIProvider = {
+    name: 'openai',
+    available(){ return true; }, // 実際に呼べるか(OPENAI_API_KEY未設定等)はサーバー側で判定し、失敗時はcoach_unreachable等のエラーとして返る
+    async request(prompt, opts){
+      opts = opts || {};
+      let httpRes;
+      try{
+        httpRes = await fetch('/api/coach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: prompt, modelTier: opts.modelTier || 'default' }),
+          signal: opts.signal
+        });
+      }catch(networkErr){
+        if(networkErr && networkErr.name==='AbortError') throw {code:'cancelled'};
+        throw {code:'coach_unreachable'};
+      }
+      if(!httpRes.ok){
+        let errCode = 'coach_unreachable';
+        try{
+          const errBody = await httpRes.json();
+          if(errBody && errBody.error==='rate_limited') errCode = 'rate_limited';
+        }catch(e){ /* ignore, keep default errCode */ }
+        throw {code:errCode};
+      }
+      let data;
+      try{ data = await httpRes.json(); }catch(e){ throw {code:'invalid_json'}; }
+      if(!data || typeof data!=='object') throw {code:'invalid_json'};
+      return data;
+      // 注意: OpenAIProviderは現状ストリーミング非対応(opts.onTextは呼ばれない)。
+      // 呼び出し側は onText が呼ばれなくても「考え中…」表示のみになるだけで問題なく動作する(既存の作り)。
+    }
+  };
+
+  function selectCoachProvider(){
+    return ClaudeArtifactProvider.available() ? ClaudeArtifactProvider : OpenAIProvider;
+  }
+
+  const CoachService = {
+    request(prompt, opts){
+      return selectCoachProvider().request(prompt, opts);
+    }
+  };
 
   // コーチ(チャット相談・記録後フィードバック共通)にプロンプトとして渡す背景情報。
   // Phase4でPB・シューズ・直近FORECAST・直近ログ傾向を追加(要件: コーチの参照情報拡張)
@@ -2819,6 +2889,7 @@
       case 'prompt_too_large': return 'プランが大きすぎて調整できませんでした';
       case 'empty_completion': return '応答が得られませんでした。もう一度お試しください';
       case 'session_expired': return 'サインインの有効期限が切れました。再読み込みしてお試しください';
+      case 'coach_unreachable': return 'コーチとの通信に失敗しました。少し時間を置いてもう一度お試しください';
       default: return '調整に失敗しました。もう一度お試しください';
     }
   }
@@ -2953,7 +3024,7 @@
       let result;
       resetAdjustStreamPreview();
       try{
-        result = await raceWithDeadline(sampleFn.json(prompt, {modelTier:'complex', cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
+        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
         if(!result || typeof result!=='object') throw {code:'invalid_json'};
       }catch(firstErr){
         if(firstErr && firstErr.code==='timeout') throw firstErr;
@@ -2961,7 +3032,7 @@
         if(!retryableCode) throw firstErr;
         // リトライ時は前回の(失敗した)プレビューを引きずらないよう一旦クリアする
         resetAdjustStreamPreview();
-        result = await raceWithDeadline(sampleFn.json(prompt, {modelTier:'complex', cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
+        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
         if(!result || typeof result!=='object') throw {code:'invalid_json'};
       }
 
@@ -3082,7 +3153,9 @@
   }
 
   async function runLogFeedback(item, log){
-    if(!sampleFn) return;
+    // 以前は「Claude Artifactのsample capabilityが無ければ即終了」だったが、
+    // OpenAIProvider経由でも記録後フィードバックを提供できるようにしたためこのガードは撤去した。
+    // 呼べるProviderが実際に無い/失敗する場合はcatch節でfeedbackText=nullとなり、既存通り静かに諦める
     const plan = currentPlan();
     if(!plan) return;
     const prevPlan = JSON.parse(JSON.stringify(plan));
@@ -3094,7 +3167,7 @@
     try{
       const instruction = buildLogInstruction(item, log);
       const prompt = buildAdjustPrompt(plan, instruction, todayISO());
-      const result = await sampleFn.json(prompt, {modelTier:'default', cache:false});
+      const result = await CoachService.request(prompt, {modelTier:'default', cache:false});
       if(!result || typeof result!=='object') throw {code:'invalid_json'};
 
       let rawOptions = null;
@@ -3733,7 +3806,15 @@
     try{
       sampleFn = (window.claude && typeof window.claude.use==='function') ? await window.claude.use('sample') : null;
     }catch(e){ sampleFn = null; }
-    if(!sampleFn) state.adjust.hidden = true;
+    // Claude Artifact上で動いている(window.claudeが存在する)のに sample capability が
+    // 使えない場合のみ、従来通りAIコーチ機能自体を非表示にする。
+    // Claude Artifact以外(window.claudeが無い = ローカル起動・Vercel等)の場合は、
+    // OpenAIProvider経由でAIコーチを提供する想定のため非表示にはしない
+    // (実際にサーバー側が呼べるかどうかは個々のリクエスト時のエラー表示に委ねる)。
+    const inClaudeArtifact = !!(window.claude && typeof window.claude.use==='function');
+    if(inClaudeArtifact && !sampleFn) state.adjust.hidden = true;
+    // 画像OCR(Garminスクリーンショット等)は今回のスコープ外のままClaude Artifact専用なので、
+    // sampleAvailableの判定はsampleFnの有無のまま変更しない
     state.sampleAvailable = !!sampleFn;
     if(sampleFn){
       try{

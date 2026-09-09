@@ -22,7 +22,7 @@ runQ.(ランクエ / "Run your quest.")は、ランニング初心者〜継続�
 - **言語**: JavaScript(TypeScriptではありません)。
 - **状態管理**: シンプルな`state`オブジェクト + `render()`によるDOM全再構築(仮想DOM等は無し)。
 - **データ保存**: 現在はClaude Artifactの`db` capability(`window.claude.use('db')`)。`db`が使えない環境(= Claude Artifact以外の場所で開いた場合)では`localStorage`へ自動フォールバックする作りに既になっています。
-- **AI Coach**: 現在はClaude Artifactの`sample` capability(`window.claude.use('sample')`)経由でAI応答を取得しています。OpenAI/AnthropicのAPIキーを直接扱う実装にはまだなっていません(詳細は[docs/architecture.md](./docs/architecture.md)を参照)。
+- **AI Coach**: `CoachService`が`ClaudeArtifactProvider`(Claude Artifactの`sample` capability)と`OpenAIProvider`(サーバー側`/api/coach`経由でOpenAI API)の2つを抽象化しています。Claude Artifactとして開いている場合は引き続き`ClaudeArtifactProvider`が使われ、それ以外(ローカル起動・Vercel等)では`OpenAIProvider`にフォールバックします。OpenAI APIキーはサーバー側(`api/coach.js`)だけで保持し、ブラウザ・Capacitorアプリには一切埋め込みません(詳細は[docs/architecture.md](./docs/architecture.md)を参照)。
 - **外部依存**: Google Fonts(`fonts.googleapis.com`)の読み込みのみ。それ以外の外部CDN・APIへの依存はありません。
 
 このため、現状は「ビルド」と呼べる工程はほぼ無く、`app/runq.html`という1ファイルがアプリの実体そのものです。詳しくは[docs/architecture.md](./docs/architecture.md)を参照してください。
@@ -37,11 +37,21 @@ npm run dev
 
 `http://localhost:3000` でアプリが開きます(内部では `npm run build` → `dist/index.html` の生成 → 簡易static server起動、の順で実行されます)。
 
-> 注意: ローカルやVercel等、Claude Artifact以外の環境で開いた場合、`db`/`sample` capabilityは存在しないため、データ保存は`localStorage`(ブラウザごとのローカル保存。同期はされません)、AI Coach機能は非表示になります。これは既存の作り(capabilityが無い場合のフォールバック処理)によるもので、今回のGitHub移行にあたって新たに追加したものではありません。
+> 注意: ローカルやVercel等、Claude Artifact以外の環境で開いた場合、`db` capabilityは存在しないため、データ保存は`localStorage`(ブラウザごとのローカル保存。同期はされません)になります。これは既存の作り(capabilityが無い場合のフォールバック処理)によるもので、今回のGitHub移行にあたって新たに追加したものではありません。AI Coachは`OPENAI_API_KEY`を設定すれば`OpenAIProvider`経由で引き続き利用できます(未設定の場合はAI Coachのみ利用不可になりますが、Plan/Workout/Forecast/Shoes等の他機能は通常通り使えます)。
 
 ## 環境変数
 
-現時点で実際に読み込んでいる環境変数はありません。`.env`はコミットしないでください(`.gitignore`済み)。必要になった時点で使う変数だけを`.env.example`に追記してください(詳細は`.env.example`のコメントを参照)。
+AI Coach(`OpenAIProvider`)をローカルで試す場合は、リポジトリ直下に`.env`を作成し、以下を設定してください(`.env.example`をコピーして使うと簡単です)。
+
+```bash
+cp .env.example .env
+# .env を編集して OPENAI_API_KEY= の後ろに実際のキーを入力
+```
+
+- `OPENAI_API_KEY` — OpenAI APIキー。サーバー側(`api/coach.js`)だけで読み込まれ、クライアントには一切渡りません。未設定でもアプリ自体は起動し、AI Coachのみ「コーチとの通信に失敗しました。」というエラーになります。
+- `OPENAI_MODEL` — 使用するモデル名(省略可。未設定時は`api/coach.js`内の`DEFAULT_MODEL`にフォールバック)。
+
+`.env`はコミットしないでください(`.gitignore`済み)。値を書かない変数を先回りして`.env.example`に大量に追加しないでください(詳細は`.env.example`のコメントを参照)。
 
 ## ビルド方法
 
@@ -51,15 +61,30 @@ npm run build
 
 `app/runq.html`(Claude Artifactへ公開する形式そのままの断片)を、標準的なHTMLドキュメント(`<!doctype>`/`<html>`/`<head>`/`<body>`)でラップして`dist/index.html`を生成するだけの処理です(`scripts/build.js`、依存パッケージなし)。アプリのロジック・スタイル・マークアップ自体は一切変更しません。
 
+## テスト
+
+```bash
+npm test        # api/coach.js の単体テスト(依存パッケージ不要。モックしたfetchでOpenAI呼び出しを検証)
+npm run build && npm run test:e2e   # ブラウザ(Playwright)でのE2Eテスト。要 npm install
+```
+
+- `npm test` はNode標準機能のみで動作し、`api/coach.js`が正常系・エラー系(レート制限・ネットワークエラー・不正なJSON・APIキー未設定等)を正しく処理するかを検証します。
+- `npm run test:e2e` は実際のOpenAI APIを呼ばず、ブラウザから`/api/coach`へのリクエストをモックすることで、コーチタブの表示・相談(advice)・プラン変更提案(options)・承認後のプラン反映・APIエラー時の挙動・Claude Artifact版(既存の`sample` capability経路)が壊れていないこと、を実ブラウザ上で確認します。Playwright(devDependencies)のインストールが必要です(`npm install`)。アプリ本体の起動・利用には一切不要です。
+
 ## ディレクトリ構成
 
 ```
 runq/
 ├─ app/
 │  └─ runq.html        # アプリ本体(Claude Artifact公開用の断片形式のまま管理。ここが正本)
+├─ api/
+│  └─ coach.js          # AI Coach用サーバーエンドポイント(Vercel Serverless Function。OpenAI API呼び出し)
 ├─ scripts/
 │  ├─ build.js          # app/runq.html → dist/index.html への変換(依存なし)
-│  └─ dev-server.js     # dist/ を配信する最小static server(依存なし)
+│  └─ dev-server.js     # dist/ を配信する最小static server + /api/coach への橋渡し(依存なし)
+├─ test/
+│  ├─ coach.api.test.js # api/coach.js の単体テスト(依存なし。`npm test`)
+│  └─ e2e/run.js         # ブラウザ(Playwright)でのE2Eテスト(`npm run test:e2e`。要npm install)
 ├─ docs/
 │  ├─ requirements.md   # V1要件定義(基準仕様)
 │  └─ architecture.md   # 現行アーキテクチャ・データモデル・将来方針
