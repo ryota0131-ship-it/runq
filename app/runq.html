@@ -440,6 +440,86 @@
   .foot-note{ text-align:center; font-size:11.5px; color:var(--text-faint); padding-top:6px; }
 
   /* ---------- home dashboard ---------- */
+  .home-dashboard{ display:flex; flex-direction:column; gap:18px; padding-bottom:4px; }
+  .home-dashboard .hero{ margin:0; }
+  .home-quest{
+    background:transparent;
+    border:none;
+    border-radius:0;
+    box-shadow:none;
+    padding:2px 2px 0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:10px 14px;
+    align-items:start;
+  }
+  .home-quest .hero-meta{ gap:4px; }
+  .home-quest .quest-kicker{ font-size:10px; letter-spacing:.1em; }
+  .home-quest .hero-race{ font-size:19px; line-height:1.35; }
+  .home-quest .hero-sub{ font-size:12px; }
+  .home-quest .hero-stats{ gap:14px; margin-top:6px; }
+  .home-quest .stat .k{ font-size:9px; letter-spacing:.06em; }
+  .home-quest .stat .v{ font-size:13px; }
+  .home-quest .countdown{
+    min-width:76px;
+    padding:8px 10px;
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:var(--surface);
+    text-align:right;
+  }
+  .home-quest .countdown .num{ font-size:25px; color:var(--accent-strong); }
+  .home-quest .countdown .lbl{ font-size:9px; letter-spacing:.06em; text-transform:none; margin:0 0 2px; }
+  .home-quest .phase-side{ grid-column:1 / -1; align-items:flex-start; }
+  .home-quest .quest-newquest-btn{ padding:7px 0; border:none; background:transparent; color:var(--text-muted); font-size:12px; }
+  .home-quest .quest-newquest-btn:hover{ color:var(--accent); }
+  .today-card{
+    padding:20px;
+    border-color:var(--border);
+    background:linear-gradient(145deg,var(--accent-soft) 0%,var(--surface) 66%);
+    box-shadow:0 10px 26px var(--shadow);
+  }
+  .today-heading{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .today-heading h3{ margin:2px 0 0; font-size:21px; letter-spacing:-.02em; }
+  .today-heading .eyebrow,
+  .home-section-head .eyebrow{ display:block; font-family:"Zen Kaku Gothic New",sans-serif; font-size:10px; font-weight:700; letter-spacing:.12em; color:var(--accent); }
+  .today-date{ color:var(--text-muted); font-size:12px; padding-top:4px; white-space:nowrap; }
+  .today-card .weeks{ margin:0; }
+  .today-card .week-card{ background:var(--surface); border-color:var(--border); padding:12px 14px 6px; border-radius:14px; }
+  .today-card .item-row{ padding-top:4px; }
+  .today-card .rest-banner{ background:var(--surface); border:1px solid var(--border); }
+  .today-card .next-run{ margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+  .today-card .next-run-label{ color:var(--accent); }
+  .todays-point{ background:var(--surface); border:1px solid var(--border); padding:11px 13px; }
+  .todays-point .tp-label{ color:var(--accent-strong); }
+  .home-section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; }
+  .home-section-head h3{ margin:0; font-size:16px; }
+  .this-week-card,.forecast-card{ padding:18px 20px; }
+  .this-week-card > h3,.forecast-card > h3{ display:none; }
+  .this-week-card{ gap:10px; }
+  .week-mini-item{ grid-template-columns:46px 1fr 22px; padding:9px 0; }
+  .week-mini-item.today{ margin:0 -6px; padding:9px 6px; background:var(--accent-soft); }
+  .week-progress-line{ margin-top:2px; }
+  .this-week-card .btn-secondary{ align-self:flex-start; padding:8px 0; border:none; background:transparent; color:var(--accent); }
+  .forecast-card{ background:var(--surface); }
+  .forecast-range{ padding-top:0; }
+  .home-coach-link{ justify-content:flex-start; margin:-6px 0 2px; }
+  .home-coach-link .btn-secondary{ padding:8px 0; border:none; background:transparent; color:var(--text-muted); font-size:12px; }
+  .home-coach-link .btn-secondary:hover{ color:var(--accent); }
+  @media (max-width:680px){
+    .home-quest{ grid-template-columns:minmax(0,1fr) auto; }
+    .home-quest .countdown{ order:initial; border:1px solid var(--border); padding:8px 10px; }
+    .home-quest .phase-side{ grid-column:1 / -1; }
+  }
+  @media (max-width:560px){
+    .home-dashboard{ gap:16px; }
+    .home-quest{ padding:2px 0 0; }
+    .home-quest .countdown{ min-width:72px; }
+    .home-quest .countdown .num{ font-size:23px; }
+    .today-card{ padding:18px 16px; }
+    .today-heading h3{ font-size:20px; }
+    .this-week-card,.forecast-card{ padding:16px; }
+  }
   .quest-card.empty{ grid-template-columns:1fr; }
   .quest-kicker{ font-family:"Zen Kaku Gothic New",sans-serif; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-faint); }
   .quest-newquest-btn{ white-space:nowrap; }
@@ -2420,7 +2500,7 @@
   function todayCardHTML(plan, today){
     const todayStr = toISO(today);
     const found = findItemByDate(plan, todayStr);
-    let html = '<div class="info-card today-card"><h3>TODAY</h3>';
+    let html = '<div class="info-card today-card"><div class="today-heading"><div><span class="eyebrow">TODAY</span><h3>今日のメニュー</h3></div><span class="today-date">'+fmtMD(today)+'（'+WEEKDAY_JA[today.getDay()]+'）</span></div>';
     if(found && found.it.type!=='rest'){
       html += '<div class="weeks"><div class="week-card">'+itemRowHTML(plan, found.wi, found.ii, found.it, today)+'</div></div>';
       const point = todaysPointFor(found.it, todayStr);
@@ -2438,7 +2518,7 @@
 
   function thisWeekCardHTML(plan, today){
     const cur = findCurrentWeek(plan, today);
-    let html = '<div class="info-card this-week-card"><h3>THIS WEEK</h3>';
+    let html = '<div class="info-card this-week-card"><div class="home-section-head"><div><span class="eyebrow">THIS WEEK</span><h3>今週の予定</h3></div></div>';
     if(!cur){
       const startDate = parseISO(plan.meta.startDate);
       html += '<div class="li-sub">'+(today<startDate ? 'プラン開始前です' : '今週の予定はありません')+'</div></div>';
@@ -2478,7 +2558,7 @@
 
   function forecastCardHTML(plan){
     const forecast = latestForecastFor(plan.id);
-    let html = '<div class="info-card forecast-card"><h3>RACE FORECAST</h3>';
+    let html = '<div class="info-card forecast-card"><div class="home-section-head"><div><span class="eyebrow">RACE FORECAST</span><h3>レース予測</h3></div></div>';
     if(!forecast){
       html += '<div class="li-sub">目標タイムまたは自己ベストの情報が不足しているため、まだ算出できません。</div></div>';
       return html;
@@ -2501,24 +2581,23 @@
   function homeHTML(){
     const plan = currentPlan();
     if(!plan){
-      return '<div class="hero quest-card empty">'
+      return '<main class="home-dashboard"><div class="hero quest-card home-quest empty">'
         + '<div class="hero-meta">'
         + '<div class="quest-kicker">CURRENT QUEST</div>'
         + '<div class="hero-race">まだクエストがありません</div>'
         + '<div class="hero-sub">レースを登録して、最初のトレーニングクエストを始めましょう</div>'
         + '<button type="button" class="btn-primary quest-newquest-btn" data-action="tab" data-tab="create">＋ 新しいクエストを作る</button>'
-        + '</div></div>';
+        + '</div></div></main>';
     }
     const today = todayLocal();
     const raceDate = parseISO(plan.meta.raceDate);
     const daysLeft = daysBetween(today, raceDate);
     let countdownNum, countdownLbl;
-    if(daysLeft>0){ countdownNum=daysLeft; countdownLbl='DAYS TO RACE'; }
-    else if(daysLeft===0){ countdownNum='0'; countdownLbl='RACE DAY'; }
-    else { countdownNum='+'+(-daysLeft); countdownLbl='DAYS SINCE RACE'; }
+    if(daysLeft>0){ countdownNum=daysLeft+'日'; countdownLbl='レースまで'; }
+    else if(daysLeft===0){ countdownNum='本日'; countdownLbl='RACE DAY'; }
+    else { countdownNum='+'+(-daysLeft)+'日'; countdownLbl='レース後'; }
 
-    let html = '<div class="hero quest-card">'
-      + '<div class="countdown"><div class="num mono">'+countdownNum+'</div><div class="lbl">'+countdownLbl+'</div></div>'
+    let quest = '<div class="hero quest-card home-quest">'
       + '<div class="hero-meta">'
       + '<div class="quest-kicker">CURRENT QUEST</div>'
       + '<div class="hero-race">'+escapeHtml(plan.meta.name)+'</div>'
@@ -2527,15 +2606,17 @@
       + '<div class="stat"><span class="k">目標タイム</span><span class="v">'+plan.meta.targetLabel+'</span></div>'
       + '<div class="stat"><span class="k">MPペース</span><span class="v">'+plan.meta.mpLabel+'</span></div>'
       + '</div></div>'
+      + '<div class="countdown"><div class="lbl">'+countdownLbl+'</div><div class="num mono">'+countdownNum+'</div></div>'
       + '<div class="phase-side"><button type="button" class="btn-secondary quest-newquest-btn" data-action="tab" data-tab="create">＋ NEW QUEST</button></div>'
       + '</div>';
 
-    html += forecastCardHTML(plan);
-
+    let html = '<main class="home-dashboard">';
     html += todayCardHTML(plan, today);
+    html += '<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div>';
+    html += quest;
     html += thisWeekCardHTML(plan, today);
-    html += '<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する</button></div>';
-    return html;
+    html += forecastCardHTML(plan);
+    return html+'</main>';
   }
 
   function coachTabHTML(){
