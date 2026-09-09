@@ -204,7 +204,11 @@
   .typing-dots span:nth-child(3){ animation-delay:0.3s; }
   @keyframes typing-bounce{ 0%,60%,100%{ transform:translateY(0); opacity:0.5; } 30%{ transform:translateY(-3px); opacity:1; } }
   .chat-input-row{ display:flex; gap:8px; align-items:flex-end; }
-  .chat-input-row textarea{ flex:1 1 auto; min-height:44px; max-height:120px; border-radius:20px; padding:10px 16px; }
+  /* rows=1指定 + line-heightの明示で、メッセージ入力欄が最初から縦長になりすぎないようにする
+     (ブラウザ間でtextareaの既定行間・既定行数の扱いが異なり、指定しないと特に一部のスマホの
+     ブラウザで初期状態から数行分の高さになってしまうことがあるため)。
+     複数行の入力自体はresize:vertical(.adjust-card textarea)で可能なまま、伸びすぎないようmax-heightは抑える */
+  .chat-input-row textarea{ flex:1 1 auto; min-height:40px; max-height:84px; border-radius:20px; padding:9px 16px; line-height:1.35; }
   .chat-send-btn{ flex:0 0 auto; padding:11px 22px; }
   .chat-cancel-btn{ flex:0 0 auto; padding:11px 16px; font-size:12px; }
   .history-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
@@ -296,10 +300,14 @@
   .field input:focus-visible, .field select:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
   .field.err input{ border-color:var(--mp); }
   .field .errmsg{ font-size:11.5px; color:var(--mp); min-height:14px; }
-  .time-picker{ display:flex; align-items:center; gap:6px; }
-  .time-picker select{ border:1px solid var(--border); background:var(--bg); color:var(--text); border-radius:10px; padding:10px 6px; font-size:16px; text-align:center; flex:1 1 auto; min-width:0; }
-  .time-picker .sep{ color:var(--text-faint); font-weight:600; flex:0 0 auto; white-space:nowrap; }
-  .time-picker .unit{ font-size:12px; color:var(--text-faint); flex:0 0 auto; white-space:nowrap; }
+  /* 時間/分/秒等のselectと単位ラベル(分・秒/km等)を横並びにする共通コンポーネント。
+     line-heightを明示しているのは、指定しない場合ブラウザ(特にiOS Safariのネイティブselect)ごとに
+     既定のline-heightが異なり、align-items:centerで揃えていても隣の単位ラベルとわずかに
+     ズレて見えることがあるため。selectとunitで同じline-height/font設定を揃えて崩れを防ぐ */
+  .time-picker{ display:flex; align-items:center; gap:8px; }
+  .time-picker select{ border:1px solid var(--border); background:var(--bg); color:var(--text); border-radius:10px; padding:11px 6px; font-size:16px; line-height:1.2; text-align:center; flex:1 1 auto; min-width:0; vertical-align:middle; }
+  .time-picker .sep{ color:var(--text-faint); font-weight:600; flex:0 0 auto; white-space:nowrap; line-height:1.2; }
+  .time-picker .unit{ font-size:12px; color:var(--text-faint); flex:0 0 auto; white-space:nowrap; line-height:1.2; align-self:center; }
   .time-picker.num-picker select{ flex:1 1 0; }
   .switch-row{ display:flex; align-items:center; gap:10px; grid-column:1/-1; padding-top:4px; }
   .switch-row label{ font-size:13px; color:var(--text); }
@@ -391,6 +399,13 @@
   .inline-form{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border); }
   .inline-form .field{ flex:1 1 140px; min-width:120px; }
   .inline-form .btn-primary{ padding:10px 20px; }
+  /* 自己ベストの「タイム」欄(時間/分/秒の3つのselectを含む)は、他の項目(種目セレクト等)と
+     横並びで幅を分け合うと1つ1つが極端に狭くなり操作しづらいため、常に単独の行いっぱいに
+     広げる。送信ボタンもその下の行に幅いっぱいで置き、タップしやすくする(モバイル優先) */
+  .inline-form .field-full{ flex:1 1 100%; min-width:0; }
+  .inline-form .btn-block{ flex:1 1 100%; width:100%; }
+  .inline-form .field-full .time-picker{ gap:8px; }
+  .inline-form .field-full .time-picker select{ padding:12px 6px; font-size:17px; }
   .shoe-row-actions{ display:flex; align-items:center; gap:10px; flex:0 0 auto; }
   .shoe-status-badge{ font-size:10px; font-weight:700; letter-spacing:0.04em; padding:2px 8px; border-radius:999px; background:var(--easy-soft); color:var(--easy); }
   .shoe-status-badge.retired{ background:var(--surface-2); color:var(--text-faint); }
@@ -1776,8 +1791,8 @@
     html += '</div>';
     html += '<form id="pb-form" class="inline-form">'
       + '<div class="field"><label>種目</label><select name="distanceKm">'+PB_DISTANCES.map(function(d){ return '<option value="'+d.km+'">'+d.label+'</option>'; }).join('')+'</select></div>'
-      + '<div class="field"><label>タイム</label>'+timePickerHTML('pbnew',0,0,0)+'</div>'
-      + '<button type="submit" class="btn-primary">追加</button>'
+      + '<div class="field field-full"><label>タイム</label>'+timePickerHTML('pbnew',0,0,0)+'</div>'
+      + '<button type="submit" class="btn-primary btn-block">追加</button>'
       + '</form>';
     html += '</div>';
     return html;
@@ -1807,7 +1822,7 @@
           + '</div></div>';
         if(editing){
           row += '<form class="inline-form shoe-edit-form" data-id="'+s.id+'">'
-            + '<div class="field"><label>ブランド(任意)</label><input type="text" name="brand" value="'+esc(s.brand||'')+'"></div>'
+            + '<div class="field"><label>ブランド・色など(任意)</label><input type="text" name="brand" value="'+esc(s.brand||'')+'"></div>'
             + '<div class="field"><label>使用開始日(任意)</label><input type="date" name="startDate" value="'+esc(s.startDate||'')+'"></div>'
             + '<div class="field"><label>メモ(任意)</label><input type="text" name="note" placeholder="例: レース本番用" value="'+esc(s.note||'')+'"></div>'
             + '<div class="switch-row"><label><input type="checkbox" name="active" '+(isActive?'checked':'')+'> 現役で使用中</label></div>'
@@ -1822,7 +1837,7 @@
     if(state.shoeFormOpen){
       html += '<form id="shoe-form" class="inline-form">'
         + '<div class="field"><label>シューズ名</label><input type="text" name="name" placeholder="例: ペガサス41" required></div>'
-        + '<div class="field"><label>ブランド(任意)</label><input type="text" name="brand" placeholder="例: ナイキ"></div>'
+        + '<div class="field"><label>ブランド・色など(任意)</label><input type="text" name="brand" placeholder="例: ナイキ"></div>'
         + '<div class="field"><label>使用開始日(任意)</label><input type="date" name="startDate" value="'+todayISO()+'"></div>'
         + '<button type="submit" class="btn-primary">追加</button>'
         + '</form>';
@@ -2526,13 +2541,13 @@
   function coachTabHTML(){
     const plan = currentPlan();
     if(!plan){
-      return '<div class="info-card">まだクエストがありません。「ホーム」から「＋ NEW QUEST」でクエストを作成すると、AIコーチに相談できるようになります。</div>';
+      return '<div class="info-card">まだクエストがありません。「ホーム」から「＋ NEW QUEST」でクエストを作成すると、コーチに相談できるようになります。</div>';
     }
     // state.adjust.hiddenは、Claude Artifact上でsample capability自体が使えない場合のみtrueになる
     // (boot()参照)。それ以外(OpenAIProvider経由)の場合はコーチタブを常に表示し、
     // 個々のリクエストが失敗した場合はチャット内のエラー吹き出しで案内する
     if(state.adjust.hidden){
-      return '<div class="info-card"><h3>AIコーチ</h3><div class="li-sub">この環境ではAIコーチ機能は利用できません。</div></div>';
+      return '<div class="info-card"><h3>コーチ</h3><div class="li-sub">この環境ではコーチ機能は利用できません。</div></div>';
     }
     return coachChatHTML();
   }
@@ -2546,8 +2561,8 @@
   function coachChatHTML(){
     const a = state.adjust, c = state.coach;
     let html = '<div class="info-card adjust-card coach-chat-card">';
-    html += '<h3>AIコーチ</h3>';
-    html += '<div class="lede">「10/25にファンランがあるので調整して」のような依頼にも、「30km走はどこかに入れた方がいい?」のような相談にも、続けてチャット形式で答えます。スケジュールを変える場合は、リスクと代替案を提示してから、選んだ案だけを反映します。</div>';
+    html += '<h3>コーチ</h3>';
+    html += '<div class="lede">プランや体調について、何でも相談できます。</div>';
 
     html += '<div class="chat-thread" id="coach-thread">';
     if(c.loading && !c.messages.length){
@@ -2568,7 +2583,7 @@
     html += '</div>';
 
     html += '<form id="adjust-form" class="chat-input-row">';
-    html += '<textarea id="adjust-input" placeholder="コーチに相談・依頼する" '+(a.busy?'disabled':'')+'>'+escapeHtml(a.draft||'')+'</textarea>';
+    html += '<textarea id="adjust-input" rows="1" placeholder="コーチに相談・依頼する" '+(a.busy?'disabled':'')+'>'+escapeHtml(a.draft||'')+'</textarea>';
     if(a.busy){
       html += '<button type="button" class="btn-secondary chat-cancel-btn" data-action="cancel-adjust">キャンセル</button>';
     } else {
