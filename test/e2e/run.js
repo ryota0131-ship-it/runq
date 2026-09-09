@@ -75,6 +75,12 @@ function seedPlan() {
   const profile = {
     pbs: [{ label: '10km', timeLabel: '40:00' }],
     shoes: [{ id: 'shoe1', name: 'E2Eテストシューズ', brand: 'TestBrand', active: true }],
+    weeklyRunDays: 3,
+    availableWeekdays: ['3', '6', '0'],
+    longestRunManualKm: 12,
+    injuryNote: '',
+    constitutionNote: '',
+    scheduleNote: '',
   };
   return { plan, profile };
 }
@@ -316,6 +322,14 @@ async function main() {
     {
       const context = await browser.newContext();
       const page = await context.newPage();
+      // 新規プラン作成フォーム(#gen-form)は、ランニングプロフィール(週の回数・曜日・
+      // 最長ロング走)が設定済み(profileTrainingReady())でないと表示されず、代わりに
+      // 「先にランニングプロフィールを設定してください」という別画面になる。
+      // このシナリオはプラン作成そのものを検証するため、事前にプロフィールを投入しておく
+      const { profile: seededProfile } = seedPlan();
+      await context.addInitScript((profile) => {
+        localStorage.setItem('paceplan.profile', JSON.stringify(profile));
+      }, seededProfile);
       await page.goto(baseUrl + '/', { waitUntil: 'load' });
       await page.waitForTimeout(300);
 
