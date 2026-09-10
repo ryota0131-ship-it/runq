@@ -63,6 +63,17 @@ function imageInfo(dataUrl) {
   return { type: match[1], bytes };
 }
 
+// モデルやアプリごとの表記ゆれ(7:05/km、7'05"、7分05秒など)を既存ログの m:ss 形式に揃える。
+function normalizePace(value) {
+  if (value == null || value === '') return null;
+  const text = String(value).replace(/：/g, ':').replace(/′|’/g, "'");
+  const match = text.match(/(\d{1,2})\s*(?::|分|m|')\s*(\d{1,2})/i);
+  if (!match) return null;
+  const minutes = Number(match[1]), seconds = Number(match[2]);
+  if (!Number.isInteger(minutes) || !Number.isInteger(seconds) || minutes < 1 || minutes > 30 || seconds > 59) return null;
+  return String(minutes) + ':' + String(seconds).padStart(2, '0');
+}
+
 function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
   return new Promise((resolve, reject) => {
@@ -111,10 +122,12 @@ async function handler(req, res, opts) {
   try { parsed = JSON.parse(extractOutputText(await openaiRes.json())); }
   catch (_) { return res.status(502).json({ error: 'invalid_json' }); }
   if (!parsed || typeof parsed !== 'object') return res.status(502).json({ error: 'invalid_json' });
+  parsed.avgPace = normalizePace(parsed.avgPace);
   return res.status(200).json(parsed);
 }
 
 module.exports = handler;
 module.exports.handler = handler;
 module.exports.imageInfo = imageInfo;
+module.exports.normalizePace = normalizePace;
 module.exports.MAX_IMAGE_BYTES = MAX_IMAGE_BYTES;

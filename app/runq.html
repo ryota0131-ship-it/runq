@@ -689,8 +689,9 @@
   }
   function pacePickerHTML(currentPaceLabel){
     let m = '', s = 0;
-    if(currentPaceLabel){
-      const parts = String(currentPaceLabel).split(':').map(Number);
+    const normalized = normalizePaceLabel(currentPaceLabel);
+    if(normalized){
+      const parts = normalized.split(':').map(Number);
       if(parts.length===2 && !parts.some(isNaN)){
         m = parts[0];
         s = Math.round(parts[1]/5)*5;
@@ -705,6 +706,16 @@
       + plainSelectHTML('avgPaceS', rangeArray(0,55,5), s, function(v){ return pad(v); })
       + '<span class="unit">/km</span>'
       + '</div>';
+  }
+  // 画像解析・手入力で生じる単位つきペース表記を、ログの共通形式 m:ss に揃える。
+  function normalizePaceLabel(value){
+    if(value==null || value==='') return null;
+    const text = String(value).replace(/：/g,':').replace(/[′’]/g,"'");
+    const match = text.match(/(\d{1,2})\s*(?::|分|m|')\s*(\d{1,2})/i);
+    if(!match) return null;
+    const minutes=Number(match[1]), seconds=Number(match[2]);
+    if(!Number.isInteger(minutes) || !Number.isInteger(seconds) || minutes<1 || minutes>30 || seconds>59) return null;
+    return minutes+':'+pad(seconds);
   }
   function durationPickerHTML(currentMin){
     const num = (currentMin!=null && currentMin!=='' && !isNaN(Number(currentMin))) ? Number(currentMin) : null;
@@ -3501,7 +3512,7 @@
       const prevValues = state.logForm.values || {};
       state.logForm.values = {
         distanceKm: (result.distanceKm!=null) ? result.distanceKm : prevValues.distanceKm,
-        avgPace: (result.avgPace!=null) ? result.avgPace : prevValues.avgPace,
+        avgPace: normalizePaceLabel(result.avgPace) || prevValues.avgPace,
         avgHr: (result.avgHr!=null) ? result.avgHr : prevValues.avgHr,
         durationMin: (result.durationMin!=null) ? result.durationMin : prevValues.durationMin,
         calories: (result.calories!=null) ? result.calories : prevValues.calories,

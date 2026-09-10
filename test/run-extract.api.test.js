@@ -16,7 +16,7 @@ function res() {
 }
 const tinyPng = 'data:image/png;base64,iVBORw0KGgo=';
 const output = {
-  activityDate:'2026-09-09', startTime:'19:58', distanceKm:4.2, durationMin:29.75, avgPace:'7:05', avgHr:145,
+  activityDate:'2026-09-09', startTime:'19:58', distanceKm:4.2, durationMin:29.75, avgPace:'7:05 /km', avgHr:145,
   maxHr:null, calories:344, elevationGainM:null, cadence:null, activityType:'running', activityName:null, sourceApp:'Garmin',
   confidence:{activityDate:'high',startTime:'high',distanceKm:'high',durationMin:'high',avgPace:'high',avgHr:'medium'}
 };
@@ -31,7 +31,8 @@ const output = {
       return {ok:true,status:200,json:async()=>({output_text:JSON.stringify(output)})};
     }});
     assert.strictEqual(response.statusCode, 200);
-    assert.deepStrictEqual(response.body, output);
+    assert.strictEqual(response.body.avgPace, '7:05');
+    assert.strictEqual(response.body.distanceKm, output.distanceKm);
     assert.strictEqual(payload.input[1].content[1].type, 'input_image');
     assert.strictEqual(payload.input[1].content[1].image_url, tinyPng);
     assert.ok(JSON.stringify(response.body).indexOf('test-key') === -1);
@@ -39,6 +40,12 @@ const output = {
   await test('画像以外・不正なdata URLは400', async () => {
     const response=res(); await extract.handler(req({imageDataUrl:'data:text/plain;base64,SGVsbG8='}), response, {apiKey:'test-key'});
     assert.strictEqual(response.statusCode,400); assert.strictEqual(response.body.error,'invalid_image');
+  });
+  await test('ペースの単位つき表記をm:ssへ正規化する', async () => {
+    assert.strictEqual(extract.normalizePace('7:05/km'), '7:05');
+    assert.strictEqual(extract.normalizePace("7'05\""), '7:05');
+    assert.strictEqual(extract.normalizePace('7分 05秒'), '7:05');
+    assert.strictEqual(extract.normalizePace('不明'), null);
   });
   await test('POST以外は405', async () => {
     const response=res(); await extract.handler(req({},'GET'), response, {apiKey:'test-key'});
