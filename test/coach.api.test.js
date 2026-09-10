@@ -42,6 +42,7 @@ function makeRes() {
     body: null,
     status(code) { res.statusCode = code; return res; },
     json(payload) { res.body = payload; return res; },
+    end() { res.ended = true; return res; },
   };
   return res;
 }
@@ -185,6 +186,27 @@ async function main() {
     });
     assert.strictEqual(res.statusCode, 502);
     assert.strictEqual(res.body.error, 'invalid_json');
+  });
+
+  await test('コードフェンス付きのJSON応答もコーチ応答として読み取る', async () => {
+    const req = makeReq({ prompt: 'こんにちは' });
+    const res = makeRes();
+    await coach.handler(req, res, {
+      apiKey: 'test-key',
+      fetchImpl: fakeOpenAIFetch({ outputText: '```json\n{"mode":"advice","summary":"水分補給を意識しましょう"}\n```' }),
+    });
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(res.body.mode, 'advice');
+  });
+
+  await test('Capacitor向けのCORSプリフライトを受け付ける', async () => {
+    const req = makeReq(undefined, 'OPTIONS');
+    const res = makeRes();
+    const headers = {};
+    res.setHeader = (name, value) => { headers[name] = value; };
+    await coach.handler(req, res, { apiKey: 'test-key' });
+    assert.strictEqual(res.statusCode, 204);
+    assert.strictEqual(headers['Access-Control-Allow-Origin'], '*');
   });
 
   await test('OPENAI_MODELが未指定の場合、DEFAULT_MODELが実際にOpenAIへ渡るリクエストに使われる', async () => {

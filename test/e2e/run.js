@@ -321,7 +321,37 @@ async function main() {
       await context.close();
     }
 
-    console.log('=== scenario 3: iOS HealthKit取り込み ===');
+    console.log('=== scenario 3: Capacitor版AI Coach ===');
+    {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      const { plan, profile } = seedPlan();
+      await context.addInitScript(({ plan, profile }) => {
+        localStorage.setItem('paceplan.plans', JSON.stringify([plan]));
+        localStorage.setItem('paceplan.profile', JSON.stringify(profile));
+        window.Capacitor = { isNativePlatform: () => true, Plugins: {} };
+      }, { plan, profile });
+      let nativeApiHit = false;
+      await page.route('https://runq-umber.vercel.app/api/coach', async (route) => {
+        nativeApiHit = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' },
+          body: JSON.stringify({ mode: 'advice', summary: 'iPhoneアプリ経由の応答です', risk: null }),
+        });
+      });
+      await page.goto(baseUrl + '/', { waitUntil: 'load' });
+      await page.locator('.bottom-nav *').filter({ hasText: 'コーチ' }).first().click({ force: true });
+      await page.locator('#adjust-input').fill('iPhoneから相談です');
+      await page.locator('.chat-send-btn').click();
+      await page.waitForTimeout(300);
+      const nativeThreadText = await page.locator('#coach-thread').innerText();
+      check('[Capacitor] コーチAPIはVercel本番URLへ送信する', nativeApiHit && nativeThreadText.includes('iPhoneアプリ経由の応答です'));
+      await context.close();
+    }
+
+    console.log('=== scenario 4: iOS HealthKit取り込み ===');
     {
       const context = await browser.newContext();
       const page = await context.newPage();
@@ -360,7 +390,7 @@ async function main() {
       await context.close();
     }
 
-    console.log('=== scenario 4: プラン週境界(月曜始まり) ===');
+    console.log('=== scenario 5: プラン週境界(月曜始まり) ===');
     {
       const context = await browser.newContext();
       const page = await context.newPage();

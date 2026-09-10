@@ -1940,6 +1940,18 @@
     if(capacitor.Plugins && capacitor.Plugins.Health) return capacitor.Plugins.Health;
     return typeof capacitor.registerPlugin==='function' ? capacitor.registerPlugin('Health') : null;
   }
+
+  // Capacitor版は端末内の https://localhost で画面を開くため、相対URLのままでは
+  // VercelのServerless Functionへ届かない。公開APIのURLだけをここに集約し、
+  // Web/Vercel版では従来どおり同一オリジンの相対URLを使う。
+  const RUNQ_NATIVE_API_ORIGIN = 'https://runq-umber.vercel.app';
+  function isNativeRuntime(){
+    const capacitor = window.Capacitor;
+    return !!(capacitor && capacitor.isNativePlatform && capacitor.isNativePlatform());
+  }
+  function apiEndpoint(path){
+    return isNativeRuntime() ? RUNQ_NATIVE_API_ORIGIN+path : path;
+  }
   function healthConnectionKey(platform){ return platform==='ios' ? 'appleHealth' : 'healthConnect'; }
   async function heartRateForWorkout(plugin, workout){
     try{
@@ -3166,7 +3178,7 @@
       opts = opts || {};
       let httpRes;
       try{
-        httpRes = await fetch('/api/coach', {
+        httpRes = await fetch(apiEndpoint('/api/coach'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: prompt, modelTier: opts.modelTier || 'default' }),
@@ -3352,7 +3364,7 @@
   function adjustErrorMessage(code){
     switch(code){
       case 'rate_limited': return 'しばらく時間をおいて、もう一度お試しください';
-      case 'invalid_json': return 'うまく解釈できませんでした。内容を具体的にして再度お試しください';
+      case 'invalid_json': return 'コーチの応答を読み取れませんでした。もう一度お試しください';
       case 'refused': return 'この内容には対応できませんでした。別の言い方でお試しください';
       case 'prompt_too_large': return 'プランが大きすぎて調整できませんでした';
       case 'empty_completion': return '応答が得られませんでした。もう一度お試しください';
@@ -3774,7 +3786,7 @@
     const imageDataUrl = await compactImageForExtraction(file);
     let response;
     try{
-      response = await fetch('/api/run-extract', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({imageDataUrl:imageDataUrl}) });
+      response = await fetch(apiEndpoint('/api/run-extract'), { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({imageDataUrl:imageDataUrl}) });
     }catch(e){ throw {code:'extract_unavailable'}; }
     let body={}; try{ body=await response.json(); }catch(e){}
     if(!response.ok) throw {code:(body&&body.error)||'extract_unavailable'};
@@ -3836,7 +3848,7 @@
     const fld = (name,label,type,extra,hint)=>{
       return '<div class="field'+(err[name]?' err':'')+'">'
         +'<label for="f_'+name+'">'+label+'</label>'
-        +'<input id="f_'+name+'" name="'+name+'" type="'+type+'" '+(extra||'')+'>'
+        +'<input id="f_'+name+'" name="'+name+'" type="'+type+'" '+(type==='date'?'lang="ja-JP" ':'')+(extra||'')+'>'
         +(hint?'<span class="hint">'+hint+'</span>':'')
         +'<span class="errmsg">'+(err[name]||'')+'</span>'
         +'</div>';

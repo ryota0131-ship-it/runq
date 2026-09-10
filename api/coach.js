@@ -97,6 +97,33 @@ function extractOutputText(data) {
   return '';
 }
 
+// JSON Schemaを指定しても、モデルや中継の表記ゆれでコードフェンスが付くことがある。
+// JSON本体だけを安全に取り出し、通常のJSON応答と同じ形へ正規化する。
+function parseCoachPayload(text) {
+  if (typeof text !== 'string') return null;
+  const raw = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const candidates = [raw];
+  const first = raw.indexOf('{');
+  const last = raw.lastIndexOf('}');
+  if (first >= 0 && last > first) candidates.push(raw.slice(first, last + 1));
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (_) { /* try the next normalized form */ }
+  }
+  return null;
+}
+
+function setCorsHeaders(res) {
+  if (typeof res.setHeader !== 'function') return;
+  // 認証Cookieは使わず、APIキーもサーバー側だけに置くV1のため、Capacitor WebViewからの
+  // POSTを許可する。公開APIの濫用対策は本格公開時に認証・レート制限で扱う。
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 /**
  * リクエストボディを読み取る。Vercelのランタイムは通常req.bodyへ既にJSONをパース済みで渡すが、
  * それ以外(このリポジトリのローカルdev-server.js等)でも動くよう、素のNode.js IncomingMessageからの
@@ -161,6 +188,11 @@ async function callOpenAI({ apiKey, model, prompt, fetchImpl }) {
  */
 async function handler(req, res, opts) {
   opts = opts || {};
+  setCorsHeaders(res);
+  if (req.method === 'OPTIONS') {
+    if (typeof res.status === 'function') return res.status(204).end();
+    return;
+  }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'method_not_allowed' });
     return;
@@ -219,13 +251,7 @@ async function handler(req, res, opts) {
   }
 
   const text = extractOutputText(data);
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (e) {
-    res.status(502).json({ error: 'invalid_json' });
-    return;
-  }
+  const parsed = parseCoachPayload(text);
   if (!parsed || typeof parsed !== 'object' || !parsed.mode) {
     res.status(502).json({ error: 'invalid_json' });
     return;
@@ -237,5 +263,6 @@ async function handler(req, res, opts) {
 module.exports = handler;
 module.exports.handler = handler;
 module.exports.extractOutputText = extractOutputText;
+module.exports.parseCoachPayload = parseCoachPayload;
 module.exports.DEFAULT_MODEL = DEFAULT_MODEL;
 module.exports.RESPONSE_SCHEMA = RESPONSE_SCHEMA;

@@ -136,7 +136,8 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
         └─ OpenAIProvider          … 上記が使えない場合(ローカル起動・Vercel等)はこちら
                 │                     ブラウザから直接OpenAIは呼ばない。必ずサーバー側 /api/coach を経由する
                 ▼
-           fetch('/api/coach', { prompt, modelTier })
+           Web: fetch('/api/coach', { prompt, modelTier })
+           Capacitor: fetch('https://runq-umber.vercel.app/api/coach', { prompt, modelTier })
                 │
                 ▼
            runQ Backend: api/coach.js (Vercel Serverless Function / ローカルはdev-server.jsが橋渡し)
@@ -160,7 +161,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 `app/runq.html`内、`planContextLines()`の直前に配置。主要なオブジェクト:
 
 - `ClaudeArtifactProvider` — `sampleFn.json(prompt, opts)`をそのままラップ。
-- `OpenAIProvider` — `fetch('/api/coach', {method:'POST', body:{prompt, modelTier}})`。ネットワークエラー・非200・不正JSONをそれぞれ`{code:'coach_unreachable'|'rate_limited'|'invalid_json'|'cancelled'}`という例外に正規化し、呼び出し元(`runAdjust`/`runLogFeedback`)の既存のcatch節・`adjustErrorMessage(code)`にそのまま渡せるようにしている。
+- `OpenAIProvider` — Web/Vercelでは`fetch('/api/coach', {method:'POST', body:{prompt, modelTier}})`、Capacitorでは`RUNQ_NATIVE_API_ORIGIN`（現在のVercel本番URL）を先頭に付けたHTTPS URLを呼ぶ。Vercel FunctionsはCapacitor WebViewからのJSON POST/OPTIONSにCORS応答する。ネットワークエラー・非200・不正JSONをそれぞれ`{code:'coach_unreachable'|'rate_limited'|'invalid_json'|'cancelled'}`という例外に正規化し、呼び出し元(`runAdjust`/`runLogFeedback`)の既存のcatch節・`adjustErrorMessage(code)`にそのまま渡せるようにしている。
 - `selectCoachProvider()` — 上記2つからどちらを使うか決定する唯一の箇所。
 - `CoachService.request(prompt, opts)` — UI側の唯一の呼び出し口。
 
@@ -179,7 +180,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 
 ### 4.3 Capacitor化を見据えた設計
 
-- APIキーはCapacitorアプリ内にも一切埋め込まない。アプリは常にHTTPS経由で`/api/coach`(または将来`RUNQ_API_BASE_URL`のような設定でホスト先を切り替え)を呼ぶ想定。
+- APIキーはCapacitorアプリ内にも一切埋め込まない。Web/Vercelは同一オリジンの`/api/coach`を、CapacitorアプリはHTTPSの`RUNQ_NATIVE_API_ORIGIN`を経由してVercel Functionを呼ぶ。公開URLは秘密情報ではないが、Vercelの本番ドメインを変更する際はこの定数も更新する。
 - `api/run-extract.js`はOpenAI Responses APIの画像入力を使い、Garmin等のスクリーンショットから構造化した走行実績を抽出する。画像はブラウザ側で最大辺2048px・JPEGに縮小した後、リクエスト中だけVercel/OpenAIへ渡す。runQ.のStorage・Vercel Blobには保存しない。
 - 受け付ける形式はJPEG/PNG/WebP、解析用画像は3MB以下。Vercel Functionのリクエスト本文上限に余裕を持たせるためであり、超過時は端末側で再縮小してから送信する。
 - 現在は認証機構を持たないV1のため、公開Vercel URLでのAPIコスト濫用を完全には防げない。本格公開前に認証と共有レート制限を導入するまで、Vercel Firewall等で公開範囲を制限する。

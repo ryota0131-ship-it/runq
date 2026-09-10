@@ -55,6 +55,13 @@ function extractOutputText(data) {
   return '';
 }
 
+function setCorsHeaders(res) {
+  if (typeof res.setHeader !== 'function') return;
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 function imageInfo(dataUrl) {
   if (typeof dataUrl !== 'string') return null;
   const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
@@ -90,6 +97,11 @@ function readJsonBody(req) {
 
 async function handler(req, res, opts) {
   opts = opts || {};
+  setCorsHeaders(res);
+  if (req.method === 'OPTIONS') {
+    if (typeof res.status === 'function') return res.status(204).end();
+    return;
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
   let body;
   try { body = await readJsonBody(req); }
