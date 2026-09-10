@@ -1676,6 +1676,8 @@
     completed: {},
     logs: {},
     workouts: [],
+    healthSyncBusy: false,
+    healthImportNotice: null,
     formError: {},
     adjust: { busy:false, error:null, draft:'', hidden:false, startedAt:null, streamPreview:null },
     // AIコーチのチャットスレッド(Phase7)。messagesは{role, kind, text, ...}の配列。
@@ -1915,6 +1917,106 @@
     };
   }
 
+  /* Native Health adapter -------------------------------------------------
+     CapacitorのHealthプラグインだけをこの境界で扱い、画面側へは共通Workout
+     しか返さない。Web/Vercelではwindow.Capacitorが無いため常に安全に失敗する。 */
+  function nativeHealthPlugin(){
+    const capacitor = window.Capacitor;
+    if(!capacitor || !capacitor.isNativePlatform || !capacitor.isNativePlatform()) return null;
+    if(capacitor.Plugins && capacitor.Plugins.Health) return capacitor.Plugins.Health;
+    return typeof capacitor.registerPlugin==='function' ? capacitor.registerPlugin('Health') : null;
+  }
+  function healthConnectionKey(platform){ return platform==='ios' ? 'appleHealth' : 'healthConnect'; }
+  async function heartRateForWorkout(plugin, workout){
+    try{
+      const result = await plugin.readSamples({ dataType:'heartRate', startDate:workout.startDate, endDate:workout.endDate, limit:1000, ascending:true });
+      const values = (result.samples||[]).map(function(sample){ return Number(sample.value); }).filter(function(value){ return value>0; });
+      if(!values.length) return { average:null, max:null };
+      return { average:Math.round(values.reduce(function(total, value){ return total+value; },0)/values.length), max:Math.round(Math.max.apply(null,values)) };
+    }catch(e){ return { average:null, max:null }; }
+  }
+  async function healthWorkoutToRunq(plugin, workout, platform){
+    const heartRate = await heartRateForWorkout(plugin, workout);
+    return {
+      started_at: workout.startDate,
+      ended_at: workout.endDate,
+      duration_seconds: workout.duration,
+      distance_meters: workout.totalDistance,
+      average_heart_rate: heartRate.average,
+      max_heart_rate: heartRate.max,
+      calories: workout.totalEnergyBurned,
+      source: platform==='ios' ? 'apple_health' : 'health_connect',
+      source_workout_id: workout.platformId || [workout.sourceId||'native', workout.startDate, workout.endDate].join(':'),
+      source_device: workout.sourceName || workout.sourceId || null
+    };
+  }
+  async function reflectImportedWorkout(workout){
+    if(!state.profile.healthConnections || state.profile.healthConnections.autoImport===false) return false;
+    if(workout.plan_id!==state.currentId || !workout.scheduled_item_date || !workout.scheduled_item_ref) return false;
+    const existing = state.logs[workout.scheduled_item_date];
+    // ユーザーが自分で入力・修正した記録は、端末連携で上書きしない。
+    if(existing && existing.source!=='apple_health' && existing.source!=='health_connect') return false;
+    const items = workout.scheduled_item_ref.match(/:w(\d+)-i(\d+)$/);
+    const entries = Object.assign({}, state.logs);
+    entries[workout.scheduled_item_date] = Object.assign({}, existing||{}, {
+      distanceKm: workout.distance_meters ? Number((workout.distance_meters/1000).toFixed(2)) : null,
+      avgPace: workout.average_pace_seconds_per_km ? paceSecToLabel(workout.average_pace_seconds_per_km) : null,
+      avgHr: workout.average_heart_rate || null,
+      durationMin: workout.duration_seconds ? Number((workout.duration_seconds/60).toFixed(1)) : null,
+      calories: workout.calories || null,
+      source: workout.source,
+      sourceWorkoutId: workout.source_workout_id,
+      imageImport: null,
+      loggedAt: workout.imported_at
+    });
+    state.logs = entries;
+    await Store.setLogs(state.currentId, entries);
+    if(items){
+      state.completed['w'+items[1]+'-'+items[2]] = true;
+      await Store.setProgress(state.currentId, state.completed);
+    }
+    return true;
+  }
+  async function syncHealthWorkouts(requestedPlatform){
+    const plugin = nativeHealthPlugin();
+    if(!plugin) throw new Error('native_only');
+    const availability = await plugin.isAvailable();
+    if(!availability || !availability.available) throw new Error('unavailable');
+    const platform = availability.platform;
+    const connectionKey = healthConnectionKey(platform);
+    if(requestedPlatform && requestedPlatform!==connectionKey) throw new Error('wrong_platform');
+    const permission = await plugin.requestAuthorization({ read:['workouts','heartRate','distance','calories'], write:[], requestHistoryAccess:true });
+    if((permission.readDenied||[]).indexOf('workouts')>=0) throw new Error('permission_denied');
+    const endDate = new Date().toISOString();
+    const startDate = new Date(Date.now()-90*86400000).toISOString();
+    let anchor = null, imported = 0, matched = 0, pages = 0;
+    do {
+      const result = await plugin.queryWorkouts({ workoutType:'running', startDate:startDate, endDate:endDate, limit:100, ascending:false, anchor:anchor||undefined });
+      const workouts = result.workouts || [];
+      for(const nativeWorkout of workouts){
+        const saved = await upsertWorkout(await healthWorkoutToRunq(plugin, nativeWorkout, platform));
+        imported++;
+        if(await reflectImportedWorkout(saved)) matched++;
+      }
+      anchor = result.anchor || null;
+      pages++;
+    } while(anchor && pages<20);
+    const connections = state.profile.healthConnections||{};
+    connections[connectionKey] = Object.assign({}, connections[connectionKey]||{}, {enabled:true,lastSyncedAt:new Date().toISOString()});
+    state.profile.healthConnections = connections;
+    await Store.setProfile(state.profile);
+    state.healthImportNotice = imported ? { count:imported, matched:matched } : null;
+    return { imported:imported, matched:matched, connectionKey:connectionKey };
+  }
+  function healthErrorMessage(error){
+    const code = error && error.message;
+    if(code==='native_only') return 'ヘルスケア連携はRUNQ.のiPhone／Androidアプリで利用できます';
+    if(code==='unavailable') return 'この端末ではヘルスケア連携を利用できません';
+    if(code==='wrong_platform') return 'この端末では選択したデータ連携を利用できません';
+    if(code==='permission_denied') return 'ヘルスケアへのアクセスが許可されていません。端末の設定から変更してください';
+    return '同期できませんでした。権限と端末のヘルスケア設定を確認してください';
+  }
+
   // シューズ累計距離に加え、マイページのRUNNER PROFILEサマリーに使う「最長RUN」も同じログ走査で
   // まとめて算出する(全プラン横断で記録された1回の走行距離の最大値。新規の永続化は行わず毎回計算)
   async function refreshShoeMileage(){
@@ -2021,10 +2123,11 @@
     };
     const row=function(label,data,platform){
       const enabled=!!(data&&data.enabled);
-      const action=enabled ? '<button type="button" class="btn-secondary" data-action="health-sync" data-platform="'+platform+'">同期する</button><button type="button" class="li-remove" data-action="health-disconnect" data-platform="'+platform+'">連携解除</button>' : '<button type="button" class="btn-secondary" data-action="health-connect" data-platform="'+platform+'">連携する</button>';
+      const busy=state.healthSyncBusy;
+      const action=enabled ? '<button type="button" class="btn-secondary" data-action="health-sync" data-platform="'+platform+'" '+(busy?'disabled':'')+'>'+ (busy?'同期中…':'同期する') +'</button><button type="button" class="li-remove" data-action="health-disconnect" data-platform="'+platform+'" '+(busy?'disabled':'')+'>連携解除</button>' : '<button type="button" class="btn-secondary" data-action="health-connect" data-platform="'+platform+'" '+(busy?'disabled':'')+'>'+ (busy?'準備中…':'連携する') +'</button>';
       return '<div class="list-row"><div><div class="li-main">'+label+'</div><div class="li-sub">'+(enabled?syncLabel(data):'未連携')+'</div></div><div class="shoe-row-actions">'+action+'</div></div>';
     };
-    return '<div class="form-card">'+mypageBackHeaderHTML('データ連携')+mypageToastHTML()+'<div class="mypage-grid"><div class="info-card"><h3>HEALTH DATA</h3><div class="li-sub">ランニングのワークアウト、距離、心拍、消費カロリーだけを取り込みます。</div>'+row('Appleヘルスケア',hc.appleHealth,'appleHealth')+row('Health Connect',hc.healthConnect,'healthConnect')+'<div class="switch-row" style="margin-top:12px;"><label><input type="checkbox" data-action="health-auto" '+(hc.autoImport!==false?'checked':'')+'> ランニング記録を自動登録する</label></div><div class="li-sub" style="margin-top:8px;">初回連携では過去90日を対象にします。権限の確認と端末からの同期は、次のネイティブ連携実装で有効になります。</div></div></div></div>';
+    return '<div class="form-card">'+mypageBackHeaderHTML('データ連携')+mypageToastHTML()+'<div class="mypage-grid"><div class="info-card"><h3>HEALTH DATA</h3><div class="li-sub">ランニングのワークアウト、距離、心拍、消費カロリーだけを取り込みます。</div>'+row('Appleヘルスケア',hc.appleHealth,'appleHealth')+row('Health Connect',hc.healthConnect,'healthConnect')+'<div class="switch-row" style="margin-top:12px;"><label><input type="checkbox" data-action="health-auto" '+(hc.autoImport!==false?'checked':'')+'> ランニング記録を自動登録する</label></div><div class="li-sub" style="margin-top:8px;">初回連携では過去90日を対象にします。連携解除後もRUNQ.へ保存済みの記録は残ります。</div></div></div></div>';
   }
 
   function runnerPbTileHTML(label, distanceKm){
@@ -2819,6 +2922,13 @@
     return html;
   }
 
+  function healthImportNoticeHTML(){
+    const notice = state.healthImportNotice;
+    if(!notice) return '';
+    const matched = notice.matched ? '予定メニュー '+notice.matched+'件にも反映しました。' : '走った記録で確認できます。';
+    return '<div class="mypage-toast" style="margin:0;"><div style="display:flex;justify-content:space-between;gap:12px;"><span>今日のランニングを見つけました。'+notice.count+'件を取り込み、'+matched+'</span><button type="button" class="li-remove" data-action="dismiss-health-notice">閉じる</button></div></div>';
+  }
+
   function homeHTML(){
     const plan = currentPlan();
     if(!plan){
@@ -2852,6 +2962,7 @@
       + '</div>';
 
     let html = '<main class="home-dashboard">';
+    html += healthImportNoticeHTML();
     html += todayCardHTML(plan, today);
     html += '<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div>';
     html += quest;
@@ -3796,15 +3907,25 @@
         const p = currentPlan();
         if(p) loadCoachThread(p.id);
       }
+    } else if(action==='dismiss-health-notice'){
+      state.healthImportNotice = null;
+      render();
     } else if(action==='toggle-policy'){
       state.policyOpen = !state.policyOpen;
       render();
-    } else if(action==='health-connect'){
-      showMypageToast('端末の権限確認と連携は、次のネイティブ連携実装で有効になります');
+    } else if(action==='health-connect' || action==='health-sync'){
+      if(state.healthSyncBusy) return;
+      state.healthSyncBusy = true;
       render();
-    } else if(action==='health-sync'){
-      showMypageToast('同期処理は、次のネイティブ連携実装で有効になります');
-      render();
+      syncHealthWorkouts(btn.dataset.platform).then(function(result){
+        const matchText = result.matched ? '、予定メニュー '+result.matched+'件に反映しました' : '';
+        showMypageToast(result.imported ? result.imported+'件のランニングを取り込みました'+matchText : '新しいランニング記録は見つかりませんでした');
+      }).catch(function(error){
+        showMypageToast(healthErrorMessage(error));
+      }).finally(function(){
+        state.healthSyncBusy = false;
+        render();
+      });
     } else if(action==='health-disconnect'){
       const platform = btn.dataset.platform;
       const current = state.profile.healthConnections||{};

@@ -193,7 +193,11 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 - `upsertWorkout(raw)`は同一`source`かつ`source_workout_id`を最優先し、補助的に開始時刻(10分以内)・距離(150m以内)・時間(3分以内)で重複候補を判定する。
 - `matchWorkoutToPlan(workout)`が同日予定を単純に探し、`plan_id`・`scheduled_item_ref`・`completion_status:'matched'`を保存する。高度なAI判定は行わない。
 - 認証未導入のため`user_id`はプロフィール内の端末ローカルID(`workoutUserId`)を使う。将来認証を導入する際は、既存の共通Workoutを保持したままAuthのIDへ移行する。
-- マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。ネイティブの権限要求・同期本体はCapacitor Adapterとして次段階で接続する。
+- マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。
+- `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、Running Workoutのみを過去90日分ページング取得する。iOSではHealthKit、AndroidではHealth Connectを同じAdapterで扱う。
+- 初回連携・手動同期では、ワークアウト・心拍・距離・消費カロリーの読み取り権限を要求する。心拍は各Workoutの時間範囲でサンプルを読み、平均・最大を決定論的に算出する。GPSルート・ケイデンス・標高・心拍ゾーンは未取得。
+- 自動登録ON時、同日の予定メニューに一致したWorkoutだけを既存の予定日別ログと完了状態にも反映する。ユーザーが手動／スクショで保存済みのログは端末連携で上書きしない。
+- Web/VercelではネイティブAPIを呼べないため、連携操作は説明メッセージを表示して他の機能を継続できる。
 
 各ネイティブ／外部ソースは、OS固有の値を画面へ渡さず、次の形で追加する。
 

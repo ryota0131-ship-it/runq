@@ -318,7 +318,46 @@ async function main() {
       await context.close();
     }
 
-    console.log('=== scenario 3: プラン週境界(月曜始まり) ===');
+    console.log('=== scenario 3: iOS HealthKit取り込み ===');
+    {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      const today = new Date().toISOString().slice(0, 10);
+      const { plan, profile } = seedPlan();
+      plan.weeks = [{ label: 'Week 1', phase: 'ベース構築期', dateRange: '', items: [
+        { type: 'easy', day: '今日', date: today, title: 'イージー', desc: '8km' },
+      ] }];
+      await context.addInitScript(({ plan, profile, today }) => {
+        localStorage.setItem('paceplan.plans', JSON.stringify([plan]));
+        localStorage.setItem('paceplan.profile', JSON.stringify(profile));
+        const start = `${today}T06:30:00.000Z`;
+        const end = `${today}T07:20:00.000Z`;
+        const health = {
+          isAvailable: async () => ({ available: true, platform: 'ios' }),
+          requestAuthorization: async () => ({ readAuthorized: ['workouts', 'heartRate', 'distance', 'calories'], readDenied: [], writeAuthorized: [], writeDenied: [] }),
+          queryWorkouts: async () => ({ workouts: [{ workoutType: 'running', duration: 3000, totalDistance: 8240, totalEnergyBurned: 510, startDate: start, endDate: end, sourceName: 'Apple Watch', platformId: 'healthkit-e2e-1' }] }),
+          readSamples: async () => ({ samples: [{ value: 145 }, { value: 155 }, { value: 150 }] }),
+        };
+        window.Capacitor = { isNativePlatform: () => true, registerPlugin: () => health, Plugins: { Health: health } };
+      }, { plan, profile, today });
+      await page.goto(baseUrl + '/', { waitUntil: 'load' });
+      await page.locator('.bottom-nav *').filter({ hasText: 'マイページ' }).first().click({ force: true });
+      await page.locator('[data-action="mypage-nav"][data-view="data-connections"]').click();
+      await page.locator('[data-action="health-connect"][data-platform="appleHealth"]').click();
+      await page.waitForTimeout(500);
+      const healthData = await page.evaluate(() => ({
+        workouts: JSON.parse(localStorage.getItem('paceplan.workouts') || '[]'),
+        logs: JSON.parse(localStorage.getItem('paceplan.logs.aqualine-2026') || '{}'),
+        progress: JSON.parse(localStorage.getItem('paceplan.progress.aqualine-2026') || '{}'),
+        profile: JSON.parse(localStorage.getItem('paceplan.profile') || '{}'),
+      }));
+      check('[HealthKit] Running Workoutを共通Workoutとして保存する', healthData.workouts.length === 1 && healthData.workouts[0].source === 'apple_health' && healthData.workouts[0].distance_meters === 8240 && healthData.workouts[0].average_heart_rate === 150 && healthData.workouts[0].max_heart_rate === 155);
+      check('[HealthKit] 同日の予定メニューへ自動反映する', healthData.logs[today] && healthData.logs[today].source === 'apple_health' && healthData.progress['w0-0'] === true);
+      check('[HealthKit] 連携状態と最終同期日時を保存する', healthData.profile.healthConnections.appleHealth.enabled === true && !!healthData.profile.healthConnections.appleHealth.lastSyncedAt);
+      await context.close();
+    }
+
+    console.log('=== scenario 4: プラン週境界(月曜始まり) ===');
     {
       const context = await browser.newContext();
       const page = await context.newPage();
