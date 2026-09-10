@@ -73,18 +73,30 @@
   }
 
   *{ box-sizing:border-box; }
+  html{
+    width:100%;
+    min-height:100%;
+    background:var(--bg);
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+    overflow-x:hidden;
+  }
   @media (prefers-reduced-motion: reduce){
     *{ transition-duration:0.001ms !important; animation-duration:0.001ms !important; }
   }
   body{
+    width:100%;
+    min-width:0;
+    min-height:100%;
     margin:0;
     background:var(--bg);
     color:var(--text);
     font-family:"Noto Sans JP",-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-    padding:28px 16px calc(96px + env(safe-area-inset-bottom));
+    padding:calc(28px + env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom));
     -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
   }
-  .wrap{ max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:22px; }
+  .wrap{ width:100%; min-width:0; max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:22px; }
   h1,h2,h3{ font-family:"Zen Kaku Gothic New",sans-serif; text-wrap:balance; margin:0; }
   .mono{ font-family:"Zen Kaku Gothic New",sans-serif; font-variant-numeric:tabular-nums; }
   a{ color:var(--accent); }
