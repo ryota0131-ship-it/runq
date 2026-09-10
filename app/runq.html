@@ -216,13 +216,14 @@
   .typing-dots span:nth-child(2){ animation-delay:0.15s; }
   .typing-dots span:nth-child(3){ animation-delay:0.3s; }
   @keyframes typing-bounce{ 0%,60%,100%{ transform:translateY(0); opacity:0.5; } 30%{ transform:translateY(-3px); opacity:1; } }
-  .chat-input-row{ display:flex; gap:8px; align-items:flex-end; border:1px solid var(--border); border-radius:24px; padding:7px 8px 7px 15px; background:var(--surface); box-shadow:0 2px 10px rgba(20,45,90,.06); }
-  .chat-input-row:focus-within{ border-color:var(--border); box-shadow:0 2px 10px rgba(20,45,90,.1); }
+  .chat-input-row{ display:flex; gap:8px; align-items:flex-end; border:1px solid var(--border); border-radius:24px; padding:7px 8px 7px 15px; background:var(--surface); box-shadow:0 2px 10px rgba(20,45,90,.06); -webkit-tap-highlight-color:transparent; outline:none; }
+  .chat-input-row:focus-within{ border-color:var(--border); box-shadow:0 2px 10px rgba(20,45,90,.1); outline:none; }
   /* GPTのように、入力面と送信操作を一つのコンポーザーにまとめる。Enterは改行、矢印ボタンで送信。 */
   .chat-input-row textarea{ flex:1 1 auto; min-height:28px; max-height:120px; border:0; outline:0; box-shadow:none; background:transparent; border-radius:0; padding:8px 2px; line-height:1.45; resize:none; }
-  .chat-input-row textarea:focus{ border:0; box-shadow:none; }
+  .chat-input-row textarea:focus, .chat-input-row textarea:focus-visible{ border:0 !important; outline:0 !important; box-shadow:none !important; }
+  .chat-input-row .chat-send-btn:focus, .chat-input-row .chat-send-btn:focus-visible{ outline:0; box-shadow:none; }
   .chat-send-btn{ flex:0 0 auto; width:36px; height:36px; min-width:36px; border-radius:50%; padding:0; display:grid; place-items:center; font-size:19px; line-height:1; }
-  .chat-send-btn span{ transform:translateY(-1px); }
+  .chat-send-btn svg{ display:block; width:18px; height:18px; }
   .chat-cancel-btn{ flex:0 0 auto; padding:11px 16px; font-size:12px; }
   .history-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
   .history-list li{ display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; font-size:12.5px; color:var(--text-muted); line-height:1.5; }
@@ -3046,7 +3047,7 @@
     if(a.busy){
       html += '<button type="button" class="btn-secondary chat-cancel-btn" data-action="cancel-adjust">キャンセル</button>';
     } else {
-      html += '<button type="submit" class="btn-primary chat-send-btn" aria-label="送信" title="送信"><span>↑</span></button>';
+      html += '<button type="submit" class="btn-primary chat-send-btn" aria-label="送信" title="送信"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none"><path d="M12 18V6m0 0-4.5 4.5M12 6l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
     }
     html += '</form>';
     html += '</div>';
