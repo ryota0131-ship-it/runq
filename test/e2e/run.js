@@ -220,7 +220,10 @@ async function main() {
 
       // --- advice応答 ---
       coachMockMode = 'advice';
-      await page.locator('#adjust-input').fill('今日の練習メニューどうすればいい?');
+      await page.locator('#adjust-input').fill('今日の練習メニュー');
+      await page.locator('#adjust-input').press('Enter');
+      await page.locator('#adjust-input').type('どうすればいい?');
+      check('[3] コーチ入力欄ではEnterで改行でき、送信されない', (await page.locator('#adjust-input').inputValue()) === '今日の練習メニュー\nどうすればいい?' && !lastCoachRequestBody);
       await page.locator('.chat-send-btn').click();
       await page.waitForSelector('.chat-bubble', { timeout: 10000 });
       await page.waitForTimeout(300);

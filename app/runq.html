@@ -104,10 +104,11 @@
   input, select{ font-family:inherit; }
 
   /* ---------- top bar ---------- */
-  .topbar{ display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:42px; }
   .brand{ display:flex; flex-direction:column; gap:2px; }
   .brand-logo{ display:inline-flex; align-items:center; padding:6px 12px; border-radius:12px; background:var(--logo-chip); }
   .brand-logo img{ display:block; height:26px; width:auto; }
+  .page-context{ margin:0; color:var(--text-muted); font-size:13px; font-weight:700; letter-spacing:.02em; }
 
   .tabs{ display:flex; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:4px; }
   .tab-btn{ border:none; background:transparent; color:var(--text-muted); font-weight:600; font-size:13px; padding:9px 18px; border-radius:999px; cursor:pointer; white-space:nowrap; }
@@ -216,8 +217,8 @@
   .typing-dots span:nth-child(3){ animation-delay:0.3s; }
   @keyframes typing-bounce{ 0%,60%,100%{ transform:translateY(0); opacity:0.5; } 30%{ transform:translateY(-3px); opacity:1; } }
   .chat-input-row{ display:flex; gap:8px; align-items:flex-end; border:1px solid var(--border); border-radius:24px; padding:7px 8px 7px 15px; background:var(--surface); box-shadow:0 2px 10px rgba(20,45,90,.06); }
-  .chat-input-row:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
-  /* GPTのように、入力面と送信操作を一つのコンポーザーにまとめる。Shift+Enterは改行。 */
+  .chat-input-row:focus-within{ border-color:var(--border); box-shadow:0 2px 10px rgba(20,45,90,.1); }
+  /* GPTのように、入力面と送信操作を一つのコンポーザーにまとめる。Enterは改行、矢印ボタンで送信。 */
   .chat-input-row textarea{ flex:1 1 auto; min-height:28px; max-height:120px; border:0; outline:0; box-shadow:none; background:transparent; border-radius:0; padding:8px 2px; line-height:1.45; resize:none; }
   .chat-input-row textarea:focus{ border:0; box-shadow:none; }
   .chat-send-btn{ flex:0 0 auto; width:36px; height:36px; min-width:36px; border-radius:50%; padding:0; display:grid; place-items:center; font-size:19px; line-height:1; }
@@ -236,7 +237,7 @@
      他のタブ(ホーム/プラン/マイページ)のレイアウトには一切影響しない。 */
   body.mode-coach{ padding:0; height:100vh; overflow:hidden; }
   body.mode-coach .wrap{ height:100%; max-width:100%; margin:0; gap:0; }
-  body.mode-coach .topbar{ flex:0 0 auto; padding:16px 16px 10px; }
+  body.mode-coach .topbar{ flex:0 0 auto; padding:calc(16px + env(safe-area-inset-top)) 16px 10px; }
   body.mode-coach .bottom-nav{ position:static; flex:0 0 auto; box-shadow:none; }
   body.mode-coach .wrap > .info-card{ flex:1 1 auto; min-height:0; margin:0 16px 16px; overflow-y:auto; }
   body.mode-coach .coach-chat-card{
@@ -1775,10 +1776,9 @@
     else if(state.mode==='coach') body = coachTabHTML();
     else if(state.mode==='home') body = homeHTML();
     else body = planViewHTML(plan);
-    // サービス名(ロゴ)はホームタブのみに表示し、他のタブでは非表示にする。
-    // 各タブとも見出し(プラン切替ピル/マイページのh2/コーチのh3など)を独自に持つため、
-    // 削除しても迷子にならない。画面が縦に狭いモバイルでの表示領域確保が狙い
-    app.innerHTML = (state.mode==='home' ? topbarHTML() : '') + body + bottomNavHTML() + modalHTML();
+    // 全タブに共通ヘッダーを置き、現在地を短い日本語ラベルで示す。
+    // 下部ナビゲーションは既存のまま維持するため、画面遷移や情報構造は変えない。
+    app.innerHTML = topbarHTML() + body + bottomNavHTML() + modalHTML();
     // コーチタブはカード型のボックスに収めず全画面表示にする(操作性・可読性の向上要望)。
     // bodyにモード専用クラスを付け外しし、CSS側でこのタブの時だけレイアウトを切り替える
     document.body.classList.toggle('mode-coach', state.mode==='coach');
@@ -1789,8 +1789,10 @@
   }
 
   function topbarHTML(){
+    const titles = { home:'ホーム', view:'プラン', coach:'コーチ', profile:'マイページ', create:'新しいQUEST' };
     return '<div class="topbar">'
       + '<div class="brand"><span class="brand-logo"><img src="'+RUNQ_LOGO_SRC+'" alt="RUNQ. Run your quest."></span></div>'
+      + '<p class="page-context">'+(titles[state.mode]||'RUNQ.')+'</p>'
       + '</div>';
   }
 
@@ -4105,13 +4107,6 @@
       const match = RACE_PRESETS.find(r=>r.name===e.target.value.trim());
       if(match){ form.distance.value = String(match.distanceKm); refreshTargetPacePreview(form); }
     }
-  });
-
-  document.getElementById('app').addEventListener('keydown', function(e){
-    if(e.target.id!=='adjust-input' || e.key!=='Enter' || e.shiftKey || e.isComposing) return;
-    e.preventDefault();
-    const form = e.target.closest('#adjust-form');
-    if(form && !state.adjust.busy) form.requestSubmit();
   });
 
   document.getElementById('app').addEventListener('change', function(e){
