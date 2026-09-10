@@ -1629,15 +1629,35 @@
       if(db){ await db.doc('coachLog/'+id).set({messages}); return; }
       try{ localStorage.setItem('paceplan.coachLog.'+id, JSON.stringify(messages)); }catch(e){}
     },
+    // 手動・スクリーンショット・HealthKit等を横断する共通Workoutの保存先。
+    // 既存の予定日別logsを置換せず、取り込み元IDによる重複防止の正本として追加する。
+    async getWorkouts(){
+      if(db){ const snap=await db.doc('workouts/main').get(); return snap.exists ? (snap.data().entries||[]) : []; }
+      try{ return JSON.parse(localStorage.getItem('paceplan.workouts')||'[]'); }catch(e){ return []; }
+    },
+    async setWorkouts(entries){
+      if(db){ await db.doc('workouts/main').set({entries:entries}); return; }
+      try{ localStorage.setItem('paceplan.workouts', JSON.stringify(entries)); }catch(e){}
+    },
     async getProfile(){
-      const empty = { name:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null };
+      const empty = { name:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
+      const withDefaults = function(raw){
+        const profile = Object.assign({}, empty, raw||{});
+        const connections = (raw&&raw.healthConnections)||{};
+        profile.healthConnections = {
+          autoImport: connections.autoImport!==false,
+          appleHealth: Object.assign({enabled:false,lastSyncedAt:null}, connections.appleHealth||{}),
+          healthConnect: Object.assign({enabled:false,lastSyncedAt:null}, connections.healthConnect||{})
+        };
+        return profile;
+      };
       if(db){
         const snap = await db.doc('profile/main').get();
-        return snap.exists ? Object.assign({}, empty, snap.data()) : empty;
+        return snap.exists ? withDefaults(snap.data()) : empty;
       }
       try{
         const raw = localStorage.getItem('paceplan.profile');
-        return raw ? Object.assign({}, empty, JSON.parse(raw)) : empty;
+        return raw ? withDefaults(JSON.parse(raw)) : empty;
       }catch(e){ return empty; }
     },
     async setProfile(profile){
@@ -1655,6 +1675,7 @@
     currentId: null,
     completed: {},
     logs: {},
+    workouts: [],
     formError: {},
     adjust: { busy:false, error:null, draft:'', hidden:false, startedAt:null, streamPreview:null },
     // AIコーチのチャットスレッド(Phase7)。messagesは{role, kind, text, ...}の配列。
@@ -1669,7 +1690,7 @@
     logUndo: null,
     logProposal: null,
     deleteModal: null,
-    profile: { name:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null },
+    profile: { name:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} },
     shoeMileage: {},
     runnerStats: { longestRunKm: null },
     profileFormError: {},
@@ -1802,6 +1823,98 @@
 
   function genId(prefix){ return prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
+  /* ============================================================
+     common Workout model
+     画面やOS固有の値を直接扱わず、すべてここでRUNQ.共通形式へ正規化する。
+     workoutUserId は認証導入前の端末内識別子。認証導入後はAuthのuser_idへ差し替える。
+  ============================================================ */
+  const WORKOUT_SOURCES = ['manual','screenshot','apple_health','health_connect','strava','garmin'];
+  function workoutPaceSeconds(value, distanceMeters, durationSeconds){
+    if(value!=null && value!==''){
+      const seconds = typeof value==='number' ? value : hmsToSeconds(String(value).replace('/km',''));
+      if(seconds!=null && seconds>0) return Math.round(seconds);
+    }
+    return distanceMeters>0 && durationSeconds>0 ? Math.round(durationSeconds/(distanceMeters/1000)) : null;
+  }
+  function normalizeWorkout(raw){
+    const now = new Date().toISOString();
+    const source = WORKOUT_SOURCES.indexOf(raw.source)>=0 ? raw.source : 'manual';
+    const distanceMeters = raw.distance_meters!=null ? Number(raw.distance_meters) : Number(raw.distanceKm||0)*1000;
+    const durationSeconds = raw.duration_seconds!=null ? Number(raw.duration_seconds) : Number(raw.durationMin||0)*60;
+    const startedAt = raw.started_at || raw.startedAt || (raw.date ? raw.date+'T12:00:00.000' : now);
+    const endedAt = raw.ended_at || raw.endedAt || (durationSeconds>0 ? new Date(new Date(startedAt).getTime()+durationSeconds*1000).toISOString() : null);
+    return {
+      id: raw.id || genId('workout_'),
+      user_id: raw.user_id || (state.profile&&state.profile.workoutUserId) || null,
+      started_at: startedAt,
+      ended_at: endedAt,
+      duration_seconds: durationSeconds>0 ? Math.round(durationSeconds) : null,
+      distance_meters: distanceMeters>0 ? Math.round(distanceMeters) : null,
+      average_pace_seconds_per_km: workoutPaceSeconds(raw.average_pace_seconds_per_km!=null ? raw.average_pace_seconds_per_km : raw.avgPace, distanceMeters, durationSeconds),
+      average_heart_rate: raw.average_heart_rate!=null ? Number(raw.average_heart_rate) : (raw.avgHr!=null ? Number(raw.avgHr) : null),
+      max_heart_rate: raw.max_heart_rate!=null ? Number(raw.max_heart_rate) : null,
+      calories: raw.calories!=null ? Number(raw.calories) : null,
+      source: source,
+      source_workout_id: raw.source_workout_id || raw.sourceWorkoutId || null,
+      source_device: raw.source_device || raw.sourceDevice || null,
+      imported_at: raw.imported_at || raw.importedAt || now,
+      created_at: raw.created_at || raw.createdAt || now,
+      updated_at: now,
+      plan_id: raw.plan_id || null,
+      scheduled_item_ref: raw.scheduled_item_ref || null,
+      scheduled_item_date: raw.scheduled_item_date || null,
+      completion_status: raw.completion_status || null
+    };
+  }
+  function isDuplicateWorkout(existing, next){
+    if(existing.source===next.source && existing.source_workout_id && next.source_workout_id && existing.source_workout_id===next.source_workout_id) return true;
+    const startGap = Math.abs(new Date(existing.started_at).getTime()-new Date(next.started_at).getTime());
+    const distanceGap = Math.abs(Number(existing.distance_meters||0)-Number(next.distance_meters||0));
+    const durationGap = Math.abs(Number(existing.duration_seconds||0)-Number(next.duration_seconds||0));
+    return startGap<=10*60*1000 && distanceGap<=150 && durationGap<=3*60;
+  }
+  function matchWorkoutToPlan(workout){
+    const dateStr = String(workout.started_at||'').slice(0,10);
+    const plan = currentPlan();
+    const found = plan && findItemByDate(plan, dateStr);
+    if(!found || !isLoggable(found.it)) return workout;
+    const itemRef = plan.id+':w'+found.wi+'-i'+found.ii;
+    return Object.assign({}, workout, {
+      plan_id: plan.id,
+      scheduled_item_ref: itemRef,
+      scheduled_item_date: dateStr,
+      completion_status: 'matched'
+    });
+  }
+  async function upsertWorkout(raw){
+    const next = matchWorkoutToPlan(normalizeWorkout(raw));
+    const entries = Array.isArray(state.workouts) ? state.workouts.slice() : [];
+    const index = entries.findIndex(function(entry){ return isDuplicateWorkout(entry, next); });
+    if(index>=0){
+      next.id = entries[index].id;
+      next.created_at = entries[index].created_at || next.created_at;
+      entries[index] = Object.assign({}, entries[index], next);
+    }else entries.unshift(next);
+    state.workouts = entries;
+    await Store.setWorkouts(entries);
+    return next;
+  }
+  function workoutFromLog(plan, dateStr, log){
+    return {
+      user_id: state.profile&&state.profile.workoutUserId,
+      date: dateStr,
+      distanceKm: log.distanceKm,
+      durationMin: log.durationMin,
+      avgPace: log.avgPace,
+      avgHr: log.avgHr,
+      calories: log.calories,
+      source: log.source || 'manual',
+      source_workout_id: (log.source||'manual')+':'+plan.id+':'+dateStr,
+      imported_at: log.loggedAt,
+      plan_id: plan.id
+    };
+  }
+
   // シューズ累計距離に加え、マイページのRUNNER PROFILEサマリーに使う「最長RUN」も同じログ走査で
   // まとめて算出する(全プラン横断で記録された1回の走行距離の最大値。新規の永続化は行わず毎回計算)
   async function refreshShoeMileage(){
@@ -1879,6 +1992,7 @@
     if(view==='training-settings') return trainingSettingsScreenHTML();
     if(view==='pace-calculator') return paceCalculatorHTML();
     if(view==='race-predictor') return raceTimePredictorHTML();
+    if(view==='data-connections') return dataConnectionsHTML();
     if(view==='settings') return settingsScreenHTML();
     return mypageMainHTML();
   }
@@ -1890,11 +2004,27 @@
     html += '<div class="mypage-grid">';
     html += runnerProfileCardHTML();
     html += myShoesCardHTML();
+    html += '<button type="button" class="mypage-menu-row" data-action="mypage-nav" data-view="data-connections"><span><span class="li-main">データ連携</span><span class="li-sub" style="display:block;margin-top:2px;">Appleヘルスケア・Health Connect</span></span><span class="mypage-menu-chevron">＞</span></button>';
     html += runningToolsMenuHTML();
     html += '<button type="button" class="mypage-menu-row" data-action="mypage-nav" data-view="training-settings"><span class="li-main">TRAINING SETTINGS</span><span class="mypage-menu-chevron">＞</span></button>';
     html += '<button type="button" class="mypage-menu-row" data-action="mypage-nav" data-view="settings"><span class="li-main">SETTINGS</span><span class="mypage-menu-chevron">＞</span></button>';
     html += '</div></div>';
     return html;
+  }
+
+  function dataConnectionsHTML(){
+    const hc=(state.profile&&state.profile.healthConnections)||{};
+    const syncLabel=function(data){
+      if(!data || !data.lastSyncedAt) return 'まだ同期していません';
+      const d = new Date(data.lastSyncedAt);
+      return isNaN(d.getTime()) ? '最終同期: —' : '最終同期: '+d.toLocaleDateString('ja-JP')+' '+d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+    };
+    const row=function(label,data,platform){
+      const enabled=!!(data&&data.enabled);
+      const action=enabled ? '<button type="button" class="btn-secondary" data-action="health-sync" data-platform="'+platform+'">同期する</button><button type="button" class="li-remove" data-action="health-disconnect" data-platform="'+platform+'">連携解除</button>' : '<button type="button" class="btn-secondary" data-action="health-connect" data-platform="'+platform+'">連携する</button>';
+      return '<div class="list-row"><div><div class="li-main">'+label+'</div><div class="li-sub">'+(enabled?syncLabel(data):'未連携')+'</div></div><div class="shoe-row-actions">'+action+'</div></div>';
+    };
+    return '<div class="form-card">'+mypageBackHeaderHTML('データ連携')+mypageToastHTML()+'<div class="mypage-grid"><div class="info-card"><h3>HEALTH DATA</h3><div class="li-sub">ランニングのワークアウト、距離、心拍、消費カロリーだけを取り込みます。</div>'+row('Appleヘルスケア',hc.appleHealth,'appleHealth')+row('Health Connect',hc.healthConnect,'healthConnect')+'<div class="switch-row" style="margin-top:12px;"><label><input type="checkbox" data-action="health-auto" '+(hc.autoImport!==false?'checked':'')+'> ランニング記録を自動登録する</label></div><div class="li-sub" style="margin-top:8px;">初回連携では過去90日を対象にします。権限の確認と端末からの同期は、次のネイティブ連携実装で有効になります。</div></div></div></div>';
   }
 
   function runnerPbTileHTML(label, distanceKm){
@@ -3468,6 +3598,9 @@
     const keepFeedbackBusy = state.logForm.feedbackBusy;
     state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy: keepFeedbackBusy };
     await Store.setLogs(plan.id, entries);
+    // 予定日別ログは従来互換のまま維持し、同じ実績を共通Workoutにも保存する。
+    // HealthKit / Health Connect / Strava等の取り込みは以後この入口へ流し込む。
+    await upsertWorkout(workoutFromLog(plan, dateStr, entries[dateStr]));
     render();
     if(found) runLogFeedback(found.it, entries[dateStr]);
     recomputeAndSaveForecast(plan).then(function(){ render(); });
@@ -3666,6 +3799,20 @@
     } else if(action==='toggle-policy'){
       state.policyOpen = !state.policyOpen;
       render();
+    } else if(action==='health-connect'){
+      showMypageToast('端末の権限確認と連携は、次のネイティブ連携実装で有効になります');
+      render();
+    } else if(action==='health-sync'){
+      showMypageToast('同期処理は、次のネイティブ連携実装で有効になります');
+      render();
+    } else if(action==='health-disconnect'){
+      const platform = btn.dataset.platform;
+      const current = state.profile.healthConnections||{};
+      state.profile.healthConnections = Object.assign({}, current, {});
+      state.profile.healthConnections[platform] = Object.assign({}, current[platform]||{}, {enabled:false,lastSyncedAt:null});
+      Store.setProfile(state.profile);
+      showMypageToast('連携を解除しました');
+      render();
     } else if(action==='remove-pb'){
       const idx = parseInt(btn.dataset.idx,10);
       state.profile.pbs = state.profile.pbs.filter((_,i)=>i!==idx);
@@ -3835,6 +3982,13 @@
   });
 
   document.getElementById('app').addEventListener('change', function(e){
+    if(e.target.dataset && e.target.dataset.action==='health-auto'){
+      const current=state.profile.healthConnections||{};
+      state.profile.healthConnections=Object.assign({},current,{autoImport:e.target.checked});
+      Store.setProfile(state.profile);
+      showMypageToast(e.target.checked?'新しいランを自動登録します':'新しいランは確認してから登録します');
+      return;
+    }
     if(e.target.id==='f_linkedFrom'){
       const form = e.target.closest('#gen-form');
       if(!form) return;
@@ -4120,6 +4274,12 @@
     try{ state.completed = await Store.getProgress(state.currentId); }catch(e){ state.completed = {}; }
     try{ state.logs = await Store.getLogs(state.currentId); }catch(e){ state.logs = {}; }
     try{ state.profile = await Store.getProfile(); }catch(e){ /* keep default */ }
+    // 認証導入前でもWorkoutを同一端末の利用者に紐付けられるよう、端末内IDを一度だけ発行する。
+    if(!state.profile.workoutUserId){
+      state.profile.workoutUserId = genId('runner_');
+      Store.setProfile(state.profile);
+    }
+    try{ state.workouts = await Store.getWorkouts(); }catch(e){ state.workouts = []; }
     try{
       const fdoc = await Store.getForecast(state.currentId);
       if(fdoc) state.forecast[state.currentId] = fdoc;

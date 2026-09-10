@@ -51,7 +51,8 @@ async savePlan(plan){
   - `forecast/{planId}` — RACE FORECASTの履歴(直近20件)
   - `coachLog/{planId}` — AIコーチの会話履歴(直近30件にローテーション。提案の完全なプランJSON・undo用スナップショットは容量対策で非永続化)
   - `profile/main` — Runner Profile(PB・シューズ・Training Settings等、全プラン共通)
-- `db`が使えない場合(ローカル起動時・Vercel等の静的ホスティング時など)は、上記に対応する`localStorage`キー(`paceplan.plans`, `paceplan.progress.{id}`, `paceplan.logs.{id}`, `paceplan.forecast.{id}`, `paceplan.coachLog.{id}`, `paceplan.profile`)に読み書きする。ブラウザ・端末をまたいだ同期は行われない。
+  - `workouts/main` — 取り込み元を問わない共通Workoutの配列(予定日別ログを置換しない正本)
+- `db`が使えない場合(ローカル起動時・Vercel等の静的ホスティング時など)は、上記に対応する`localStorage`キー(`paceplan.plans`, `paceplan.progress.{id}`, `paceplan.logs.{id}`, `paceplan.forecast.{id}`, `paceplan.coachLog.{id}`, `paceplan.profile`, `paceplan.workouts`)に読み書きする。ブラウザ・端末をまたいだ同期は行われない。
 
 ### 重要な制約
 
@@ -86,7 +87,15 @@ Workout Result (logs/{planId}["{date}"])
  ├─ pain { level: 0〜3, parts: [部位名] } or null
  ├─ completionType ('as_planned' | 'partial' | 'skipped' or null)
  ├─ feedback, loggedAt
- └─ (将来のActivity Import拡張ポイント。4.1参照)
+ └─ 既存の予定日別表示・入力との後方互換のため保持する
+
+Common Workout (workouts/main.entries[])
+ ├─ id, user_id, started_at, ended_at, duration_seconds, distance_meters
+ ├─ average_pace_seconds_per_km, average_heart_rate, max_heart_rate, calories
+ ├─ source: manual | screenshot | apple_health | health_connect | strava | garmin
+ ├─ source_workout_id, source_device, imported_at, created_at, updated_at
+ └─ plan_id, scheduled_item_ref, scheduled_item_date, completion_status
+    … 取り込み元横断の正規化・重複防止・将来の同期用として保存する。
 
 Race Forecast (forecast/{planId})
  └─ history: [{ predictedSec, predictedMinSec, predictedMaxSec,
@@ -176,38 +185,25 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 - 現在は認証機構を持たないV1のため、公開Vercel URLでのAPIコスト濫用を完全には防げない。本格公開前に認証と共有レート制限を導入するまで、Vercel Firewall等で公開範囲を制限する。
 - 開発・本番でのAPI URL切り替え・CORS等は、現時点では過剰に作り込まず、必要になった段階で最小限の設定を追加する方針とする。
 
-## 5. 将来の Activity Import(Garmin / Apple Health / Strava等)を見据えた設計
+## 5. Activity Import(HealthKit / Health Connect / Garmin / Strava)の基盤
 
-**今回のGitHub移行では、外部連携そのものは実装しない。** ただし、将来Garmin/Apple Health/Strava等からランニング実績を自動取得できるようにする可能性があるため、Workout Result(`logs/{planId}`の各エントリ)を「手入力されたデータしか保存できない構造」に強く依存させないことを設計上の方針とする。
+共通Workoutを`workouts/main.entries[]`に追加した。手動登録・スクリーンショット登録は従来どおり予定日別の`logs/{planId}`へ保存したうえで、同じ実績を共通Workoutにも正規化して保存する。既存画面・既存データを壊さないため、`logs`を置き換えない。
 
-現状のログの型:
+- `normalizeWorkout(raw)`が各入力形式を共通フィールドへ変換する唯一の入口。
+- `upsertWorkout(raw)`は同一`source`かつ`source_workout_id`を最優先し、補助的に開始時刻(10分以内)・距離(150m以内)・時間(3分以内)で重複候補を判定する。
+- `matchWorkoutToPlan(workout)`が同日予定を単純に探し、`plan_id`・`scheduled_item_ref`・`completion_status:'matched'`を保存する。高度なAI判定は行わない。
+- 認証未導入のため`user_id`はプロフィール内の端末ローカルID(`workoutUserId`)を使う。将来認証を導入する際は、既存の共通Workoutを保持したままAuthのIDへ移行する。
+- マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。ネイティブの権限要求・同期本体はCapacitor Adapterとして次段階で接続する。
 
-```
-{
-  distanceKm, avgPace, avgHr, durationMin, calories,
-  fuelingNote, note, shoeId,
-  rpe, pain, completionType,
-  source, imageImport, // source: 'manual' | 'screenshot'。画像本体は保持しない
-  feedback, loggedAt
-}
-```
-
-将来、外部Activityを取り込む場合に拡張可能な項目の例(今回は追加しない。設計メモとして残すのみ):
+各ネイティブ／外部ソースは、OS固有の値を画面へ渡さず、次の形で追加する。
 
 ```
-{
-  source,              // 'manual' | 'garmin' | 'apple_health' | 'strava'
-  externalActivityId,  // 外部サービス側のID(重複取り込み防止用)
-  distance,
-  duration,
-  pace,
-  heartRate,
-  date,
-  activityType
-}
+HealthKit / Health Connect / Strava / Garmin
+  -> source adapter
+  -> normalizeWorkout(raw)
+  -> upsertWorkout(raw)
+  -> workouts/main
 ```
-
-これらは`logs/{planId}`のエントリに後方互換な形で追加していく想定で、既存の手入力フィールド(`distanceKm`, `avgPace`等)を置き換えるものではない。実際に連携を実装する段階になったら、このドキュメントを更新した上で着手すること。
 
 ## 6. 秘密情報・環境変数
 
