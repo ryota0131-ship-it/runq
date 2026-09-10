@@ -142,7 +142,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 
 - **Provider選択は`selectCoachProvider()`の1箇所のみ**(`app/runq.html`)。`ClaudeArtifactProvider.available()`(=`window.claude.use('sample')`が使えるか)を優先し、使えない場合のみ`OpenAIProvider`にフォールバックする。Claude Artifactとして開いている限り、この移行前と挙動は変わらない。
 - **レスポンス形式は既存のまま**: `{mode:'advice'|'options', summary, risk, options[].{label,summary,plan}}`。新しい独自スキーマを作るのではなく、Claude Artifact版が既に返していた形式をOpenAI側にも合わせている。下流(`buildAdjustPrompt`の解釈・`applyPlanChange`等)は無変更で動く。
-- **画像OCR(`extractFromImage`、Garminスクリーンショット等の読み取り)は今回のスコープ外**。引き続き`window.claude.use('sample')`(`sampleFn`)を直接使い、`CoachService`/`OpenAIProvider`経由にはしていない。将来Capacitor化後、OpenAIの画像入力でOCRも移行する想定(§4.3)。
+- **画像解析はCoachとは分離**: `extractFromImage`はClaude Artifactでは従来の`sampleFn`を使い、通常Web/Vercelでは`/api/run-extract`を使う。コーチ相談の`CoachService`に画像を混在させないため、既存のコーチ応答形式・プラン変更フローには影響しない。
 - 数値計算(プラン生成・RACE FORECAST・PACE CALCULATOR・RACE TIME PREDICTOR等)は`estimateRacePerformance()`等の独立した純粋関数が担当し、AIは説明文・提案・対話のみを担当する設計を維持している(この原則はOpenAI移行後も変えていない)。
 - プラン変更は「GPT/Claudeが`options[].plan`としてJSON提案 → UIが選択肢を提示 → ユーザーが選択 → 既存の`applyPlanChange()`がTraining Planへ適用」という流れを維持。AIが直接Training Planを書き換えることはない。
 
@@ -171,7 +171,9 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 ### 4.3 Capacitor化を見据えた設計
 
 - APIキーはCapacitorアプリ内にも一切埋め込まない。アプリは常にHTTPS経由で`/api/coach`(または将来`RUNQ_API_BASE_URL`のような設定でホスト先を切り替え)を呼ぶ想定。
-- 画像入力(Garmin等のスクリーンショットOCR)をOpenAIの画像入力APIへ移行する場合も、`OpenAIProvider`と同様に`/api/coach`側で処理し、キーをクライアントに渡さない構造を踏襲する。今回は着手しない。
+- `api/run-extract.js`はOpenAI Responses APIの画像入力を使い、Garmin等のスクリーンショットから構造化した走行実績を抽出する。画像はブラウザ側で最大辺2048px・JPEGに縮小した後、リクエスト中だけVercel/OpenAIへ渡す。runQ.のStorage・Vercel Blobには保存しない。
+- 受け付ける形式はJPEG/PNG/WebP、解析用画像は3MB以下。Vercel Functionのリクエスト本文上限に余裕を持たせるためであり、超過時は端末側で再縮小してから送信する。
+- 現在は認証機構を持たないV1のため、公開Vercel URLでのAPIコスト濫用を完全には防げない。本格公開前に認証と共有レート制限を導入するまで、Vercel Firewall等で公開範囲を制限する。
 - 開発・本番でのAPI URL切り替え・CORS等は、現時点では過剰に作り込まず、必要になった段階で最小限の設定を追加する方針とする。
 
 ## 5. 将来の Activity Import(Garmin / Apple Health / Strava等)を見据えた設計
@@ -185,6 +187,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
   distanceKm, avgPace, avgHr, durationMin, calories,
   fuelingNote, note, shoeId,
   rpe, pain, completionType,
+  source, imageImport, // source: 'manual' | 'screenshot'。画像本体は保持しない
   feedback, loggedAt
 }
 ```
@@ -208,11 +211,11 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 
 ## 6. 秘密情報・環境変数
 
-`app/runq.html`(クライアント側)にAPIキー等の秘密情報はハードコードされていない(確認済み)。`OPENAI_API_KEY`は`api/coach.js`(サーバー側)からのみ`process.env.OPENAI_API_KEY`として読み込まれ、クライアントへ返すレスポンス・エラーメッセージのいずれにも含めていない。外部ネットワーク呼び出しはGoogle Fontsの読み込みと、サーバー側からの`https://api.openai.com/v1/responses`呼び出しのみ。`.env.example`および README の「環境変数」を参照。
+`app/runq.html`(クライアント側)にAPIキー等の秘密情報はハードコードされていない(確認済み)。`OPENAI_API_KEY`は`api/coach.js`および`api/run-extract.js`のサーバー側からのみ`process.env`として読み込まれ、クライアントへ返さない。外部ネットワーク呼び出しはGoogle Fontsの読み込みと、サーバー側からの`https://api.openai.com/v1/responses`呼び出しのみ。`.env.example`および README の「環境変数」を参照。
 
 ## 7. デプロイ
 
 - **現状**: Claude Artifactとして公開(`app/runq.html`の内容をArtifactツールで公開)。ユーザーが実際に使っているのはこちら。この経路では`ClaudeArtifactProvider`が使われ、`OPENAI_API_KEY`等は一切関与しない。
 - **今回のGitHub移行後**: `app/runq.html`をGitHub上の正本として管理し、Claude Artifactへの公開は引き続きこのファイルの内容をそのまま使う運用とする。
-- **Vercel等への静的+サーバーレスデプロイ**: `npm run build`で生成される`dist/index.html`(静的ファイル)と`api/coach.js`(Vercel Serverless Function)を組み合わせてデプロイできる。`db`/`sample` capabilityは使えないため、データ保存は引き続き`localStorage`フォールバックとなるが、AI Coachは環境変数`OPENAI_API_KEY`(必須)・`OPENAI_MODEL`(省略可)を設定すれば`OpenAIProvider`経由で利用できる(未設定の場合はAI Coachのみ`coach_unavailable`エラーとなり、Plan/Workout/Forecast/Shoes等の他機能は引き続き利用可能)。
-- **ローカル開発**: `npm run dev`で起動する`scripts/dev-server.js`が`/api/coach`を`api/coach.js`へ橋渡しする(依存パッケージなしの最小実装)。ルート直下に`.env`を置けば`OPENAI_API_KEY`/`OPENAI_MODEL`を自動で読み込む。
+- **Vercel等への静的+サーバーレスデプロイ**: `npm run build`で生成される`dist/index.html`と`api/coach.js`/`api/run-extract.js`を組み合わせてデプロイできる。`OPENAI_API_KEY`を設定すればAI Coachとスクリーンショット解析の両方を利用できる。
+- **ローカル開発**: `npm run dev`で起動する`scripts/dev-server.js`が`/api/coach`と`/api/run-extract`を橋渡しする。ルート直下に`.env`を置けば`OPENAI_API_KEY`/`OPENAI_MODEL`を自動で読み込む。

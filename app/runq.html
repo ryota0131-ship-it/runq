@@ -2164,7 +2164,7 @@
       : (isNewEntry ? '0' : '');
     const currentPainParts = v.painParts || (v.pain && v.pain.parts) || [];
     let html = '<form class="log-form" data-date="'+dateStr+'">';
-    if(state.sampleImageOk){
+    if(state.sampleImageOk || !state.sampleAvailable){
       html += '<div class="log-image-row"><label class="log-image-btn">画像から自動入力(Garmin等のスクリーンショット)<input type="file" accept="image/*" data-action="log-image" data-date="'+dateStr+'" '+(lf.imageBusy?'disabled':'')+'></label>';
       if(lf.imageBusy) html += '<span class="adjust-status">画像を読み取り中…</span>';
       if(lf.imageError) html += '<span class="adjust-status error">'+escapeHtml(lf.imageError)+'</span>';
@@ -3438,14 +3438,65 @@
     recomputeAndSaveForecast(plan).then(function(){ render(); });
   }
 
+  function readFileAsDataUrl(file){
+    return new Promise(function(resolve, reject){
+      const reader = new FileReader();
+      reader.onload = function(){ resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function imageElementFromFile(file){
+    return new Promise(function(resolve, reject){
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = function(){ URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = function(){ URL.revokeObjectURL(url); reject({code:'invalid_image'}); };
+      image.src = url;
+    });
+  }
+
+  async function compactImageForExtraction(file){
+    if(!file || !/^image\/(jpeg|png|webp)$/i.test(file.type||'')) throw {code:'invalid_image'};
+    // iPhoneの高解像度スクリーンショットもVercelのリクエスト上限内に収める。
+    const image = await imageElementFromFile(file);
+    let width = image.naturalWidth || image.width, height = image.naturalHeight || image.height;
+    const maxSide = 2048;
+    if(Math.max(width,height)>maxSide){ const ratio=maxSide/Math.max(width,height); width=Math.round(width*ratio); height=Math.round(height*ratio); }
+    for(let attempt=0; attempt<4; attempt++){
+      const canvas = document.createElement('canvas');
+      canvas.width=width; canvas.height=height;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(image,0,0,width,height);
+      const blob = await new Promise(function(resolve){ canvas.toBlob(resolve,'image/jpeg',0.86); });
+      if(!blob) throw {code:'invalid_image'};
+      if(blob.size<=3*1024*1024) return readFileAsDataUrl(blob);
+      width=Math.round(width*0.72); height=Math.round(height*0.72);
+    }
+    throw {code:'image_too_large'};
+  }
+
+  async function extractFromWebApi(file){
+    const imageDataUrl = await compactImageForExtraction(file);
+    let response;
+    try{
+      response = await fetch('/api/run-extract', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({imageDataUrl:imageDataUrl}) });
+    }catch(e){ throw {code:'extract_unavailable'}; }
+    let body={}; try{ body=await response.json(); }catch(e){}
+    if(!response.ok) throw {code:(body&&body.error)||'extract_unavailable'};
+    return body;
+  }
+
   async function extractFromImage(file, dateStr){
-    if(!sampleFn) return;
     state.logForm.imageBusy = true;
     state.logForm.imageError = null;
     render();
     try{
       const prompt = 'この画像はGarmin、Apple Fitness、Strava、Nike Run Club等のランニング記録画面です。画面の意味を理解して、読み取れる事実だけを以下のJSON形式で返してください。推測で値を埋めず、見えない項目はnullにしてください。説明文やコードフェンスは不要です。confidenceは主要値ごとにhigh、medium、low、unknownのいずれかです。\n{"activityDate":"YYYY-MM-DD"またはnull,"startTime":"HH:MM"またはnull,"distanceKm":数値またはnull,"durationMin":数値(分、小数可)またはnull,"avgPace":"7:20"形式またはnull,"avgHr":数値またはnull,"maxHr":数値またはnull,"calories":数値またはnull,"elevationGainM":数値またはnull,"cadence":数値またはnull,"activityType":"running"等またはnull,"activityName":文字列またはnull,"sourceApp":文字列またはnull,"confidence":{"distanceKm":"high"等}}';
-      const result = await sampleFn.json(prompt, {images:[file], modelTier:'quick', cache:false});
+      const result = state.sampleImageOk && sampleFn
+        ? await sampleFn.json(prompt, {images:[file], modelTier:'quick', cache:false})
+        : await extractFromWebApi(file);
       if(!result || typeof result!=='object') throw {code:'invalid_json'};
       const prevValues = state.logForm.values || {};
       state.logForm.values = {
@@ -3477,6 +3528,9 @@
       const code = e && e.code;
       if(code==='image_rejected') state.logForm.imageError = '画像を読み取れませんでした。別の画像でお試しください';
       else if(code==='images_unavailable') state.logForm.imageError = '画像からの読み取りは利用できません';
+      else if(code==='image_too_large') state.logForm.imageError = '画像が大きすぎます。別の画像でお試しください';
+      else if(code==='invalid_image') state.logForm.imageError = 'JPEG、PNG、WebP形式の画像を選択してください';
+      else if(code==='rate_limited') state.logForm.imageError = '画像の読み取りが集中しています。少し時間を置いてお試しください';
       else state.logForm.imageError = '画像の読み取りに失敗しました。手入力してください';
     } finally {
       state.logForm.imageBusy = false;

@@ -6,7 +6,7 @@
  * `npm install` すら不要にするための最小実装(Node標準モジュールのみ)。
  * ビルドツール導入を避け、現状の「素のHTML/CSS/JS」という構成を保つための選択です。
  *
- * OpenAI経由のAI Coachをローカルでも試せるよう、`POST /api/coach` だけは
+ * OpenAI経由のAI Coachとスクリーンショット読み取りをローカルでも試せるよう、APIは
  * api/coach.js のハンドラへ直接橋渡しする(Vercel Dev等を導入せず、
  * 依存パッケージ無しで最小限のAPIルーティングを行うための実装)。
  * それ以外のパスは従来通り dist/ の静的ファイル配信のみ。
@@ -60,8 +60,9 @@ function loadDotEnvIfPresent() {
 loadDotEnvIfPresent();
 
 const coachHandler = require(path.resolve(__dirname, '..', 'api', 'coach.js'));
+const runExtractHandler = require(path.resolve(__dirname, '..', 'api', 'run-extract.js'));
 
-function handleApiCoach(req, res) {
+function handleApi(handler, req, res) {
   // api/coach.js は Vercel の (req, res) 規約に合わせて書かれているため、
   // Node標準の http.ServerResponse に無い res.status()/res.json() をここで簡易的に付与する。
   res.status = function status(code) { res.statusCode = code; return res; };
@@ -70,8 +71,8 @@ function handleApiCoach(req, res) {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(body);
   };
-  Promise.resolve(coachHandler(req, res)).catch((err) => {
-    console.error('api/coach handler error:', err);
+  Promise.resolve(handler(req, res)).catch((err) => {
+    console.error('api handler error:', err);
     if (!res.headersSent) {
       res.status(500).json({ error: 'coach_unavailable' });
     }
@@ -82,7 +83,11 @@ const server = http.createServer((req, res) => {
   const reqPath = decodeURIComponent(req.url.split('?')[0]);
 
   if (reqPath === '/api/coach') {
-    handleApiCoach(req, res);
+    handleApi(coachHandler, req, res);
+    return;
+  }
+  if (reqPath === '/api/run-extract') {
+    handleApi(runExtractHandler, req, res);
     return;
   }
 
@@ -109,6 +114,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`runQ. dev server: http://localhost:${PORT}`);
   console.log(process.env.OPENAI_API_KEY
-    ? '  /api/coach: OPENAI_API_KEY 設定済み(OpenAI呼び出し有効)'
-    : '  /api/coach: OPENAI_API_KEY 未設定(呼び出すと coach_unavailable エラーを返します)');
+    ? '  /api/coach, /api/run-extract: OPENAI_API_KEY 設定済み(OpenAI呼び出し有効)'
+    : '  /api/coach, /api/run-extract: OPENAI_API_KEY 未設定(呼び出すと利用不可エラーを返します)');
 });

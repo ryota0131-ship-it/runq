@@ -22,7 +22,7 @@ runQ.(ランクエ / "Run your quest.")は、ランニング初心者〜継続�
 - **言語**: JavaScript(TypeScriptではありません)。
 - **状態管理**: シンプルな`state`オブジェクト + `render()`によるDOM全再構築(仮想DOM等は無し)。
 - **データ保存**: 現在はClaude Artifactの`db` capability(`window.claude.use('db')`)。`db`が使えない環境(= Claude Artifact以外の場所で開いた場合)では`localStorage`へ自動フォールバックする作りに既になっています。
-- **AI Coach**: `CoachService`が`ClaudeArtifactProvider`(Claude Artifactの`sample` capability)と`OpenAIProvider`(サーバー側`/api/coach`経由でOpenAI API)の2つを抽象化しています。Claude Artifactとして開いている場合は引き続き`ClaudeArtifactProvider`が使われ、それ以外(ローカル起動・Vercel等)では`OpenAIProvider`にフォールバックします。OpenAI APIキーはサーバー側(`api/coach.js`)だけで保持し、ブラウザ・Capacitorアプリには一切埋め込みません(詳細は[docs/architecture.md](./docs/architecture.md)を参照)。
+- **AI Coach / 画像解析**: CoachはClaude Artifactの`sample` capabilityまたはサーバー側`/api/coach`を使います。スクリーンショット解析はClaude Artifactでは`sample`、通常Web/Vercelではサーバー側`/api/run-extract`からOpenAI画像入力を使います。OpenAI APIキーはサーバー側だけで保持し、ブラウザ・Capacitorアプリには一切埋め込みません。
 - **外部依存**: Google Fonts(`fonts.googleapis.com`)の読み込みのみ。それ以外の外部CDN・APIへの依存はありません。
 
 このため、現状は「ビルド」と呼べる工程はほぼ無く、`app/runq.html`という1ファイルがアプリの実体そのものです。詳しくは[docs/architecture.md](./docs/architecture.md)を参照してください。
@@ -48,7 +48,7 @@ cp .env.example .env
 # .env を編集して OPENAI_API_KEY= の後ろに実際のキーを入力
 ```
 
-- `OPENAI_API_KEY` — OpenAI APIキー。サーバー側(`api/coach.js`)だけで読み込まれ、クライアントには一切渡りません。未設定でもアプリ自体は起動し、AI Coachのみ「コーチとの通信に失敗しました。」というエラーになります。
+- `OPENAI_API_KEY` — OpenAI APIキー。サーバー側(`api/coach.js`/`api/run-extract.js`)だけで読み込まれ、クライアントには一切渡りません。未設定でもアプリ自体は起動し、AI Coachと画像解析のみ利用できません。
 - `OPENAI_MODEL` — 使用するモデル名(省略可。未設定時は`api/coach.js`内の`DEFAULT_MODEL`にフォールバック)。
 
 `.env`はコミットしないでください(`.gitignore`済み)。値を書かない変数を先回りして`.env.example`に大量に追加しないでください(詳細は`.env.example`のコメントを参照)。
@@ -79,6 +79,7 @@ runq/
 │  └─ runq.html        # アプリ本体(Claude Artifact公開用の断片形式のまま管理。ここが正本)
 ├─ api/
 │  └─ coach.js          # AI Coach用サーバーエンドポイント(Vercel Serverless Function。OpenAI API呼び出し)
+│  └─ run-extract.js    # スクリーンショット解析用エンドポイント(画像は保存しない)
 ├─ scripts/
 │  ├─ build.js          # app/runq.html → dist/index.html への変換(依存なし)
 │  └─ dev-server.js     # dist/ を配信する最小static server + /api/coach への橋渡し(依存なし)
