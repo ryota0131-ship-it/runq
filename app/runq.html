@@ -203,13 +203,13 @@
   .typing-dots span:nth-child(2){ animation-delay:0.15s; }
   .typing-dots span:nth-child(3){ animation-delay:0.3s; }
   @keyframes typing-bounce{ 0%,60%,100%{ transform:translateY(0); opacity:0.5; } 30%{ transform:translateY(-3px); opacity:1; } }
-  .chat-input-row{ display:flex; gap:8px; align-items:flex-end; }
-  /* rows=1指定 + line-heightの明示で、メッセージ入力欄が最初から縦長になりすぎないようにする
-     (ブラウザ間でtextareaの既定行間・既定行数の扱いが異なり、指定しないと特に一部のスマホの
-     ブラウザで初期状態から数行分の高さになってしまうことがあるため)。
-     複数行の入力自体はresize:vertical(.adjust-card textarea)で可能なまま、伸びすぎないようmax-heightは抑える */
-  .chat-input-row textarea{ flex:1 1 auto; min-height:40px; max-height:84px; border-radius:20px; padding:9px 16px; line-height:1.35; }
-  .chat-send-btn{ flex:0 0 auto; padding:11px 22px; }
+  .chat-input-row{ display:flex; gap:8px; align-items:flex-end; border:1px solid var(--border); border-radius:24px; padding:7px 8px 7px 15px; background:var(--surface); box-shadow:0 2px 10px rgba(20,45,90,.06); }
+  .chat-input-row:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  /* GPTのように、入力面と送信操作を一つのコンポーザーにまとめる。Shift+Enterは改行。 */
+  .chat-input-row textarea{ flex:1 1 auto; min-height:28px; max-height:120px; border:0; outline:0; box-shadow:none; background:transparent; border-radius:0; padding:8px 2px; line-height:1.45; resize:none; }
+  .chat-input-row textarea:focus{ border:0; box-shadow:none; }
+  .chat-send-btn{ flex:0 0 auto; width:36px; height:36px; min-width:36px; border-radius:50%; padding:0; display:grid; place-items:center; font-size:19px; line-height:1; }
+  .chat-send-btn span{ transform:translateY(-1px); }
   .chat-cancel-btn{ flex:0 0 auto; padding:11px 16px; font-size:12px; }
   .history-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
   .history-list li{ display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; font-size:12.5px; color:var(--text-muted); line-height:1.5; }
@@ -235,8 +235,7 @@
   body.mode-coach .coach-chat-card .lede{ padding:0 16px; margin-bottom:10px; }
   body.mode-coach .chat-thread{ flex:1 1 auto; min-height:0; max-height:none; padding:4px 16px 8px; }
   body.mode-coach .chat-input-row{
-    flex:0 0 auto; margin:0; padding:10px 16px calc(10px + env(safe-area-inset-bottom));
-    border-top:1px solid var(--border); background:var(--surface);
+    flex:0 0 auto; margin:0 12px calc(10px + env(safe-area-inset-bottom)); padding:7px 8px 7px 15px;
   }
 
   /* ---------- week cards ---------- */
@@ -790,6 +789,31 @@
     {name:'千葉アクアラインマラソン', distanceKm:42.195},
     {name:'北海道マラソン', distanceKm:42.195},
     {name:'徳島マラソン', distanceKm:42.195},
+    {name:'静岡マラソン', distanceKm:42.195},
+    {name:'長野マラソン', distanceKm:42.195},
+    {name:'富山マラソン', distanceKm:42.195},
+    {name:'金沢マラソン', distanceKm:42.195},
+    {name:'岡山マラソン', distanceKm:42.195},
+    {name:'愛媛マラソン', distanceKm:42.195},
+    {name:'熊本城マラソン', distanceKm:42.195},
+    {name:'福岡マラソン', distanceKm:42.195},
+    {name:'北九州マラソン', distanceKm:42.195},
+    {name:'高知龍馬マラソン', distanceKm:42.195},
+    {name:'下関海響マラソン', distanceKm:42.195},
+    {name:'水戸黄門漫遊マラソン', distanceKm:42.195},
+    {name:'かすみがうらマラソン', distanceKm:42.195},
+    {name:'新潟シティマラソン', distanceKm:42.195},
+    {name:'青島太平洋マラソン', distanceKm:42.195},
+    {name:'別府大分毎日マラソン', distanceKm:42.195},
+    {name:'びわ湖マラソン', distanceKm:42.195},
+    {name:'ふくい桜マラソン', distanceKm:42.195},
+    {name:'松本マラソン', distanceKm:42.195},
+    {name:'松江城マラソン', distanceKm:42.195},
+    {name:'鳥取マラソン', distanceKm:42.195},
+    {name:'仙台国際ハーフマラソン', distanceKm:21.0975},
+    {name:'香川丸亀国際ハーフマラソン', distanceKm:21.0975},
+    {name:'札幌マラソン', distanceKm:21.0975},
+    {name:'青梅マラソン', distanceKm:30},
     {name:'防府読売マラソン', distanceKm:42.195},
     {name:'奈良マラソン', distanceKm:42.195},
     {name:'福知山マラソン', distanceKm:42.195},
@@ -2751,11 +2775,11 @@
     html += '</div>';
 
     html += '<form id="adjust-form" class="chat-input-row">';
-    html += '<textarea id="adjust-input" rows="1" placeholder="コーチに相談・依頼する" '+(a.busy?'disabled':'')+'>'+escapeHtml(a.draft||'')+'</textarea>';
+    html += '<textarea id="adjust-input" rows="1" placeholder="メッセージを入力" aria-label="コーチへのメッセージ" '+(a.busy?'disabled':'')+'>'+escapeHtml(a.draft||'')+'</textarea>';
     if(a.busy){
       html += '<button type="button" class="btn-secondary chat-cancel-btn" data-action="cancel-adjust">キャンセル</button>';
     } else {
-      html += '<button type="submit" class="btn-primary chat-send-btn">送信</button>';
+      html += '<button type="submit" class="btn-primary chat-send-btn" aria-label="送信" title="送信"><span>↑</span></button>';
     }
     html += '</form>';
     html += '</div>';
@@ -3587,7 +3611,7 @@
       + '<div class="lede">今回のレース条件を入力すると、マイページのランニングプロフィールをもとに週別プランを自動生成します。</div>'
       + '<div class="info-card" style="margin:14px 0;"><div class="runner-profile-head"><h3>トレーニング設定</h3><button type="button" class="li-remove" data-action="tab" data-tab="profile">プロフィールを変更 ＞</button></div><div class="li-sub">週'+prof.weeklyRunDays+'回（'+escapeHtml(availableLabel)+'） ・ 最長ロング走 '+formatKm(longest.km)+'（'+longest.source+'）</div><div class="li-sub" style="margin-top:4px;">自己ベスト: '+escapeHtml(pbLabel)+'</div></div>'
       + '<form id="gen-form"><div class="form-grid">'
-      + fld('name','大会名','text','placeholder="例: ○○マラソン" value="新しいレース" required list="race-presets"','主要大会は候補から選ぶと距離が自動入力されます。無い大会は自由に入力できます')
+      + fld('name','大会名','text','placeholder="例: ○○マラソン" required list="race-presets"','主要大会は候補から選ぶと距離が自動入力されます。無い大会は自由に入力できます')
       + '<datalist id="race-presets">'+raceOptions+'</datalist>'
       + '<div class="field"><label for="f_distance">距離</label><select id="f_distance" name="distance">'
         + '<option value="42.195">フルマラソン(42.195km)</option>'
@@ -3788,12 +3812,26 @@
   });
 
   document.getElementById('app').addEventListener('input', function(e){
+    if(e.target.id==='adjust-input'){
+      // 入力に応じて自然に伸びる。送信前にrenderしても文面を失わないよう下書きも保持する。
+      e.target.style.height = 'auto';
+      e.target.style.height = Math.min(e.target.scrollHeight, 120)+'px';
+      state.adjust.draft = e.target.value;
+      return;
+    }
     if(e.target.id==='f_name'){
       const form = e.target.closest('#gen-form');
       if(!form) return;
       const match = RACE_PRESETS.find(r=>r.name===e.target.value.trim());
       if(match){ form.distance.value = String(match.distanceKm); refreshTargetPacePreview(form); }
     }
+  });
+
+  document.getElementById('app').addEventListener('keydown', function(e){
+    if(e.target.id!=='adjust-input' || e.key!=='Enter' || e.shiftKey || e.isComposing) return;
+    e.preventDefault();
+    const form = e.target.closest('#adjust-form');
+    if(form && !state.adjust.busy) form.requestSubmit();
   });
 
   document.getElementById('app').addEventListener('change', function(e){
