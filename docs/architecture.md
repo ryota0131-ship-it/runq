@@ -63,9 +63,11 @@ async savePlan(plan){
 Runner Profile (profile/main)
  ├─ pbs[]                 … 自己ベスト(種目別、複数)
  ├─ shoes[]                … シューズ(id, name, brand, startDate, active, note)
- ├─ weeklyRunDays / availableWeekdays / longRunWeekday
+ ├─ weeklyRunDays / availableWeekdays
+ ├─ longestRunManualKm          … 実績が無い場合の手動最長ロング走
  ├─ injuryNote / courseNote / constitutionNote / scheduleNote
- └─ (New Questの曜日初期値として参照される)
+ └─ 新規Quest作成時のプロフィール正本。既存のlongRunWeekday/courseNoteは
+    互換目的で保持し、新規プランの曜日・レース固有コース情報には使用しない
 
 Training Plan (plans/{planId})  … Quest + Race + TrainingPlan が1ドキュメントに一体化
  ├─ id, createdAt

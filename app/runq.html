@@ -1335,6 +1335,19 @@
     return addDays(weekStart, offset);
   }
 
+  // プロフィールの走れる曜日から、ポイント走とロング走をできるだけ離して配置する。
+  // ロング走は週末を優先し、残りの走行日はすべてイージー走として使う。
+  function trainingWeekPattern(availableWeekdays, weeklyRunDays, fallback){
+    const days = Array.from(new Set((availableWeekdays||[]).map(Number).filter(function(d){ return d>=0 && d<=6; }))).sort(function(a,b){ return a-b; });
+    if(days.length!==weeklyRunDays || days.length<2) return fallback || { mpWeekday:1, easyWeekdays:[3], longWeekday:6 };
+    const weekend = days.filter(function(d){ return d===0 || d===6; });
+    const longWeekday = weekend.indexOf(0)>=0 ? 0 : (weekend.indexOf(6)>=0 ? 6 : days[days.length-1]);
+    const distance = function(a,b){ const diff=Math.abs(a-b); return Math.min(diff,7-diff); };
+    const candidates = days.filter(function(d){ return d!==longWeekday; });
+    const mpWeekday = candidates.slice().sort(function(a,b){ return distance(b,longWeekday)-distance(a,longWeekday) || a-b; })[0];
+    return { mpWeekday, longWeekday, easyWeekdays: days.filter(function(d){ return d!==longWeekday && d!==mpWeekday; }) };
+  }
+
   // プランの週は常に月曜始まり・日曜終わり。開始日が週の途中なら、Week 1はその日以降だけを使う。
   function mondayOfWeek(date){
     return addDays(date, -((date.getDay()+6)%7));
@@ -1365,7 +1378,7 @@
     const peakCap = Math.max(cfg.distanceKm*conf.peakMult, cfg.longRunStart*1.1);
     const peakWeekIndex = buildWeeks-1;
     const mpWeekday = (cfg.mpWeekday!=null) ? cfg.mpWeekday : 1;
-    const easyWeekday = (cfg.easyWeekday!=null) ? cfg.easyWeekday : 3;
+    const easyWeekdays = (cfg.easyWeekdays && cfg.easyWeekdays.length) ? cfg.easyWeekdays : [(cfg.easyWeekday!=null) ? cfg.easyWeekday : 3];
     const longWeekday = (cfg.longWeekday!=null) ? cfg.longWeekday : 6;
     const restWeekday = (longWeekday+1)%7;
 
@@ -1400,7 +1413,6 @@
         items.push({type:'race', day:WEEKDAY_JA[raceDate.getDay()], date:toISO(raceDate), title:'レース本番', desc:cfg.name+' — 目標 '+cfg.targetLabel});
       } else {
         const mpDate = dateForWeekday(weekStart, mpWeekday);
-        const easyDate = dateForWeekday(weekStart, easyWeekday);
         const longDate = dateForWeekday(weekStart, longWeekday);
         const restDate = dateForWeekday(weekStart, restWeekday);
 
@@ -1439,11 +1451,15 @@
         const easyDist = Math.max(conf.easyFloor, Math.round(longDist*conf.easyRatio));
 
         if(isPlanItemDate(mpDate, weekStart, cfg)) items.push({type:'mp', day:WEEKDAY_JA[mpDate.getDay()], date:toISO(mpDate), title:'MP走', desc:mpDesc(mpTpl, band.mpLabel)});
-        if(isPlanItemDate(easyDate, weekStart, cfg)) items.push({type:'easy', day:WEEKDAY_JA[easyDate.getDay()], date:toISO(easyDate), title:'イージー', desc:formatKm(easyDist)+'('+band.easyLabel+')'});
+        easyWeekdays.forEach(function(easyWeekday){
+          const easyDate = dateForWeekday(weekStart, easyWeekday);
+          if(isPlanItemDate(easyDate, weekStart, cfg)) items.push({type:'easy', day:WEEKDAY_JA[easyDate.getDay()], date:toISO(easyDate), title:'イージー', desc:formatKm(easyDist)+'('+band.easyLabel+')'});
+        });
         if(isPlanItemDate(longDate, weekStart, cfg)) items.push({type:'long', day:WEEKDAY_JA[longDate.getDay()], date:toISO(longDate), title:'ロング走', desc:longDesc, flag: flag?flag.kind:null, flagText: flag?flag.text:null, peak: w===peakWeekIndex});
         if(isPlanItemDate(restDate, weekStart, cfg)) items.push({type:'rest', day:WEEKDAY_JA[restDate.getDay()], date:toISO(restDate), title:'完全休養', desc:''});
       }
 
+      items.sort(function(a,b){ return (a.date||'9999-99-99').localeCompare(b.date||'9999-99-99'); });
       const rangeStart = weekStart, rangeEnd = addDays(weekStart,6);
       weeks.push({ label:'Week '+(w+1), phase, dateRange:fmtMD(rangeStart)+'〜'+fmtMD(rangeEnd), items });
     }
@@ -1470,7 +1486,7 @@
         linkedFromPlanId: cfg.linkedFromPlanId || null,
         peakLongRunKm: Math.round((maxLongDist || cfg.longRunStart)*10)/10,
         policy: [
-          WEEKDAY_JA[mpWeekday]+':MP走(marathon pace) / '+WEEKDAY_JA[easyWeekday]+':イージー / '+WEEKDAY_JA[longWeekday]+':ロング走 / '+WEEKDAY_JA[restWeekday]+':完全休養(残りは休息 or 軽い活動)',
+          WEEKDAY_JA[mpWeekday]+':MP走(marathon pace) / '+easyWeekdays.map(function(d){ return WEEKDAY_JA[d]; }).join('・')+':イージー / '+WEEKDAY_JA[longWeekday]+':ロング走 / '+WEEKDAY_JA[restWeekday]+':完全休養(残りは休息 or 軽い活動)',
           cfg.injuryNote ? cfg.injuryNote+'への配慮 → 距離・強度の増加は段階的に。違和感が出たら即座に落とす' : '週間距離の急増(前週比+20%超)は避ける',
           '60〜70分あたりから補給ジェルを練習に組み込み、本番の"壁"対策を仕込む'
         ].concat(cfg.linkedFromPlanId && returnWeeks>0 ? ['前の大会からの継続プランのため、最初の'+returnWeeks+'週間は回復期として距離を抑える'] : [])
@@ -1579,7 +1595,7 @@
       try{ localStorage.setItem('paceplan.coachLog.'+id, JSON.stringify(messages)); }catch(e){}
     },
     async getProfile(){
-      const empty = { name:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null };
+      const empty = { name:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null };
       if(db){
         const snap = await db.doc('profile/main').get();
         return snap.exists ? Object.assign({}, empty, snap.data()) : empty;
@@ -1614,11 +1630,11 @@
     calendarSelected: null,
     sampleImageOk: false,
     sampleAvailable: false,
-    logForm: { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, feedbackBusy:null },
+    logForm: { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy:null },
     logUndo: null,
     logProposal: null,
     deleteModal: null,
-    profile: { name:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null },
+    profile: { name:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null },
     shoeMileage: {},
     runnerStats: { longestRunKm: null },
     profileFormError: {},
@@ -1774,6 +1790,18 @@
     if(state.mode==='profile') render();
   }
 
+  function effectiveLongestRunKm(profile){
+    const auto = state.runnerStats && state.runnerStats.longestRunKm;
+    if(auto!=null) return { km:auto, source:'RUNQ.の記録から算出' };
+    const manual = profile && Number(profile.longestRunManualKm);
+    return manual>0 ? { km:manual, source:'手動で設定' } : { km:null, source:'未設定' };
+  }
+  function profileTrainingReady(profile){
+    const count = Number(profile && profile.weeklyRunDays);
+    const days = (profile && profile.availableWeekdays) || [];
+    return count>=2 && count<=6 && days.length===count && !!effectiveLongestRunKm(profile).km;
+  }
+
   // マイページの保存成功トースト(「プロフィールを保存しました」等)。2.6秒後に自動で消える
   let mypageToastTimer = null;
   function showMypageToast(msg){
@@ -1844,13 +1872,13 @@
   function runnerProfileCardHTML(){
     const prof = state.profile || {};
     const fullPb = bestPbExact(42.195);
-    const longest = state.runnerStats && state.runnerStats.longestRunKm;
+    const longest = effectiveLongestRunKm(prof);
     let html = '<div class="info-card runner-profile-card">';
     html += '<div class="runner-profile-head"><h3>RUNNER PROFILE</h3><button type="button" class="li-remove" data-action="toggle-profile-edit">'+(state.profileEditOpen?'閉じる':'編集 ＞')+'</button></div>';
     if(prof.name) html += '<div class="li-main" style="font-size:16px;font-weight:700;">'+escapeHtml(prof.name)+'</div>';
     html += '<div class="hero-stats" style="margin-top:8px;">'
       + '<div class="stat"><div class="k">FULL PB</div><div class="v mono">'+(fullPb?escapeHtml(fullPb.timeLabel):'未登録')+'</div></div>'
-      + '<div class="stat"><div class="k">最長RUN</div><div class="v mono">'+(longest?formatKm(longest):'—')+'</div></div>'
+      + '<div class="stat"><div class="k">最長RUN</div><div class="v mono">'+(longest.km?formatKm(longest.km):'—')+'</div></div>'
       + '<div class="stat"><div class="k">RUN / WEEK</div><div class="v mono">'+(prof.weeklyRunDays?prof.weeklyRunDays+'回':'—')+'</div></div>'
       + '</div>';
     html += '<div class="runner-pb-grid">'
@@ -1964,16 +1992,15 @@
     const availLabel = (prof.availableWeekdays && prof.availableWeekdays.length)
       ? prof.availableWeekdays.map(function(d){ return WEEKDAY_JA[Number(d)]; }).join('・')
       : '未設定';
-    const longLabel = (prof.longRunWeekday!=null && prof.longRunWeekday!=='') ? WEEKDAY_JA[Number(prof.longRunWeekday)]+'曜日' : '未設定';
+    const longest = effectiveLongestRunKm(prof);
     let html = '<div class="info-card">';
-    html += '<div class="runner-profile-head"><h3>トレーニング設定</h3><button type="button" class="li-remove" data-action="toggle-training-edit">編集 ＞</button></div>';
+    html += '<div class="runner-profile-head"><h3>ランニングプロフィール</h3><button type="button" class="li-remove" data-action="toggle-training-edit">編集 ＞</button></div>';
+    html += '<div class="list-row"><div><div class="li-main">走力・実績</div><div class="li-sub">最長ロング走 '+(longest.km?formatKm(longest.km)+' ・ '+longest.source:'未設定')+'</div></div></div>';
     html += '<div class="list-row"><div><div class="li-main">週何回走れるか</div><div class="li-sub">'+(prof.weeklyRunDays?prof.weeklyRunDays+'回/週':'未設定')+'</div></div></div>';
     html += '<div class="list-row"><div><div class="li-main">走れる曜日</div><div class="li-sub">'+escapeHtml(availLabel)+'</div></div></div>';
-    html += '<div class="list-row"><div><div class="li-main">ロング走の曜日</div><div class="li-sub">'+escapeHtml(longLabel)+'</div></div></div>';
-    html += '<div class="list-row"><div><div class="li-main">怪我・痛みの傾向</div><div class="li-sub">'+(prof.injuryNote?escapeHtml(prof.injuryNote):'未設定')+'</div></div></div>';
-    html += '<div class="list-row"><div><div class="li-main">コース特性・気候</div><div class="li-sub">'+(prof.courseNote?escapeHtml(prof.courseNote):'未設定')+'</div></div></div>';
+    html += '<div class="list-row"><div><div class="li-main">身体・コンディション</div><div class="li-sub">'+(prof.injuryNote?escapeHtml(prof.injuryNote):'既往症・怪我パターンは未設定')+'</div></div></div>';
     html += '<div class="list-row"><div><div class="li-main">体質的特徴</div><div class="li-sub">'+(prof.constitutionNote?escapeHtml(prof.constitutionNote):'未設定')+'</div></div></div>';
-    html += '<div class="list-row"><div><div class="li-main">生活制約</div><div class="li-sub">'+(prof.scheduleNote?escapeHtml(prof.scheduleNote):'未設定')+'</div></div></div>';
+    html += '<div class="list-row"><div><div class="li-main">生活スタイル</div><div class="li-sub">'+(prof.scheduleNote?escapeHtml(prof.scheduleNote):'生活制約は未設定')+'</div></div></div>';
     html += '</div>';
     return html;
   }
@@ -1984,11 +2011,10 @@
     let html = '<div class="info-card">';
     html += '<h3>トレーニング設定を編集</h3>';
     html += '<form id="training-settings-form"><div class="form-grid">'
-      + '<div class="field"><label>週何回走れるか</label>'+emptyableSelectHTML('weeklyRunDays', rangeArray(1,7,1), prof.weeklyRunDays, function(v){ return v+'回'; })+'</div>'
+      + '<div class="field"><label>週に何回走れますか？</label>'+emptyableSelectHTML('weeklyRunDays', rangeArray(2,6,1), prof.weeklyRunDays, function(v){ return v+'回'; })+'</div>'
       + '<div class="field" style="grid-column:1/-1;"><label>走れる曜日</label>'+segmentedHTML('availableWeekdays', WEEKDAY_OPTIONS, availValues, {multiple:true})+'</div>'
-      + '<div class="field" style="grid-column:1/-1;"><label>ロング走の曜日</label>'+segmentedHTML('longRunWeekday', WEEKDAY_OPTIONS, (prof.longRunWeekday!=null?String(prof.longRunWeekday):''), {})+'</div>'
+      + '<div class="field"><label for="ts_longestRunManualKm">現在の最長ロング走(km)</label><input id="ts_longestRunManualKm" name="longestRunManualKm" type="number" min="3" max="60" step="0.5" value="'+(prof.longestRunManualKm||'')+'"><span class="hint">RUNQ.の記録がある場合は自動算出を優先します。未記録時の開始距離として使います。</span></div>'
       + '<div class="field"><label for="ts_injuryNote">怪我・痛みの傾向(任意)</label><input id="ts_injuryNote" name="injuryNote" type="text" placeholder="例: 踵の痛み(負荷増加との相関あり)" value="'+esc(prof.injuryNote||'')+'"></div>'
-      + '<div class="field"><label for="ts_courseNote">コース特性・気候(任意)</label><input id="ts_courseNote" name="courseNote" type="text" placeholder="例: 平坦基調、11月は冷え込む" value="'+esc(prof.courseNote||'')+'"></div>'
       + '<div class="field"><label for="ts_constitutionNote">体質的特徴(任意)</label><input id="ts_constitutionNote" name="constitutionNote" type="text" placeholder="例: 心拍が上がりやすい" value="'+esc(prof.constitutionNote||'')+'"></div>'
       + '<div class="field"><label for="ts_scheduleNote">生活制約(任意)</label><input id="ts_scheduleNote" name="scheduleNote" type="text" placeholder="例: 在宅ワークで月水が動きやすい" value="'+esc(prof.scheduleNote||'')+'"></div>'
       + '<div class="form-actions"><button type="submit" class="btn-primary">変更を保存</button></div>'
@@ -2102,6 +2128,30 @@
     return parts.join(' ・ ') || '記録あり';
   }
 
+  // 画像から読み取った3項目は、表示値を変えずに算術的な矛盾だけを知らせる。
+  // AIの推測で補正せず、最終判断は常にユーザーに委ねる。
+  function screenshotConsistencyMessage(values){
+    const distance = Number(values.distanceKm);
+    const duration = Number(values.durationMin);
+    const pace = String(values.avgPace || '');
+    const match = pace.match(/^(\d{1,2}):(\d{2})$/);
+    if(!(distance>0 && duration>0 && match)) return '';
+    const statedSec = Number(match[1])*60 + Number(match[2]);
+    const calculatedSec = duration*60/distance;
+    return Math.abs(statedSec-calculatedSec)>25
+      ? '距離・時間から計算したペースと読み取り値に差があります。画像を確認して必要なら修正してください。'
+      : '';
+  }
+
+  function existingLogWarning(dateStr, values, prefill){
+    if(!prefill || !values || !values.distanceKm) return '';
+    const sameDistance = prefill.distanceKm!=null && Math.abs(Number(prefill.distanceKm)-Number(values.distanceKm))<0.15;
+    const sameDuration = !prefill.durationMin || !values.durationMin || Math.abs(Number(prefill.durationMin)-Number(values.durationMin))<3;
+    return sameDistance && sameDuration
+      ? 'この日に似た記録がすでにあります。重複登録ではないか確認してください。'
+      : '';
+  }
+
   function logFormHTML(dateStr, prefill){
     const lf = state.logForm;
     const v = lf.values || prefill || {};
@@ -2122,6 +2172,18 @@
     } else if(state.sampleAvailable){
       html += '<div class="log-image-row"><span class="adjust-status">この環境では画像からの自動読み取りは利用できません。下記に手入力してください</span></div>';
     }
+    if(lf.imageImport){
+      const imported = lf.imageImport;
+      const details = [imported.sourceApp, imported.activityDate, imported.startTime].filter(Boolean).join(' ・ ');
+      html += '<div class="adjust-status" style="margin-top:8px;">スクリーンショットを読み取りました'+(details ? '（'+escapeHtml(details)+'）' : '')+'。内容を確認してから登録してください。</div>';
+      if(imported.activityDate && imported.activityDate!==dateStr) html += '<div class="adjust-status error" style="margin-top:6px;">画像の日付と予定日の表示が異なります。この予定の実績として登録する前に確認してください。</div>';
+      const lowFields = Object.keys(imported.confidence||{}).filter(function(key){ return imported.confidence[key]==='low' || imported.confidence[key]==='unknown'; });
+      if(lowFields.length) html += '<div class="adjust-status" style="margin-top:6px;">一部の値は読み取りが不確かです。入力欄を確認してください。</div>';
+    }
+    const consistency = screenshotConsistencyMessage(v);
+    const duplicate = existingLogWarning(dateStr, v, prefill);
+    if(consistency) html += '<div class="adjust-status error" style="margin-top:8px;">'+consistency+'</div>';
+    if(duplicate) html += '<div class="adjust-status error" style="margin-top:8px;">'+duplicate+'</div>';
     html += '<div class="log-grid">'
       + '<div class="field"><label>距離(km)</label>'+distancePickerHTML(v.distanceKm)+'</div>'
       + '<div class="field"><label>平均ペース(分:秒/km)</label>'+pacePickerHTML(v.avgPace)+'</div>'
@@ -2855,15 +2917,21 @@
   // Phase4でPB・シューズ・直近FORECAST・直近ログ傾向を追加(要件: コーチの参照情報拡張)
   function planContextLines(plan){
     const lines = [];
-    if(plan.meta.injuryNote) lines.push('既往症・怪我パターン: '+plan.meta.injuryNote);
+    const profile = state.profile || {};
+    // 個人プロフィールは最新の内容を、レース固有のコース情報はプラン作成時の内容を参照する。
+    if(profile.injuryNote || plan.meta.injuryNote) lines.push('既往症・怪我パターン: '+(profile.injuryNote || plan.meta.injuryNote));
     if(plan.meta.courseNote) lines.push('コース特性・気候: '+plan.meta.courseNote);
-    if(plan.meta.constitutionNote) lines.push('体質的特徴: '+plan.meta.constitutionNote);
-    if(plan.meta.scheduleNote) lines.push('生活制約・走れる曜日: '+plan.meta.scheduleNote);
+    if(profile.constitutionNote || plan.meta.constitutionNote) lines.push('体質的特徴: '+(profile.constitutionNote || plan.meta.constitutionNote));
+    if(profile.scheduleNote || plan.meta.scheduleNote) lines.push('生活制約・走れる曜日: '+(profile.scheduleNote || plan.meta.scheduleNote));
     const pbs = (state.profile && state.profile.pbs) || [];
     if(pbs.length) lines.push('自己ベスト: '+pbs.map(function(pb){ return pb.label+' '+pb.timeLabel; }).join('、'));
     const shoes = (state.profile && state.profile.shoes) || [];
     const activeShoes = shoes.filter(function(s){ return s.active!==false; });
     if(activeShoes.length) lines.push('使用中のシューズ: '+activeShoes.map(function(s){ return s.name+(s.brand?'('+s.brand+')':''); }).join('、'));
+    if(profile.weeklyRunDays) lines.push('週に走れる回数: '+profile.weeklyRunDays+'回');
+    if(profile.availableWeekdays && profile.availableWeekdays.length) lines.push('走れる曜日: '+profile.availableWeekdays.map(function(d){ return WEEKDAY_JA[Number(d)]; }).join('・'));
+    const longest = effectiveLongestRunKm(profile);
+    if(longest.km) lines.push('現在の最長ロング走: '+formatKm(longest.km)+'('+longest.source+')');
     const forecast = latestForecastFor(plan.id);
     if(forecast){
       lines.push('直近のRACE FORECAST: 目標'+secToHMSLabel(forecast.recommendedGoalSec)+'(CHALLENGE '+secToHMSLabel(forecast.challengeGoalSec)+'〜SAFE '+secToHMSLabel(forecast.safeGoalSec)+'、確信度: '+(FORECAST_CONFIDENCE_LABEL[forecast.confidence]||forecast.confidence)+')');
@@ -3339,6 +3407,7 @@
     const found = findItemByDate(plan, dateStr);
     const entries = Object.assign({}, state.logs);
     const prevFeedback = entries[dateStr] && entries[dateStr].feedback;
+    const imageImport = state.logForm.imageImport || (entries[dateStr] && entries[dateStr].imageImport) || null;
     const painLevelNum = values.painLevel ? Number(values.painLevel) : 0;
     const painParts = values.painParts || [];
     const pain = (painLevelNum>0 || painParts.length) ? { level: painLevelNum, parts: painParts } : null;
@@ -3354,12 +3423,15 @@
       rpe: values.rpe ? Number(values.rpe) : null,
       pain: pain,
       completionType: values.completionType || null,
+      source: imageImport ? 'screenshot' : 'manual',
+      // 元画像は保存せず、読み取れた構造化データだけを通常の走行実績に残す。
+      imageImport: imageImport,
       feedback: prevFeedback || null,
       loggedAt: new Date().toISOString()
     };
     state.logs = entries;
     const keepFeedbackBusy = state.logForm.feedbackBusy;
-    state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, feedbackBusy: keepFeedbackBusy };
+    state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy: keepFeedbackBusy };
     await Store.setLogs(plan.id, entries);
     render();
     if(found) runLogFeedback(found.it, entries[dateStr]);
@@ -3372,7 +3444,7 @@
     state.logForm.imageError = null;
     render();
     try{
-      const prompt = 'この画像はランニングウォッチ(Garmin Connectなど)のアクティビティ記録画面です。読み取れる範囲で以下のJSON形式だけを出力してください。読み取れない項目はnullにしてください。説明文やコードフェンスは不要です。\n{"distanceKm": 数値またはnull, "avgPace": "7:20"のような"分:秒"形式の文字列またはnull, "avgHr": 数値またはnull, "durationMin": 数値(分)またはnull, "calories": 数値またはnull}';
+      const prompt = 'この画像はGarmin、Apple Fitness、Strava、Nike Run Club等のランニング記録画面です。画面の意味を理解して、読み取れる事実だけを以下のJSON形式で返してください。推測で値を埋めず、見えない項目はnullにしてください。説明文やコードフェンスは不要です。confidenceは主要値ごとにhigh、medium、low、unknownのいずれかです。\n{"activityDate":"YYYY-MM-DD"またはnull,"startTime":"HH:MM"またはnull,"distanceKm":数値またはnull,"durationMin":数値(分、小数可)またはnull,"avgPace":"7:20"形式またはnull,"avgHr":数値またはnull,"maxHr":数値またはnull,"calories":数値またはnull,"elevationGainM":数値またはnull,"cadence":数値またはnull,"activityType":"running"等またはnull,"activityName":文字列またはnull,"sourceApp":文字列またはnull,"confidence":{"distanceKm":"high"等}}';
       const result = await sampleFn.json(prompt, {images:[file], modelTier:'quick', cache:false});
       if(!result || typeof result!=='object') throw {code:'invalid_json'};
       const prevValues = state.logForm.values || {};
@@ -3389,6 +3461,17 @@
         rpe: prevValues.rpe,
         painLevel: prevValues.painLevel,
         painParts: prevValues.painParts
+      };
+      state.logForm.imageImport = {
+        activityDate: result.activityDate || null,
+        startTime: result.startTime || null,
+        maxHr: result.maxHr!=null ? Number(result.maxHr) : null,
+        elevationGainM: result.elevationGainM!=null ? Number(result.elevationGainM) : null,
+        cadence: result.cadence!=null ? Number(result.cadence) : null,
+        activityType: result.activityType || null,
+        activityName: result.activityName || null,
+        sourceApp: result.sourceApp || null,
+        confidence: result.confidence && typeof result.confidence==='object' ? result.confidence : {}
       };
     }catch(e){
       const code = e && e.code;
@@ -3425,18 +3508,19 @@
         +'</div>';
     };
     const prof = state.profile||{};
-    // Training Settingsに保存済みの「走れる曜日」「ロング走曜日」があれば、それを曜日選択の初期値として使う
-    const availDays = (prof.availableWeekdays||[]).map(Number).filter(function(d){ return !isNaN(d); });
-    const defaultLongDay = (prof.longRunWeekday!=null && prof.longRunWeekday!=='') ? Number(prof.longRunWeekday) : 6;
-    const otherDays = availDays.filter(function(d){ return d!==defaultLongDay; });
-    const defaultMpDay = otherDays.length ? otherDays[0] : 1;
-    const defaultEasyDay = otherDays.length>1 ? otherDays[1] : 3;
+    const longest = effectiveLongestRunKm(prof);
+    const availableLabel = (prof.availableWeekdays||[]).map(function(d){ return WEEKDAY_JA[Number(d)]; }).join('・');
+    const pbLabel = (prof.pbs||[]).length ? prof.pbs.map(function(pb){ return pb.label+' '+pb.timeLabel; }).join('、') : '未登録（任意）';
+    if(!profileTrainingReady(prof)){
+      return '<div class="form-card"><h2>新しいプランを作る</h2><div class="info-card"><h3>先にランニングプロフィールを設定してください</h3><p class="li-sub">週に走れる回数・曜日・現在の最長ロング走を設定すると、あなたの習慣に合わせてプランを自動配置できます。</p><button type="button" class="btn-primary" data-action="tab" data-tab="profile">マイページで設定する</button></div></div>';
+    }
     const raceOptions = RACE_PRESETS.map(function(r){ return '<option value="'+escapeHtml(r.name)+'">'; }).join('');
     const linkOptions = state.plans.slice().sort(function(a,b){ return a.meta.raceDate<b.meta.raceDate?-1:1; })
       .map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.meta.name)+'('+p.meta.raceDate+')</option>'; }).join('');
     return '<div class="form-card">'
       + '<h2>新しいプランを作る</h2>'
-      + '<div class="lede">レース日・目標タイム・現在の走力を入れると、アクアラインマラソンのプランと同じロジック（復帰期→ベース構築→ピーク期→テーパー期の期分け、MP走・イージー・ロング走の週間構成、10〜25%の漸増、ジェル補給計画）で週別プランを自動生成します。</div>'
+      + '<div class="lede">今回のレース条件を入力すると、マイページのランニングプロフィールをもとに週別プランを自動生成します。</div>'
+      + '<div class="info-card" style="margin:14px 0;"><div class="runner-profile-head"><h3>トレーニング設定</h3><button type="button" class="li-remove" data-action="tab" data-tab="profile">プロフィールを変更 ＞</button></div><div class="li-sub">週'+prof.weeklyRunDays+'回（'+escapeHtml(availableLabel)+'） ・ 最長ロング走 '+formatKm(longest.km)+'（'+longest.source+'）</div><div class="li-sub" style="margin-top:4px;">自己ベスト: '+escapeHtml(pbLabel)+'</div></div>'
       + '<form id="gen-form"><div class="form-grid">'
       + fld('name','大会名','text','placeholder="例: ○○マラソン" value="新しいレース" required list="race-presets"','主要大会は候補から選ぶと距離が自動入力されます。無い大会は自由に入力できます')
       + '<datalist id="race-presets">'+raceOptions+'</datalist>'
@@ -3461,16 +3545,7 @@
             + pbSuggestionHTML(pb, predictedSec)
             + '</div>';
         })()
-      + fld('longRunStart','現在の最長ロング走(km)','number','min="3" max="35" step="0.5" value="12" required')
-      + timeField('pb','自己ベスト(任意)','未達成の場合は0のままでOK',0,0,0)
-      + '<div class="field" style="grid-column:1/-1;"><div class="hint" style="margin-bottom:2px;">週間パターン(曜日は自由に変更できます)</div></div>'
-      + daySelect('mpWeekday','MP走の曜日',defaultMpDay)
-      + daySelect('easyWeekday','イージーの曜日',defaultEasyDay)
-      + daySelect('longWeekday','ロング走の曜日',defaultLongDay)
-      + fld('injuryNote','既往症・怪我パターン(任意)','text','placeholder="例: 踵の痛み(負荷増加との相関あり)" value="'+escapeHtml(prof.injuryNote||'')+'"','入力すると、距離増加を段階的にする配慮がプランと相談チャットに反映されます')
-      + fld('courseNote','コース特性・気候(任意)','text','placeholder="例: 平坦基調、11月は冷え込む" value="'+escapeHtml(prof.courseNote||'')+'"')
-      + fld('constitutionNote','体質的特徴(任意)','text','placeholder="例: 心拍が上がりやすい" value="'+escapeHtml(prof.constitutionNote||'')+'"')
-      + fld('scheduleNote','生活制約(任意)','text','placeholder="例: 在宅ワークで月水が動きやすい" value="'+escapeHtml(prof.scheduleNote||'')+'"')
+      + fld('courseNote','今回のコース特性・気候(任意)','text','placeholder="例: 起伏が多い、11月は冷え込む"')
       + '<div class="form-actions"><button type="submit" class="btn-primary">プランを作成</button><span class="form-note">作成後にいつでも削除できます</span></div>'
       + '</div></form>'
       + '</div>';
@@ -3539,7 +3614,7 @@
       state.currentId = id;
       state.adjust.draft = ''; state.adjust.error = null;
       state.coach = { messages:[], loadedFor:null, loading:false };
-      state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, feedbackBusy:null };
+      state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy:null };
       state.logUndo = null;
       state.logProposal = null;
       state.calendarSelected = null;
@@ -3617,7 +3692,7 @@
       const date = btn.dataset.date;
       const plan = currentPlan();
       const existing = plan ? state.logs[date] : null;
-      state.logForm = { openDate: date, values: existing ? Object.assign({}, existing) : {}, busy:false, error:null, imageBusy:false, imageError:null, feedbackBusy: state.logForm.feedbackBusy };
+      state.logForm = { openDate: date, values: existing ? Object.assign({}, existing) : {}, busy:false, error:null, imageBusy:false, imageError:null, imageImport: existing && existing.imageImport || null, feedbackBusy: state.logForm.feedbackBusy };
       render();
     } else if(action==='close-log'){
       state.logForm.openDate = null;
@@ -3766,12 +3841,16 @@
       e.preventDefault();
       const f = e.target;
       const weekly = f.weeklyRunDays.value;
-      state.profile.weeklyRunDays = weekly ? parseInt(weekly,10) : null;
-      state.profile.availableWeekdays = Array.from(f.querySelectorAll('input[name="availableWeekdays"]:checked')).map(function(el){ return el.value; });
-      const longChecked = f.querySelector('input[name="longRunWeekday"]:checked');
-      state.profile.longRunWeekday = longChecked ? longChecked.value : null;
+      const weeklyCount = weekly ? parseInt(weekly,10) : null;
+      const availableWeekdays = Array.from(f.querySelectorAll('input[name="availableWeekdays"]:checked')).map(function(el){ return el.value; });
+      if(!weeklyCount || availableWeekdays.length!==weeklyCount){
+        showMypageToast('週の回数と、選択した曜日の数を一致させてください');
+        return;
+      }
+      state.profile.weeklyRunDays = weeklyCount;
+      state.profile.availableWeekdays = availableWeekdays;
+      state.profile.longestRunManualKm = f.longestRunManualKm.value ? Number(f.longestRunManualKm.value) : null;
       state.profile.injuryNote = f.injuryNote.value.trim() || null;
-      state.profile.courseNote = f.courseNote.value.trim() || null;
       state.profile.constitutionNote = f.constitutionNote.value.trim() || null;
       state.profile.scheduleNote = f.scheduleNote.value.trim() || null;
       Store.setProfile(state.profile);
@@ -3835,17 +3914,7 @@
       targetH: parseInt(f.targetH.value,10)||0,
       targetM: parseInt(f.targetM.value,10)||0,
       targetS: parseInt(f.targetS.value,10)||0,
-      longRunStart: parseFloat(f.longRunStart.value),
-      pbH: parseInt(f.pbH.value,10)||0,
-      pbM: parseInt(f.pbM.value,10)||0,
-      pbS: parseInt(f.pbS.value,10)||0,
-      injuryNote: f.injuryNote.value.trim(),
       courseNote: f.courseNote.value.trim(),
-      constitutionNote: f.constitutionNote.value.trim(),
-      scheduleNote: f.scheduleNote.value.trim(),
-      mpWeekday: parseInt(f.mpWeekday.value,10),
-      easyWeekday: parseInt(f.easyWeekday.value,10),
-      longWeekday: parseInt(f.longWeekday.value,10),
       linkedFrom: f.linkedFrom ? f.linkedFrom.value : ''
     };
     const errs = {};
@@ -3854,11 +3923,14 @@
     const targetSec = data.targetH*3600 + data.targetM*60 + data.targetS;
     if(!targetSec) errs.target = '目標タイムを入力してください';
     if(data.raceDate && data.startDate && new Date(data.startDate) >= new Date(data.raceDate)) errs.startDate = 'レース日より前の日付にしてください';
-    if(!data.longRunStart || data.longRunStart<=0) errs.longRunStart = '現在走れる距離を入力してください';
+    if(!profileTrainingReady(state.profile)) errs.profile = 'プラン作成前に、マイページでトレーニング設定を完了してください';
 
     if(Object.keys(errs).length){ state.formError = errs; render(); return; }
 
-    const pbSec = data.pbH*3600 + data.pbM*60 + data.pbS;
+    const profile = state.profile;
+    const longest = effectiveLongestRunKm(profile);
+    const pattern = trainingWeekPattern(profile.availableWeekdays, Number(profile.weeklyRunDays));
+    const bestPb = bestPbForDistance(data.distanceKm, profile.pbs);
     const distLabels = {'42.195':'フルマラソン','21.0975':'ハーフマラソン','16':'16km','10':'10km','5':'5km'};
     const linkedPlan = data.linkedFrom ? state.plans.find(p=>p.id===data.linkedFrom) : null;
     const forceRecoveryWeeks = linkedPlan ? recoveryPlanFor(linkedPlan).forceRecoveryWeeks : null;
@@ -3870,16 +3942,16 @@
       startDate: parseISO(data.startDate),
       targetSec: targetSec,
       targetLabel: secToHMSLabel(targetSec),
-      longRunStart: data.longRunStart,
-      pbLabel: pbSec>0 ? secToHMSLabel(pbSec) : null,
-      heelCaution: !!data.injuryNote,
-      injuryNote: data.injuryNote || null,
+      longRunStart: longest.km,
+      pbLabel: bestPb ? bestPb.timeLabel : null,
+      heelCaution: !!profile.injuryNote,
+      injuryNote: profile.injuryNote || null,
       courseNote: data.courseNote || null,
-      constitutionNote: data.constitutionNote || null,
-      scheduleNote: data.scheduleNote || null,
-      mpWeekday: data.mpWeekday,
-      easyWeekday: data.easyWeekday,
-      longWeekday: data.longWeekday,
+      constitutionNote: profile.constitutionNote || null,
+      scheduleNote: profile.scheduleNote || null,
+      mpWeekday: pattern.mpWeekday,
+      easyWeekdays: pattern.easyWeekdays,
+      longWeekday: pattern.longWeekday,
       linkedFromPlanId: linkedPlan ? linkedPlan.id : null,
       forceRecoveryWeeks: forceRecoveryWeeks
     });
@@ -3889,7 +3961,7 @@
       state.currentId = plan.id;
       state.completed = {};
       state.logs = {};
-      state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, feedbackBusy:null };
+      state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy:null };
       state.logUndo = null;
       state.logProposal = null;
       state.calendarSelected = null;
