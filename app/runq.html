@@ -222,8 +222,7 @@
   .chat-input-row textarea{ flex:1 1 auto; min-height:28px; max-height:120px; border:0; outline:0; box-shadow:none; background:transparent; border-radius:0; padding:8px 2px; line-height:1.45; resize:none; }
   .chat-input-row textarea:focus, .chat-input-row textarea:focus-visible{ border:0 !important; outline:0 !important; box-shadow:none !important; }
   .chat-input-row .chat-send-btn:focus, .chat-input-row .chat-send-btn:focus-visible{ outline:0; box-shadow:none; }
-  .chat-send-btn{ flex:0 0 auto; width:36px; height:36px; min-width:36px; border-radius:50%; padding:0; display:grid; place-items:center; font-size:19px; line-height:1; }
-  .chat-send-btn svg{ display:block; width:18px; height:18px; }
+  .chat-send-btn{ flex:0 0 auto; width:auto; min-width:58px; height:36px; border-radius:18px; padding:0 14px; font-size:13px; line-height:1; }
   .chat-cancel-btn{ flex:0 0 auto; padding:11px 16px; font-size:12px; }
   .history-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
   .history-list li{ display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; font-size:12.5px; color:var(--text-muted); line-height:1.5; }
@@ -240,7 +239,7 @@
   body.mode-coach .wrap{ height:100%; max-width:100%; margin:0; gap:0; }
   body.mode-coach .topbar{ flex:0 0 auto; padding:calc(16px + env(safe-area-inset-top)) 16px 10px; }
   body.mode-coach .bottom-nav{ position:static; flex:0 0 auto; box-shadow:none; }
-  body.mode-coach .wrap > .info-card{ flex:1 1 auto; min-height:0; margin:0 16px 16px; overflow-y:auto; }
+  body.mode-coach .wrap > .info-card{ flex:1 1 auto; min-height:0; margin:0 16px; overflow-y:auto; }
   body.mode-coach .coach-chat-card{
     flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:0;
     background:transparent; border:none; border-radius:0; box-shadow:none; padding:0;
@@ -249,7 +248,7 @@
   body.mode-coach .coach-chat-card .lede{ padding:0 16px; margin-bottom:10px; }
   body.mode-coach .chat-thread{ flex:1 1 auto; min-height:0; max-height:none; padding:4px 16px 8px; }
   body.mode-coach .chat-input-row{
-    flex:0 0 auto; margin:0 12px calc(10px + env(safe-area-inset-bottom)); padding:7px 8px 7px 15px;
+    flex:0 0 auto; margin:0 12px 6px; padding:7px 8px 7px 15px;
   }
 
   /* ---------- week cards ---------- */
@@ -3021,7 +3020,6 @@
   function coachChatHTML(){
     const a = state.adjust, c = state.coach;
     let html = '<div class="info-card adjust-card coach-chat-card">';
-    html += '<h3>コーチ</h3>';
     html += '<div class="lede">プランや体調について、何でも相談できます。</div>';
 
     html += '<div class="chat-thread" id="coach-thread">';
@@ -3047,7 +3045,7 @@
     if(a.busy){
       html += '<button type="button" class="btn-secondary chat-cancel-btn" data-action="cancel-adjust">キャンセル</button>';
     } else {
-      html += '<button type="submit" class="btn-primary chat-send-btn" aria-label="送信" title="送信"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none"><path d="M12 18V6m0 0-4.5 4.5M12 6l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      html += '<button type="submit" class="btn-primary chat-send-btn" aria-label="送信" title="送信">送信</button>';
     }
     html += '</form>';
     html += '</div>';
