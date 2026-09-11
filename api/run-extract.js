@@ -143,3 +143,6 @@ module.exports.handler = handler;
 module.exports.imageInfo = imageInfo;
 module.exports.normalizePace = normalizePace;
 module.exports.MAX_IMAGE_BYTES = MAX_IMAGE_BYTES;
+// api/coach.jsと同じ理由(Vercel Hobbyプランのデフォルト10秒タイムアウト対策)で、
+// 画像解析(OpenAI Vision呼び出し)にも同じ上限まで実行時間を延長しておく。
+module.exports.config = { maxDuration: 60 };

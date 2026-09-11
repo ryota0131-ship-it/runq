@@ -266,3 +266,8 @@ module.exports.extractOutputText = extractOutputText;
 module.exports.parseCoachPayload = parseCoachPayload;
 module.exports.DEFAULT_MODEL = DEFAULT_MODEL;
 module.exports.RESPONSE_SCHEMA = RESPONSE_SCHEMA;
+// Vercelのデフォルトの関数実行時間(Hobbyプランは既定10秒)だと、options応答
+// (変更後の完全なプランJSONを生成する必要があり時間がかかりやすい)が間に合わず
+// タイムアウトし、クライアント側には「coach_unreachable(通信に失敗)」として
+// 見えてしまうことがあった。Hobbyプランで設定可能な上限(60秒)まで延長する。
+module.exports.config = { maxDuration: 60 };
