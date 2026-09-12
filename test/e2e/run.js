@@ -21,6 +21,7 @@ const http = require('http');
 const ROOT = path.resolve(__dirname, '..', '..');
 const DIST_INDEX = path.join(ROOT, 'dist', 'index.html');
 const PORT = 4173; // npm run dev の既定(3000)と衝突しないよう専用ポートを使う
+const CAPTURE_DIR = path.join(ROOT, 'test-artifacts', 'coach-companion');
 
 let passed = 0;
 let failed = 0;
@@ -35,6 +36,13 @@ function check(name, condition) {
     failures.push(name);
     console.error(`  FAIL - ${name}`);
   }
+}
+
+async function captureIfRequested(page, name, fullPage = false) {
+  if (!process.env.RUNQ_CAPTURE) return;
+  fs.mkdirSync(CAPTURE_DIR, { recursive: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: path.join(CAPTURE_DIR, name), fullPage });
 }
 
 /** 最小限の「実行中クエスト」を1件localStorageへ直接投入する(NEW QUESTウィザードを介さず、
@@ -180,8 +188,8 @@ async function main() {
 
       const { plan, profile } = seedPlan();
       await context.addInitScript(({ plan, profile }) => {
-        localStorage.setItem('paceplan.plans', JSON.stringify([plan]));
-        localStorage.setItem('paceplan.profile', JSON.stringify(profile));
+        if (!localStorage.getItem('paceplan.plans')) localStorage.setItem('paceplan.plans', JSON.stringify([plan]));
+        if (!localStorage.getItem('paceplan.profile')) localStorage.setItem('paceplan.profile', JSON.stringify(profile));
       }, { plan, profile });
 
       let lastCoachRequestBody = null;
@@ -230,6 +238,7 @@ async function main() {
       await page.waitForTimeout(300);
       const threadTextAfterAdvice = await page.locator('#coach-thread').innerText();
       check('[3] advice応答がチャットに表示される', threadTextAfterAdvice.includes('イージーjog'));
+      await captureIfRequested(page, 'coach-chat.png');
       check('[8] コーチへのリクエストにPB(自己ベスト)情報が含まれる', !!lastCoachRequestBody && lastCoachRequestBody.includes('自己ベスト') && lastCoachRequestBody.includes('40:00'));
       check('[8] コーチへのリクエストにシューズ情報が含まれる', !!lastCoachRequestBody && lastCoachRequestBody.includes('E2Eテストシューズ'));
 
@@ -264,6 +273,24 @@ async function main() {
       await mypageNav.click({ force: true });
       await page.waitForTimeout(300);
       check('[9] コーチAPIエラー後もマイページ等、他の機能は利用できる', (await page.locator('text=ランナープロフィール').count()) > 0);
+
+      check('[相棒] マイページで3種類の相棒を比較できる', await page.locator('[data-action="select-coach-persona"]').count() === 3);
+      await page.locator('[data-action="select-coach-persona"][data-persona="analyst"]').click();
+      await page.waitForTimeout(100);
+      check('[相棒] 分析型の選択をプロフィールへ保存する', await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.profile')).coachPersona === 'analyst'));
+      await page.reload({ waitUntil: 'load' });
+      await page.locator('.bottom-nav *').filter({ hasText: 'マイページ' }).first().click({ force: true });
+      await page.waitForTimeout(250);
+      const companionAfterReload = { profile: await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.profile') || '{}').coachPersona), selected: await page.locator('[data-action="select-coach-persona"][data-persona="analyst"][aria-pressed="true"]').count() };
+      check('[相棒] 再起動後も選択した相棒を保持する', companionAfterReload.profile === 'analyst' && companionAfterReload.selected === 1);
+      await captureIfRequested(page, 'companion-selection.png', true);
+      await page.locator('.bottom-nav *').filter({ hasText: 'コーチ' }).first().click({ force: true });
+      await page.waitForTimeout(250);
+      coachMockMode = 'advice';
+      await page.locator('#adjust-input').fill('相棒の確認です');
+      await page.locator('.chat-send-btn').click();
+      await page.waitForFunction(() => document.querySelectorAll('#coach-thread .chat-msg').length > 1);
+      check('[相棒] 選択した口調指示を既存のコーチ呼び出しへ追加する', !!lastCoachRequestBody && lastCoachRequestBody.includes('冷静な分析型'));
 
       await context.close();
     }
@@ -388,6 +415,17 @@ async function main() {
       check('[HealthKit] Running Workoutを共通Workoutとして保存する', healthData.workouts.length === 1 && healthData.workouts[0].source === 'apple_health' && healthData.workouts[0].distance_meters === 8240 && healthData.workouts[0].average_heart_rate === 150 && healthData.workouts[0].max_heart_rate === 155);
       check('[HealthKit] 同日の予定メニューへ自動反映する', healthData.logs[today] && healthData.logs[today].source === 'apple_health' && healthData.progress['w0-0'] === true);
       check('[HealthKit] 連携状態と最終同期日時を保存する', healthData.profile.healthConnections.appleHealth.enabled === true && !!healthData.profile.healthConnections.appleHealth.lastSyncedAt);
+      await page.locator('[data-action="health-sync"][data-platform="appleHealth"]').click();
+      await page.waitForTimeout(300);
+      const repeatedSyncWorkouts = await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.workouts') || '[]'));
+      check('[重複] 同じ外部記録を繰り返し同期しても1件のまま', repeatedSyncWorkouts.length === 1 && repeatedSyncWorkouts[0].source_workout_id === 'healthkit-e2e-1');
+      await page.evaluate(() => {
+        const button = document.querySelector('[data-action="health-sync"][data-platform="appleHealth"]');
+        button.click(); button.click();
+      });
+      await page.waitForTimeout(300);
+      const concurrentSyncWorkouts = await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.workouts') || '[]'));
+      check('[重複] 同期操作が同時に走っても外部記録は1件のまま', concurrentSyncWorkouts.length === 1);
       await page.locator('[data-action="mypage-nav"][data-view="main"]').click();
       const mypageText = await page.locator('.form-card').innerText();
       check('[マイページ] 今月の集計と最近のワークアウトに共通Workoutを表示する', mypageText.includes('今月のランニング') && mypageText.includes('8km') && mypageText.includes('最近のワークアウト'));
@@ -395,6 +433,83 @@ async function main() {
       check('[マイページ] すべての記録画面へ遷移できる', (await page.locator('.form-card').innerText()).includes('これまでの記録'));
       await page.locator('[data-action="open-workout-detail"]').first().click();
       check('[マイページ] ワークアウト詳細に実績と予定の関係を表示する', (await page.locator('.form-card').innerText()).includes('ワークアウト詳細') && (await page.locator('.form-card').innerText()).includes('予定：イージー'));
+      await context.close();
+    }
+
+    console.log('=== scenario 4b: 取得元横断の重複候補と安全な統合 ===');
+    {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      const today = new Date().toISOString().slice(0, 10);
+      const { plan, profile } = seedPlan();
+      await context.addInitScript(({ plan, profile, today }) => {
+        localStorage.setItem('paceplan.plans', JSON.stringify([plan]));
+        localStorage.setItem('paceplan.profile', JSON.stringify(profile));
+        // スクリーンショットは実行時刻まで読めたケース: Healthと確実に同一なら自動統合する。
+        localStorage.setItem('paceplan.workouts', JSON.stringify([{
+          id: 'screenshot-1', started_at: `${today}T06:30:00.000Z`, ended_at: `${today}T08:18:00.000Z`, duration_seconds: 6480, distance_meters: 14000,
+          source: 'screenshot', source_workout_id: 'screenshot-1', source_refs: [{ source: 'screenshot', source_workout_id: 'screenshot-1' }], time_precision: 'exact',
+          metadata: { note: '給水を1回', image_import: { startTime: '06:30' } }, created_at: `${today}T09:00:00.000Z`
+        }]));
+        const health = {
+          isAvailable: async () => ({ available: true, platform: 'ios' }),
+          requestAuthorization: async () => ({ readDenied: [] }),
+          queryWorkouts: async () => ({ workouts: [{ duration: 6480, totalDistance: 14000, startDate: `${today}T06:30:00.000Z`, endDate: `${today}T08:18:00.000Z`, platformId: 'health-same-run', sourceName: 'Apple Watch' }] }),
+          readSamples: async () => ({ samples: [] }),
+        };
+        window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios', Plugins: { Health: health }, registerPlugin: () => health };
+      }, { plan, profile, today });
+      await page.goto(baseUrl + '/', { waitUntil: 'load' });
+      await page.locator('.bottom-nav *').filter({ hasText: 'マイページ' }).first().click({ force: true });
+      await page.locator('[data-action="mypage-nav"][data-view="data-connections"]').click();
+      await page.locator('[data-action="health-connect"][data-platform="appleHealth"]').click();
+      await page.waitForTimeout(300);
+      const screenshotAndHealth = await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.workouts') || '[]'));
+      check('[重複] 画像とHealthで開始・距離・時間が一致する記録は1件に統合し、画像メモを残す', screenshotAndHealth.length === 1 && screenshotAndHealth[0].metadata.note === '給水を1回' && screenshotAndHealth[0].source_refs.length === 2);
+      await context.close();
+    }
+
+    console.log('=== scenario 4c: あいまいな手入力は確認後だけ統合 ===');
+    {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      const today = new Date().toISOString().slice(0, 10);
+      const { plan, profile } = seedPlan();
+      await context.addInitScript(({ plan, profile, today }) => {
+        localStorage.setItem('paceplan.plans', JSON.stringify([plan]));
+        localStorage.setItem('paceplan.profile', JSON.stringify(profile));
+        // 手入力には開始時刻が無い。日付と距離が近いだけではHealth記録を自動削除しない。
+        localStorage.setItem('paceplan.workouts', JSON.stringify([{
+          id: 'manual-1', started_at: `${today}T12:00:00.000`, duration_seconds: 6480, distance_meters: 14000,
+          source: 'manual', source_workout_id: 'manual-1', source_refs: [{ source: 'manual', source_workout_id: 'manual-1' }], time_precision: 'estimated', metadata: { note: '手入力メモ' }
+        }]));
+        const health = {
+          isAvailable: async () => ({ available: true, platform: 'ios' }), requestAuthorization: async () => ({ readDenied: [] }),
+          // 夕方のほぼ同距離ランも返す。同日2回でも外部IDと時刻の重なりが無いので別記録として残る。
+          queryWorkouts: async () => ({ workouts: [
+            { duration: 6480, totalDistance: 14000, startDate: `${today}T06:30:00.000Z`, endDate: `${today}T08:18:00.000Z`, platformId: 'health-morning', sourceName: 'Apple Watch' },
+            { duration: 6500, totalDistance: 14100, startDate: `${today}T18:30:00.000Z`, endDate: `${today}T20:18:20.000Z`, platformId: 'health-evening', sourceName: 'Apple Watch' },
+          ] }), readSamples: async () => ({ samples: [] }),
+        };
+        window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'ios', Plugins: { Health: health }, registerPlugin: () => health };
+      }, { plan, profile, today });
+      await page.goto(baseUrl + '/', { waitUntil: 'load' });
+      await page.locator('.bottom-nav *').filter({ hasText: 'マイページ' }).first().click({ force: true });
+      await page.locator('[data-action="mypage-nav"][data-view="data-connections"]').click();
+      await page.locator('[data-action="health-connect"][data-platform="appleHealth"]').click();
+      await page.waitForTimeout(300);
+      const beforeConfirmation = await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.workouts') || '[]'));
+      check('[重複] 時刻が不明な手入力は同日・近距離でも自動統合せず、同日2回のHealth記録も残す', beforeConfirmation.length === 3 && beforeConfirmation.some((w) => (w.duplicate_candidate_ids || []).length));
+      await page.locator('[data-action="mypage-nav"][data-view="main"]').click();
+      await page.locator('[data-action="mypage-nav"][data-view="workout-history"]').click();
+      await page.locator('[data-action="open-workout-detail"][data-id="manual-1"]').click();
+      check('[重複] あいまいな記録には確認メッセージを表示する', (await page.locator('.form-card').innerText()).includes('同じランニングの可能性があります'));
+      await page.locator('[data-action="request-workout-merge"]').first().click();
+      check('[重複] 統合前に確認ダイアログを表示する', (await page.locator('.modal-card').innerText()).includes('統合しますか'));
+      await page.locator('[data-action="confirm-workout-merge"]').click();
+      await page.waitForTimeout(200);
+      const afterConfirmation = await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.workouts') || '[]'));
+      check('[重複] 確認後の統合だけが保存・集計対象を減らし、別時間帯のランは残す', afterConfirmation.length === 2 && afterConfirmation.some((w) => w.source_workout_id === 'health-evening'));
       await context.close();
     }
 

@@ -22,6 +22,8 @@ const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'app', 'runq.html');
 const OUT_DIR = path.join(ROOT, 'dist');
 const OUT_FILE = path.join(OUT_DIR, 'index.html');
+const ASSET_SRC = path.join(ROOT, 'app', 'assets');
+const ASSET_OUT = path.join(OUT_DIR, 'assets');
 
 const fragment = fs.readFileSync(SRC, 'utf8');
 
@@ -53,5 +55,11 @@ ${bodyPart}
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(OUT_FILE, wrapped, 'utf8');
+// HTML断片から参照する画像素材も、Web/VercelとCapacitorの両方で同じ相対URLになるよう出力へコピーする。
+// `app/assets` が無い既存チェックアウトでもビルドできるよう、存在する場合だけ同期する。
+if (fs.existsSync(ASSET_SRC)) {
+  fs.rmSync(ASSET_OUT, { recursive: true, force: true });
+  fs.cpSync(ASSET_SRC, ASSET_OUT, { recursive: true });
+}
 
 console.log(`built ${path.relative(ROOT, OUT_FILE)} (${wrapped.length} bytes) from ${path.relative(ROOT, SRC)}`);

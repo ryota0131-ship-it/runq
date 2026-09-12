@@ -94,7 +94,11 @@ Common Workout (workouts/main.entries[])
  ├─ average_pace_seconds_per_km, average_heart_rate, max_heart_rate, calories
  ├─ source: manual | screenshot | apple_health | health_connect | strava | garmin
  ├─ source_workout_id, source_device, imported_at, created_at, updated_at
- └─ plan_id, scheduled_item_ref, scheduled_item_date, completion_status
+ ├─ plan_id, scheduled_item_ref, scheduled_item_date, completion_status
+ ├─ source_refs[]        … 統合した取得元と外部Workout IDを保持
+ ├─ time_precision       … exact | estimated。手入力で時刻が無いことを区別する
+ ├─ duplicate_candidate_ids[]
+ └─ metadata { note, rpe, pain, feedback, image_import }
     … 取り込み元横断の正規化・重複防止・将来の同期用として保存する。
 
 Race Forecast (forecast/{planId})
@@ -151,6 +155,8 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 ```
 
 - **Provider選択は`selectCoachProvider()`の1箇所のみ**(`app/runq.html`)。`ClaudeArtifactProvider.available()`(=`window.claude.use('sample')`が使えるか)を優先し、使えない場合のみ`OpenAIProvider`にフォールバックする。Claude Artifactとして開いている限り、この移行前と挙動は変わらない。
+- **相棒の人格は保存・表示層で分離**: `profile/main.coachPersona`に`companion`（ナギ）/ `analyst`（リツ）/ `cheer`（カイ）を保存する。`buildAdjustPrompt()`はリクエスト開始時に固定した人格の口調指示だけを加え、判断ルール・コンテキスト・JSON形式は共通に保つ。チャット履歴とWorkoutの`metadata.feedback_coach_persona`には生成時の相棒を保存するため、後で相棒を変更しても過去の表示は書き換わらない。
+- `app/assets/coach/`には、提供された確定デザインから背景だけを透明化した相棒の静止PNG（通常・考え中・喜び）を置く。白いお腹や顔の白は透明化しない。画像は`aria-hidden`の装飾として扱い、テキストの状態表示を必ず併記する。
 - **レスポンス形式は既存のまま**: `{mode:'advice'|'options', summary, risk, options[].{label,summary,plan}}`。新しい独自スキーマを作るのではなく、Claude Artifact版が既に返していた形式をOpenAI側にも合わせている。下流(`buildAdjustPrompt`の解釈・`applyPlanChange`等)は無変更で動く。
 - **画像解析はCoachとは分離**: `extractFromImage`はClaude Artifactでは従来の`sampleFn`を使い、通常Web/Vercelでは`/api/run-extract`を使う。コーチ相談の`CoachService`に画像を混在させないため、既存のコーチ応答形式・プラン変更フローには影響しない。
 - 数値計算(プラン生成・RACE FORECAST・PACE CALCULATOR・RACE TIME PREDICTOR等)は`estimateRacePerformance()`等の独立した純粋関数が担当し、AIは説明文・提案・対話のみを担当する設計を維持している(この原則はOpenAI移行後も変えていない)。
@@ -207,14 +213,17 @@ iOSは`LaunchScreen.storyboard`でRUNQ.名とタグラインを表示する。�
 共通Workoutを`workouts/main.entries[]`に追加した。手動登録・スクリーンショット登録は従来どおり予定日別の`logs/{planId}`へ保存したうえで、同じ実績を共通Workoutにも正規化して保存する。既存画面・既存データを壊さないため、`logs`を置き換えない。
 
 - `normalizeWorkout(raw)`が各入力形式を共通フィールドへ変換する唯一の入口。
-- `upsertWorkout(raw)`は同一`source`かつ`source_workout_id`を最優先し、補助的に開始時刻(10分以内)・距離(150m以内)・時間(3分以内)で重複候補を判定する。
+- `upsertWorkout(raw)`は同一`source`かつ`source_workout_id`（統合後は`source_refs[]`を含む）を最優先してupsertする。保存前のread-modify-writeはアプリ内キューで直列化し、手動同期・自動同期・連打が競合しても同じ外部記録を増やさない。
+- 取得元が異なる場合は、両方に正確な開始時刻があり、実行時間帯の80%以上が重なり、距離（3%または250m以内）と所要時間（4%または3分以内）が一致する場合だけ自動統合する。時刻不明の手入力・画像記録、または時間帯が重ならない同日2回のランは自動統合しない。距離・所要時間が近い場合は`duplicate_candidate_ids[]`に候補として保存し、詳細画面で根拠を確認してから統合できる。
+- 利用者が候補を統合したときは、取得元参照、メモ、画像由来情報、フィードバック、予定への紐付けを残す。既存記録は起動時に候補だけを付与し、自動削除・表示だけの非表示は行わない。
 - `matchWorkoutToPlan(workout)`が同日予定を単純に探し、`plan_id`・`scheduled_item_ref`・`completion_status:'matched'`を保存する。高度なAI判定は行わない。
 - 認証未導入のため`user_id`はプロフィール内の端末ローカルID(`workoutUserId`)を使う。将来認証を導入する際は、既存の共通Workoutを保持したままAuthのIDへ移行する。
 - マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。
 - マイページの振り返り表示・月別履歴・ワークアウト詳細は、追加の保存先を作らず`workouts/main.entries[]`を読み取り専用で集計する。予定との関係は、共通Workoutの`plan_id`と`scheduled_item_date`から既存プランのメニューを参照する。距離差は予定説明文に明示された距離がある場合だけ表示し、推測で評価しない。
 - `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、Running Workoutのみを過去90日分ページング取得する。iOSではHealthKit、AndroidではHealth Connectを同じAdapterで扱う。
 - 初回連携・手動同期では、ワークアウト・心拍・距離・消費カロリーの読み取り権限を要求する。心拍は各Workoutの時間範囲でサンプルを読み、平均・最大を決定論的に算出する。GPSルート・ケイデンス・標高・心拍ゾーンは未取得。
-- 自動登録ON時、同日の予定メニューに一致したWorkoutだけを既存の予定日別ログと完了状態にも反映する。ユーザーが手動／スクショで保存済みのログは端末連携で上書きしない。
+- 自動登録ON時、同日の予定メニューに一致したWorkoutだけを既存の予定日別ログと完了状態にも反映する。ユーザーが手動／スクショで保存済みのログは端末連携で上書きしない。予定の完了チェックだけではCommon Workoutを作らず、実際のWorkoutへの紐付けだけを行う。
+- 記録入力では画像解析は入力欄への反映まで、Health同期はCommon Workoutへの保存までを担う。同期済みWorkoutを選んで保存すると、既存Workoutへメモ・RPE・痛みを追記し、新しい走行記録は作らない。記録後のAIフィードバックは`metadata.feedback`にも保存する。
 - Web/VercelではネイティブAPIを呼べないため、連携操作は説明メッセージを表示して他の機能を継続できる。
 
 各ネイティブ／外部ソースは、OS固有の値を画面へ渡さず、次の形で追加する。
