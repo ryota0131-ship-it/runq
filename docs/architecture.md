@@ -125,8 +125,8 @@ Application (UI / state)
         │
         ▼
 buildAdjustPrompt() / planContextLines()   … プロンプト組み立て(Quest・目標タイム・Training Plan・
-        │                                     Runner Profile・PB・シューズ・直近Workout・RPE・pain・
-        │                                     RACE FORECAST・直近コーチ会話 等を含む。変更なし)
+        │                                     Runner Profile・PB・シューズ・共通Workout・予定日別ログ・
+        │                                     RPE・pain・RACE FORECAST・直近コーチ会話 等を含む)
         ▼
 CoachService.request(prompt, opts)   … 呼び出し口はこの1関数のみ。UI側は下記どちらのProviderが
         │                              実際にAIを呼んでいるか意識しない(sampleFn.json(prompt, opts)と
@@ -157,6 +157,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 - **Provider選択は`selectCoachProvider()`の1箇所のみ**(`app/runq.html`)。`ClaudeArtifactProvider.available()`(=`window.claude.use('sample')`が使えるか)を優先し、使えない場合のみ`OpenAIProvider`にフォールバックする。Claude Artifactとして開いている限り、この移行前と挙動は変わらない。
 - **コーチの人格は保存・表示層で分離**: `profile/main.coachPersona`に`companion`（ナギ コーチ）/ `analyst`（リツ コーチ）/ `cheer`（カイ コーチ）を保存する。`buildAdjustPrompt()`はリクエスト開始時に固定した人格の口調指示だけを加え、判断ルール・コンテキスト・JSON形式は共通に保つ。チャット履歴とWorkoutの`metadata.feedback_coach_persona`には生成時のコーチを保存するため、後でコーチを変更しても過去の表示は書き換わらない。
 - `app/assets/coach/`には、提供された確定デザインから背景だけを透明化したコーチの静止PNG（通常・考え中・喜び）を置く。白いお腹や顔の白は透明化しない。画像は`aria-hidden`の装飾として扱い、テキストの状態表示を必ず併記する。
+- **実走・予定の共通コンテキスト**: `coachRunningContextLines()`が、重複統合済みの`workouts/main.entries[]`を正本として、直近90日の実走（距離・時間・ペース・心拍・RPE・痛み・メモ・取得元・予定との紐付け）、当日の予定、今後7日間の予定を要約して渡す。90日より前の実走は全体集計に留める。旧来の`logs/{planId}`は、`workoutId`で共通Workoutに紐付いていない記録だけを補完情報として渡すため、同じ走行を二重に判断しない。コーチ呼び出しの直前に全プランの予定日別ログを読み直し、画面を開いたまま記録・同期した内容も会話へ反映する。
 - **レスポンス形式は既存のまま**: `{mode:'advice'|'options', summary, risk, options[].{label,summary,plan}}`。新しい独自スキーマを作るのではなく、Claude Artifact版が既に返していた形式をOpenAI側にも合わせている。下流(`buildAdjustPrompt`の解釈・`applyPlanChange`等)は無変更で動く。
 - **画像解析はCoachとは分離**: `extractFromImage`はClaude Artifactでは従来の`sampleFn`を使い、通常Web/Vercelでは`/api/run-extract`を使う。コーチ相談の`CoachService`に画像を混在させないため、既存のコーチ応答形式・プラン変更フローには影響しない。
 - 数値計算(プラン生成・RACE FORECAST・PACE CALCULATOR・RACE TIME PREDICTOR等)は`estimateRacePerformance()`等の独立した純粋関数が担当し、AIは説明文・提案・対話のみを担当する設計を維持している(この原則はOpenAI移行後も変えていない)。

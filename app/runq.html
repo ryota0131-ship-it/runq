@@ -3697,6 +3697,96 @@
     return lines;
   }
 
+  // コーチが「同期済みなのに実績を知らない」状態にならないよう、共通Workoutを正本として
+  // プラン・予定日別ログと同じ相談文脈にまとめる。全件をそのまま渡すのではなく、古い記録は
+  // 集計、直近90日は個別要約にして、会話に必要な事実を保ちながらプロンプトを過大にしない。
+  function coachWorkoutActualLabel(workout){
+    const values=[];
+    const distance=Number(workout.distance_meters||0)/1000;
+    const duration=Number(workout.duration_seconds||0);
+    const pace=Number(workout.average_pace_seconds_per_km)||workoutPaceSeconds(null,Number(workout.distance_meters||0),duration);
+    if(distance>0) values.push(formatKm(distance));
+    if(duration>0) values.push(workoutDurationLabel(duration));
+    if(pace>0) values.push(paceSecToLabel(pace)+'/km');
+    if(workout.average_heart_rate) values.push('平均心拍 '+Math.round(Number(workout.average_heart_rate))+'bpm');
+    if(workout.max_heart_rate) values.push('最大心拍 '+Math.round(Number(workout.max_heart_rate))+'bpm');
+    if(workout.calories) values.push(Math.round(Number(workout.calories))+'kcal');
+    return values.join('、') || '数値未記録';
+  }
+  function coachWorkoutStatusLabel(workout){
+    const meta=workout.metadata||{}, parts=[];
+    const info=workoutPlanInfo(workout);
+    if(info&&info.item) parts.push('予定「'+info.item.title+'」に紐付け済み');
+    else if(workout.completion_status==='matched') parts.push('予定メニューに紐付け済み');
+    else parts.push('フリーラン');
+    parts.push('取得元: '+workoutSourceLabel(workout.source));
+    if(meta.rpe) parts.push('RPE '+meta.rpe+'/4');
+    if(meta.pain&&Number(meta.pain.level)>0) parts.push('痛み・違和感: '+(PAIN_LEVEL_LABEL[meta.pain.level]||'あり')+(meta.pain.parts&&meta.pain.parts.length?'（'+meta.pain.parts.join('・')+'）':''));
+    if(meta.note) parts.push('メモ: '+String(meta.note).replace(/\s+/g,' ').slice(0,180));
+    if((workout.duplicate_candidate_ids||[]).length) parts.push('重複の可能性あり（未統合のため別記録として保持）');
+    return parts.join('、');
+  }
+  async function loadCoachPlanLogs(){
+    const pairs=await Promise.all((state.plans||[]).map(async function(plan){
+      try{ return [plan.id,await Store.getLogs(plan.id)]; }catch(e){ return [plan.id,{}]; }
+    }));
+    return pairs.reduce(function(result,pair){ result[pair[0]]=pair[1]||{}; return result; },{});
+  }
+  function coachRunningContextLines(plan, allPlanLogs){
+    const lines=[], today=todayISO(), todayDate=todayLocal();
+    const workouts=allWorkouts();
+    const ninetyDaysAgo=addDays(todayDate,-90), older=workouts.filter(function(w){ const d=workoutDate(w); return d&&d<ninetyDaysAgo; });
+    const recent=workouts.filter(function(w){ const d=workoutDate(w); return d&&d>=ninetyDaysAgo; });
+    const totalDistance=workouts.reduce(function(sum,w){ return sum+Number(w.distance_meters||0); },0);
+    const totalDuration=workouts.reduce(function(sum,w){ return sum+Number(w.duration_seconds||0); },0);
+    if(workouts.length){
+      lines.push('RUNQ.に保存済みの実走ワークアウト: 全'+workouts.length+'件、合計'+formatKm(totalDistance/1000)+'、合計時間 '+workoutDurationLabel(totalDuration)+'（重複統合済みの共通Workoutを正本として参照）');
+      if(older.length) lines.push('90日より前の実走: '+older.length+'件、'+formatKm(older.reduce(function(sum,w){ return sum+Number(w.distance_meters||0); },0)/1000)+'（個別の詳細は直近記録を優先）');
+      const visible=recent.slice(0,16);
+      if(visible.length) lines.push('直近90日の実走（新しい順）:\n- '+visible.map(function(w){ return workoutDateKey(w)+': '+coachWorkoutActualLabel(w)+'。'+coachWorkoutStatusLabel(w); }).join('\n- '));
+    } else {
+      lines.push('RUNQ.に保存済みの実走ワークアウト: まだありません');
+    }
+
+    const todayItem=findItemByDate(plan,today);
+    if(todayItem){
+      const todayWorkouts=workouts.filter(function(w){ return workoutDateKey(w)===today; });
+      lines.push('今日の予定メニュー: '+todayItem.it.title+'（'+(todayItem.it.desc||'詳細なし')+'）'+(todayWorkouts.length?'。今日の実走 '+todayWorkouts.length+'件を上記に含む。':'。今日の実走はまだありません。'));
+    }
+    const upcoming=[];
+    for(let offset=1;offset<=7;offset++){
+      const date=toISO(addDays(todayDate,offset)), found=findItemByDate(plan,date);
+      if(found) upcoming.push(date+' '+found.it.title+(found.it.desc?'（'+found.it.desc+'）':''));
+    }
+    if(upcoming.length) lines.push('今後7日間の予定: '+upcoming.join(' / '));
+
+    // 旧来の予定日別ログは共通Workoutが未作成の記録だけを補完する。同じ走行を二重に
+    // 評価・集計しないため、workoutIdで紐付いたログはここでは重ねて送らない。
+    const legacy=[];
+    (state.plans||[]).forEach(function(p){
+      const logs=(allPlanLogs&&allPlanLogs[p.id])||{};
+      Object.keys(logs).forEach(function(date){
+        const log=logs[date]||{};
+        if(log.workoutId && workouts.some(function(w){ return w.id===log.workoutId; })) return;
+        const dt=parseISO(date);
+        if(!dt || dt<ninetyDaysAgo) return;
+        const item=findItemByDate(p,date);
+        const actual=[];
+        if(log.distanceKm) actual.push(formatKm(Number(log.distanceKm)));
+        if(log.durationMin) actual.push(Math.round(Number(log.durationMin))+'分');
+        if(log.avgPace) actual.push(String(log.avgPace)+'/km');
+        if(log.avgHr) actual.push('平均心拍 '+log.avgHr+'bpm');
+        if(log.rpe) actual.push('RPE '+log.rpe+'/4');
+        if(log.pain&&Number(log.pain.level)>0) actual.push('痛み・違和感 '+(PAIN_LEVEL_LABEL[log.pain.level]||'あり'));
+        if(log.note) actual.push('メモ: '+String(log.note).replace(/\s+/g,' ').slice(0,180));
+        legacy.push(date+': '+(item&&item.it?item.it.title:'予定外の記録')+'、'+(actual.join('、')||'完了のみ記録')+'（予定日別ログ。共通Workout未紐付け）');
+      });
+    });
+    if(legacy.length) lines.push('直近90日の予定日別ログ（共通Workoutと重複しない補完記録）:\n- '+legacy.sort().reverse().slice(0,12).join('\n- '));
+    if(Array.isArray(plan.history)&&plan.history.length) lines.push('直近のプラン変更履歴: '+plan.history.slice(-3).map(function(h){ return (h.summary||h.reason||'プランを調整'); }).join(' / '));
+    return lines;
+  }
+
   /* ============================================================
      Coach Service — LLM Providerの抽象化(GitHub移行後、OpenAI API対応で追加)
      UI側(runAdjust/runLogFeedback)は CoachService.request(prompt, opts) だけを呼び、
@@ -3791,7 +3881,7 @@
     return lines;
   }
 
-  function buildAdjustPrompt(plan, instruction, todayStr, historyLines, personaKey){
+  function buildAdjustPrompt(plan, instruction, todayStr, historyLines, personaKey, runningContext){
     const payload = {meta:plan.meta, weeks:plan.weeks, extras:plan.extras};
     const context = planContextLines(plan);
     return [
@@ -3799,6 +3889,7 @@
       coachPersona(personaKey).prompt,
       '今日の日付: '+todayStr,
       context.length ? ('ランナーの背景情報:\n- '+context.join('\n- ')) : '',
+      (runningContext&&runningContext.length) ? ('# RUNQ.に保存されたランニング実績・予定\n'+runningContext.map(function(line){ return '- '+line; }).join('\n')) : '',
       (historyLines && historyLines.length) ? ('# これまでの会話の流れ(直近、参考情報。矛盾する場合は現在のプランと今回の依頼を優先する)\n- '+historyLines.join('\n- ')) : '',
       '',
       '# ランナーからの今回の依頼',
@@ -4029,7 +4120,9 @@
     // リクエスト開始時のコーチを固定する。途中で設定を変更しても、この返答の文章と表示は一致する。
     const personaKey=coachPersonaKey((state.profile||{}).coachPersona);
     state.adjust.personaKey=personaKey;
-    const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey);
+    const planLogs=await loadCoachPlanLogs();
+    const runningContext=coachRunningContextLines(plan,planLogs);
+    const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey, runningContext);
     adjustController = new AbortController();
     const deadline = Date.now() + ADJUST_TIMEOUT_MS;
     let pendingDeadlineTimers = [];
@@ -4201,7 +4294,9 @@
     let feedbackText = null;
     try{
       const instruction = buildLogInstruction(item, log);
-      const prompt = buildAdjustPrompt(plan, instruction, todayISO(), null, personaKey);
+      const planLogs=await loadCoachPlanLogs();
+      const runningContext=coachRunningContextLines(plan,planLogs);
+      const prompt = buildAdjustPrompt(plan, instruction, todayISO(), null, personaKey, runningContext);
       const result = await CoachService.request(prompt, {modelTier:'default', cache:false});
       if(!result || typeof result!=='object') throw {code:'invalid_json'};
 

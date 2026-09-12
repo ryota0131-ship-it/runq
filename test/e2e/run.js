@@ -75,7 +75,9 @@ function seedPlan() {
       policy: [],
     },
     weeks: [
-      { label: 'Week 1', phase: 'ベース構築期', dateRange: '', items: [] },
+      { label: 'Week 1', phase: 'ベース構築期', dateRange: '', items: [
+        { type: 'long', day: '日', date: today, title: 'ロング走', desc: '14km。余裕を残せるペースで。' },
+      ] },
     ],
     extras: { fueling: [], cautions: [] },
     history: [],
@@ -91,7 +93,19 @@ function seedPlan() {
     scheduleNote: '',
     onboarding: { version: 1, walkthroughCompleted: true, profileCompleted: true, draft: null },
   };
-  return { plan, profile };
+  const workouts = [{
+    id: 'health-today-14km', user_id: 'runner_e2e',
+    started_at: today + 'T06:30:00.000', ended_at: today + 'T08:18:25.000',
+    duration_seconds: 6505, distance_meters: 14000, average_pace_seconds_per_km: 465,
+    average_heart_rate: 142, max_heart_rate: 156, calories: 860,
+    source: 'apple_health', source_workout_id: 'apple-e2e-today-14km', source_device: 'Apple Watch',
+    imported_at: today + 'T09:00:00.000', created_at: today + 'T09:00:00.000', updated_at: today + 'T09:00:00.000',
+    plan_id: 'aqualine-2026', scheduled_item_ref: 'aqualine-2026:w0-i0', scheduled_item_date: today,
+    completion_status: 'matched', time_precision: 'exact',
+    source_refs: [{ source: 'apple_health', source_workout_id: 'apple-e2e-today-14km' }],
+    duplicate_candidate_ids: [], metadata: { note: '後半も余裕あり', rpe: 2, pain: { level: 0, parts: [] } },
+  }];
+  return { plan, profile, workouts };
 }
 
 function nextMondayIso(date) {
@@ -186,11 +200,12 @@ async function main() {
       const pageErrors = [];
       page.on('pageerror', (err) => pageErrors.push(String(err)));
 
-      const { plan, profile } = seedPlan();
-      await context.addInitScript(({ plan, profile }) => {
+      const { plan, profile, workouts } = seedPlan();
+      await context.addInitScript(({ plan, profile, workouts }) => {
         if (!localStorage.getItem('paceplan.plans')) localStorage.setItem('paceplan.plans', JSON.stringify([plan]));
         if (!localStorage.getItem('paceplan.profile')) localStorage.setItem('paceplan.profile', JSON.stringify(profile));
-      }, { plan, profile });
+        if (!localStorage.getItem('paceplan.workouts')) localStorage.setItem('paceplan.workouts', JSON.stringify(workouts));
+      }, { plan, profile, workouts });
 
       let lastCoachRequestBody = null;
       let coachMockMode = 'advice';
@@ -241,6 +256,7 @@ async function main() {
       await captureIfRequested(page, 'coach-chat.png');
       check('[8] コーチへのリクエストにPB(自己ベスト)情報が含まれる', !!lastCoachRequestBody && lastCoachRequestBody.includes('自己ベスト') && lastCoachRequestBody.includes('40:00'));
       check('[8] コーチへのリクエストにシューズ情報が含まれる', !!lastCoachRequestBody && lastCoachRequestBody.includes('E2Eテストシューズ'));
+      check('[コーチ文脈] 今日のHealth同期済み14kmと予定メニューが含まれる', !!lastCoachRequestBody && lastCoachRequestBody.includes('Appleヘルスケア') && lastCoachRequestBody.includes('14km') && lastCoachRequestBody.includes('ロング走') && lastCoachRequestBody.includes('RPE 2/4'));
 
       // --- options応答 + プラン変更フロー ---
       const planBeforeChoice = await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.plans')).find(p => p.id === 'aqualine-2026').weeks[0].label);
