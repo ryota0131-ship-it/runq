@@ -3480,7 +3480,7 @@
     return '<span class="coach-mascot coach-mascot-'+(size||'small')+'" aria-hidden="true"><img src="assets/coach/'+personaKey+'-'+stateName+'.png" alt=""></span>';
   }
   function coachLabelHTML(key){ return '<span class="coach-label">'+escapeHtml(coachPersona(key).label)+'</span>'; }
-  function coachCompanionSettingsHTML(){ const current=coachPersonaKey(state.profile&&state.profile.coachPersona); return '<div class="info-card coach-companion-settings"><h3>ランニングの相棒</h3><div class="li-sub">口調だけが変わります。判断基準やプランは変わりません。</div><div class="companion-choice-list">'+Object.keys(COACH_PERSONAS).map(function(key){const p=COACH_PERSONAS[key];return '<button type="button" class="companion-choice'+(current===key?' selected':'')+'" data-action="select-coach-persona" data-persona="'+key+'" aria-pressed="'+(current===key?'true':'false')+'">'+coachMascotHTML(key,'normal','choice')+'<span class="companion-choice-copy"><strong>'+p.label+'</strong><span class="companion-type">'+p.typeLabel+'</span><span>'+p.description+'</span><small>「'+p.example+'」</small></span><span class="companion-choice-state">'+(current===key?'選択中':'選ぶ')+'</span></button>';}).join('')+'</div></div>'; }
+  function coachCompanionSettingsHTML(){ const current=coachPersonaKey(state.profile&&state.profile.coachPersona); return '<div class="info-card coach-companion-settings"><h3>あなたのコーチ</h3><div class="li-sub">コーチによって口調は変わりますが、判断基準やプランは変わりません。</div><div class="companion-choice-list">'+Object.keys(COACH_PERSONAS).map(function(key){const p=COACH_PERSONAS[key];return '<button type="button" class="companion-choice'+(current===key?' selected':'')+'" data-action="select-coach-persona" data-persona="'+key+'" aria-pressed="'+(current===key?'true':'false')+'">'+coachMascotHTML(key,'normal','choice')+'<span class="companion-choice-copy"><strong>'+p.label+' コーチ</strong><span class="companion-type">'+p.typeLabel+'</span><span>'+p.description+'</span><small>「'+p.example+'」</small></span><span class="companion-choice-state">'+(current===key?'選択中':'選ぶ')+'</span></button>';}).join('')+'</div></div>'; }
   function planReviewAssessment(plan){
     const today=todayLocal(), from=addDays(today,-14), items=flattenPlanItems(plan).filter(function(x){return x.date&&parseISO(x.date)>=from&&parseISO(x.date)<=today&&['easy','long','mp'].indexOf(x.type)>=0;});
     const done=items.filter(function(x){return state.logs[x.date]||state.completed['w'+x.wi+'-'+x.ii];}).length;
@@ -4026,7 +4026,7 @@
     const normalizedPrev = normalizeAdjustedPlan(plan, {meta:prevPlan.meta, weeks:prevPlan.weeks, extras:prevPlan.extras});
     // 直前に追加したランナーの発言(=今回のinstruction)を除いた、それより前のやりとりだけを文脈として渡す
     const historyLines = recentCoachHistoryLines(state.coach.messages.slice(0, -1));
-    // リクエスト開始時の相棒を固定する。途中で設定を変更しても、この返答の文章と表示は一致する。
+    // リクエスト開始時のコーチを固定する。途中で設定を変更しても、この返答の文章と表示は一致する。
     const personaKey=coachPersonaKey((state.profile||{}).coachPersona);
     state.adjust.personaKey=personaKey;
     const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey);
@@ -4759,7 +4759,7 @@
       render();
     } else if(action==='select-coach-persona'){
       state.profile.coachPersona=btn.dataset.persona||'companion';
-      Store.setProfile(state.profile); showMypageToast(coachPersona().label+'を相棒にしました'); render();
+      Store.setProfile(state.profile); showMypageToast(coachPersona().label+' コーチを選択しました'); render();
     } else if(action==='dismiss-plan-review'){
       const plan=currentPlan(); if(plan){ state.profile.planReviewDismissedFor=plan.id+':'+todayISO(); Store.setProfile(state.profile); showMypageToast('今のプランを続けます'); render(); }
     } else if(action==='review-consult'){

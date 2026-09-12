@@ -274,23 +274,23 @@ async function main() {
       await page.waitForTimeout(300);
       check('[9] コーチAPIエラー後もマイページ等、他の機能は利用できる', (await page.locator('text=ランナープロフィール').count()) > 0);
 
-      check('[相棒] マイページで3種類の相棒を比較できる', await page.locator('[data-action="select-coach-persona"]').count() === 3);
+      check('[コーチ] マイページで3種類のコーチを比較できる', await page.locator('[data-action="select-coach-persona"]').count() === 3);
       await page.locator('[data-action="select-coach-persona"][data-persona="analyst"]').click();
       await page.waitForTimeout(100);
-      check('[相棒] 分析型の選択をプロフィールへ保存する', await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.profile')).coachPersona === 'analyst'));
+      check('[コーチ] 分析型の選択をプロフィールへ保存する', await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.profile')).coachPersona === 'analyst'));
       await page.reload({ waitUntil: 'load' });
       await page.locator('.bottom-nav *').filter({ hasText: 'マイページ' }).first().click({ force: true });
       await page.waitForTimeout(250);
       const companionAfterReload = { profile: await page.evaluate(() => JSON.parse(localStorage.getItem('paceplan.profile') || '{}').coachPersona), selected: await page.locator('[data-action="select-coach-persona"][data-persona="analyst"][aria-pressed="true"]').count() };
-      check('[相棒] 再起動後も選択した相棒を保持する', companionAfterReload.profile === 'analyst' && companionAfterReload.selected === 1);
+      check('[コーチ] 再起動後も選択したコーチを保持する', companionAfterReload.profile === 'analyst' && companionAfterReload.selected === 1);
       await captureIfRequested(page, 'companion-selection.png', true);
       await page.locator('.bottom-nav *').filter({ hasText: 'コーチ' }).first().click({ force: true });
       await page.waitForTimeout(250);
       coachMockMode = 'advice';
-      await page.locator('#adjust-input').fill('相棒の確認です');
+      await page.locator('#adjust-input').fill('コーチの確認です');
       await page.locator('.chat-send-btn').click();
       await page.waitForFunction(() => document.querySelectorAll('#coach-thread .chat-msg').length > 1);
-      check('[相棒] 選択した口調指示を既存のコーチ呼び出しへ追加する', !!lastCoachRequestBody && lastCoachRequestBody.includes('冷静な分析型'));
+      check('[コーチ] 選択した口調指示を既存のコーチ呼び出しへ追加する', !!lastCoachRequestBody && lastCoachRequestBody.includes('冷静な分析型'));
 
       await context.close();
     }
