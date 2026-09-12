@@ -681,7 +681,7 @@
   .forecast-goal .fg-time{ font-size:16px; font-weight:700; color:var(--text-muted); }
   .forecast-goal.main{ position:relative; }
   .forecast-goal.main .fg-label{ color:var(--accent); font-weight:700; }
-  .forecast-goal.main .fg-time{ font-size:26px; color:var(--accent-strong); }
+  .forecast-goal.main .fg-time{ font-size:15px; line-height:1.45; color:var(--accent-strong); text-align:center; }
   .forecast-confidence{ font-size:11.5px; color:var(--text-faint); text-align:center; padding-bottom:12px; border-bottom:1px solid var(--border); margin-bottom:10px; }
   .forecast-factors{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; }
   .forecast-factors li{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12.5px; padding:3px 0; }
@@ -1088,7 +1088,7 @@
      入力データから予想タイムレンジを算出する。詳細ロジックは
      claude/run-quest-v1-plan.md の「⑧ RACE FORECAST 実装案」を参照。
   ============================================================ */
-  const FORECAST_ALGO_VERSION = 'v1';
+  const FORECAST_ALGO_VERSION = 'v2';
 
   function parsePaceLabel(label){
     if(!label) return null;
@@ -1146,7 +1146,6 @@
     if(!raceDistanceKm) return null;
 
     const pbs = input.pbs || [];
-    const logs = input.logs || {};
     const completed = input.completed || {};
     const today = input.today || todayLocal();
     const prevForecast = input.prevForecast || null;
@@ -1155,6 +1154,7 @@
     const windowStart = addDays(today, -28);
     const planItems = flattenPlanItems(plan);
     const mainFactors = [];
+    const evidence=input.evidence||runningEvidence(plan,input.planLogs||{},completed,today);
 
     // 1) speed baseline — 自己ベストからの換算(リーゲルの式)。無ければ申告済みの目標タイムを基準に
     const pb = bestPbForDistance(raceDistanceKm, pbs);
@@ -1169,111 +1169,46 @@
       return null;
     }
 
-    let factor = 1.0; // 1.0を基準に、値が大きいほど減速(遅く)方向へ補正
+    let factor = 1.0; // 走力の目安だけを補正する。フルへの準備量や痛みは別の準備度へ分離する。
 
-    // 2) 持久力補正 — 直近ログでのロング走の最大実施距離 ÷ レース距離
-    const longDates = planItems.filter(function(p){ return p.type==='long' && p.date; }).map(function(p){ return p.date; });
-    let maxLongRun = 0;
-    longDates.forEach(function(d){
-      const log = logs[d];
-      if(log && log.distanceKm && Number(log.distanceKm)>maxLongRun) maxLongRun = Number(log.distanceKm);
-    });
+    // 2) 実走量 — 走力のタイムを機械的に遅らせず、フルへの準備度の根拠として表示する。
+    const maxLongRun=evidence.maxRunKm, longTarget=longRunRatioTarget(raceDistanceKm);
+    const longRatio=maxLongRun/raceDistanceKm;
     if(maxLongRun>0){
-      const ratio = maxLongRun/raceDistanceKm;
-      const target = longRunRatioTarget(raceDistanceKm);
-      if(ratio < target.min){
-        const shortfallPct = (target.min-ratio)/target.min*100;
-        factor += Math.min(0.15, shortfallPct*0.004);
-        mainFactors.push({ label:'ロング走の実績', value: formatKm(maxLongRun)+'(目安の'+Math.round(ratio*100)+'%)', impact:'slower' });
-      } else {
-        mainFactors.push({ label:'ロング走の実績', value: formatKm(maxLongRun)+'(目安達成)', impact:'good' });
-      }
+      mainFactors.push({ label:'直近4週の最長実走', value:formatKm(maxLongRun)+'（フルに向けた準備の参考）', impact:longRatio>=longTarget.min?'good':'neutral' });
     } else {
-      mainFactors.push({ label:'ロング走の実績', value:'まだ記録がありません', impact:'neutral' });
+      mainFactors.push({ label:'直近4週の最長実走', value:'まだ記録がありません', impact:'neutral' });
     }
 
-    // 3) 週間走行量トレンド(直近4週平均)
-    let volSum = 0;
-    Object.keys(logs).forEach(function(d){
-      const dt = parseISO(d);
-      if(dt && dt>=windowStart && dt<=today && logs[d] && logs[d].distanceKm) volSum += Number(logs[d].distanceKm);
-    });
-    const weeklyAvgKm = volSum/4;
-    if(volSum>0){
-      const expectedWeekly = raceDistanceKm * (raceDistanceKm>=30 ? 1.6 : raceDistanceKm>=15 ? 1.3 : 1.0);
-      if(weeklyAvgKm < expectedWeekly*0.6){
-        factor += 0.05;
-        mainFactors.push({ label:'直近4週の週間走行距離', value:Math.round(weeklyAvgKm)+'km/週', impact:'slower' });
-      } else {
-        mainFactors.push({ label:'直近4週の週間走行距離', value:Math.round(weeklyAvgKm)+'km/週', impact:'neutral' });
-      }
+    if(evidence.recent.length){
+      mainFactors.push({ label:'直近4週の実走', value:evidence.recent.length+'件・'+evidence.runDays+'日・合計'+formatKm(evidence.totalKm)+'（平均'+formatKm(evidence.weeklyAvgKm)+'/週）', impact:'neutral' });
     }
-
-    // 4) 実施率(アドヒアランス) — 直近4週で予定していたMP/イージー/ロングのうち記録orチェック済みの割合
-    const windowItems = planItems.filter(function(p){
-      if(!p.date || ['mp','easy','long'].indexOf(p.type)===-1) return false;
-      const dt = parseISO(p.date);
-      return dt && dt>=windowStart && dt<=today;
-    });
-    if(windowItems.length>0){
-      let doneCount = 0;
-      windowItems.forEach(function(p){
-        if(completed['w'+p.wi+'-'+p.ii] || logs[p.date]) doneCount++;
-      });
-      const adherence = doneCount/windowItems.length;
-      if(adherence < 0.6){
-        factor += (0.6-adherence)*0.15;
-        mainFactors.push({ label:'直近4週の実施率', value:Math.round(adherence*100)+'%', impact:'slower' });
-      } else {
-        mainFactors.push({ label:'直近4週の実施率', value:Math.round(adherence*100)+'%', impact:'good' });
-      }
-    }
+    if(evidence.adherence!=null) mainFactors.push({ label:'直近4週の予定実施率', value:Math.round(evidence.adherence*100)+'%（'+evidence.completedCount+'/'+evidence.plannedCount+'回）', impact:evidence.adherence>=0.8?'good':'neutral' });
 
     // 5) MP走の達成度 — 記録された平均ペースとMPペース帯の差
     const mpBand = parsePaceLabel(plan.meta.mpLabel);
-    let mpLogCount = 0;
+    let mpLogCount = evidence.mpActivities.length;
     if(mpBand){
-      const mpSecs = [];
-      planItems.forEach(function(p){
-        if(p.type==='mp' && p.date && logs[p.date] && logs[p.date].avgPace){
-          const sec = hmsToSeconds(logs[p.date].avgPace);
-          if(sec!=null) mpSecs.push(sec);
-        }
-      });
-      mpLogCount = mpSecs.length;
+      const mpSecs=evidence.mpActivities.map(function(a){ return a.paceSec; });
       if(mpSecs.length){
         const avgMpSec = mpSecs.reduce(function(a,b){ return a+b; },0)/mpSecs.length;
         const bandCenter = (mpBand.low+mpBand.high)/2;
         const diffRatio = (avgMpSec-bandCenter)/bandCenter;
-        if(diffRatio>0.02){
-          factor += Math.min(0.08, diffRatio*0.5);
+        if(mpSecs.length>=2 && diffRatio>0.02){
+          factor += Math.min(0.04, diffRatio*0.3);
           mainFactors.push({ label:'MP走の実施ペース', value:paceSecToLabel(avgMpSec)+'/km(目標よりやや遅め)', impact:'slower' });
-        } else if(diffRatio<-0.02){
-          factor -= Math.min(0.05, -diffRatio*0.4);
+        } else if(mpSecs.length>=2 && diffRatio<-0.02){
+          factor -= Math.min(0.03, -diffRatio*0.25);
           mainFactors.push({ label:'MP走の実施ペース', value:paceSecToLabel(avgMpSec)+'/km(目標より速め)', impact:'good' });
         } else {
-          mainFactors.push({ label:'MP走の実施ペース', value:paceSecToLabel(avgMpSec)+'/km(目標通り)', impact:'good' });
+          mainFactors.push({ label:'MP走の実施ペース', value:paceSecToLabel(avgMpSec)+'/km'+(mpSecs.length<2?'（1回のため走力予測には未反映）':'(目標通り)'), impact:mpSecs.length<2?'neutral':'good' });
         }
       }
     }
 
-    // 6) 直近の痛み・不調(直近14日) — Phase3で{level, parts}形式の入力UIが揃ったため、level(0〜3)をそのまま考慮する
-    let maxPainLevel = 0;
-    Object.keys(logs).forEach(function(d){
-      const dt = parseISO(d);
-      if(dt && dt>=addDays(today,-14) && dt<=today && logs[d] && logs[d].pain){
-        const p = logs[d].pain;
-        if(typeof p==='object' && p.level!=null) maxPainLevel = Math.max(maxPainLevel, Number(p.level)||0);
-        else if(p) maxPainLevel = Math.max(maxPainLevel, 2); // 旧形式(文字列等)が残っていた場合の後方互換フォールバック
-      }
-    });
-    if(maxPainLevel>=3){
-      factor += 0.08;
-      mainFactors.push({ label:'直近の痛み・不調', value:'強めの記録あり', impact:'slower' });
-    } else if(maxPainLevel>0){
-      factor += 0.03;
-      mainFactors.push({ label:'直近の痛み・不調', value:'軽度の記録あり', impact:'slower' });
-    }
+    // 4) 痛みは走力タイムの減点ではなく、安全な負荷調整の注意として扱う。
+    if(evidence.maxPainLevel>=3) mainFactors.push({ label:'直近の痛み・不調', value:'強めの記録あり。負荷を増やさず、コーチに相談してください', impact:'slower' });
+    else if(evidence.maxPainLevel>0) mainFactors.push({ label:'直近の痛み・不調', value:'軽度の記録あり。距離・強度は急に増やさない', impact:'neutral' });
 
     // 7) 残り日数による確信度 — 遠いほど補正を弱め、直前(2週間以内)はほぼそのまま適用
     let confidenceWeight = 1.0;
@@ -1293,16 +1228,13 @@
       finalSec = Math.round(adjustedSec);
     }
 
-    const predictedMinSec = Math.round(finalSec*0.98);   // 挑戦目標側(速め)は控えめに
-    const predictedMaxSec = Math.round(finalSec*1.045);  // 安全目標側(遅め)は後半失速リスクを踏まえやや広めに
+    const predictedMinSec = Math.round(finalSec*0.98);
+    const predictedMaxSec = Math.round(finalSec*1.045);
     const recommendedGoalSec = roundToNiceGoal(finalSec, raceDistanceKm);
 
-    let confidenceScore = 0;
-    if(pb) confidenceScore++;
-    if(maxLongRun>0) confidenceScore++;
-    if(volSum>0) confidenceScore++;
-    if(mpLogCount>0) confidenceScore++;
-    const confidence = confidenceScore>=3 ? 'high' : confidenceScore>=1 ? 'medium' : 'low';
+    const confidence = evidence.recent.length>=10&&evidence.runDays>=7&&!!pb&&maxLongRun>=raceDistanceKm*0.45&&mpLogCount>=2 ? 'high' : evidence.recent.length>=4&&!!pb ? 'medium' : 'low';
+    const readinessLevel=evidence.maxPainLevel>=3?'caution':(maxLongRun>=raceDistanceKm*longTarget.min&&evidence.weeklyAvgKm>=raceDistanceKm*0.8?'ready':'building');
+    const readiness={ level:readinessLevel, label:readinessLevel==='ready'?'準備が進んでいます':readinessLevel==='caution'?'負荷を増やさないでください':'準備中', summary:readinessLevel==='ready'?'ロング走と週間走行量が、フルに向けた目安に近づいています。':readinessLevel==='caution'?'痛み・不調の記録があります。走力の目安とは別に、回復を優先してプランを見直しましょう。':'走力の目安と、フルを最後まで走るための準備量は別です。ロング走と週間の実走を少しずつ積み上げましょう。', longRunRatio:longRatio, weeklyAvgKm:evidence.weeklyAvgKm, workoutCount:evidence.recent.length, runDays:evidence.runDays };
 
     return {
       predictedSec: finalSec,
@@ -1313,6 +1245,8 @@
       safeGoalSec: predictedMaxSec,
       mainFactors: mainFactors,
       confidence: confidence,
+      readiness: readiness,
+      evidence: { workoutCount:evidence.recent.length, runDays:evidence.runDays, totalKm:evidence.totalKm, weeklyAvgKm:evidence.weeklyAvgKm, maxRunKm:maxLongRun, mpLogCount:mpLogCount, maxPainLevel:evidence.maxPainLevel },
       algorithmVersion: FORECAST_ALGO_VERSION,
       generatedAt: new Date().toISOString()
     };
@@ -1341,14 +1275,17 @@
     if(!plan) return null;
     const fallbackTargetSec = parseTargetLabelToSec(plan.meta.targetLabel);
     const prevForecast = latestForecastFor(plan.id);
+    const planLogs=await loadRunningPlanLogs();
+    const evidence=runningEvidence(plan,planLogs,state.completed||{},todayLocal());
     const result = estimateRacePerformance({
       plan: plan,
       pbs: (state.profile && state.profile.pbs) || [],
-      logs: state.logs || {},
       completed: state.completed || {},
       today: todayLocal(),
       fallbackTargetSec: fallbackTargetSec,
-      prevForecast: prevForecast
+      prevForecast: prevForecast,
+      planLogs: planLogs,
+      evidence: evidence
     });
     if(!result) return null;
     const prevDoc = state.forecast[plan.id] || { history: [] };
@@ -2335,6 +2272,9 @@
     connections[connectionKey] = Object.assign({}, connections[connectionKey]||{}, {enabled:true,lastSyncedAt:new Date().toISOString()});
     state.profile.healthConnections = connections;
     await Store.setProfile(state.profile);
+    // Health同期で増えた共通WorkoutをRace Forecastにもすぐ反映する。
+    const activePlan=currentPlan();
+    if(activePlan) await recomputeAndSaveForecast(activePlan);
     state.healthImportNotice = { count:imported, matched:matched, merged:merged, possible:possible };
     return { imported:imported, matched:matched, merged:merged, possible:possible, connectionKey:connectionKey };
   }
@@ -3436,7 +3376,17 @@
     return 'ff-neutral';
   }
 
-  const FORECAST_CONFIDENCE_LABEL = { high:'データ十分に基づく予想', medium:'データやや少なめ', low:'まだ参考値(記録を増やすと精度が上がります)' };
+  const FORECAST_CONFIDENCE_LABEL = { high:'実走データがそろった目安', medium:'傾向を見始められる目安', low:'参考値 — 実走を増やすと幅を絞れます' };
+  function forecastNeedsRefresh(plan){ const forecast=latestForecastFor(plan&&plan.id); return !forecast||forecast.algorithmVersion!==FORECAST_ALGO_VERSION; }
+  function forecastEstimateLabel(forecast){
+    const sec=Number(forecast&&forecast.recommendedGoalSec)||Number(forecast&&forecast.predictedSec)||0;
+    if(!sec) return '—';
+    const rounded=function(minutes){ return Math.round(sec/(minutes*60))*minutes*60; };
+    if(forecast.confidence==='high') return secToHMSLabel(rounded(1))+'前後';
+    if(forecast.confidence==='medium') return secToHMSLabel(rounded(5))+'前後';
+    const low=Math.max(0,rounded(10)-10*60), high=rounded(10)+10*60;
+    return secToHMSLabel(low)+'〜'+secToHMSLabel(high)+'の目安';
+  }
 
   function forecastCardHTML(plan){
     const forecast = latestForecastFor(plan.id);
@@ -3445,13 +3395,13 @@
       html += '<div class="li-sub">目標タイムまたは自己ベストの情報が不足しているため、まだ算出できません。</div></div>';
       return html;
     }
-    html += '<div class="hero-stats" style="margin:8px 0 14px"><div class="stat"><span class="k">設定した目標タイム</span><span class="v mono">'+escapeHtml(plan.meta.targetLabel||'—')+'</span></div><div class="stat"><span class="k">現在の予測</span><span class="v mono">'+secToHMSLabel(forecast.recommendedGoalSec)+'</span></div></div>';
+    const readiness=forecast.readiness||{label:'準備度を更新中',summary:'実走記録をもとに準備度を確認します。'};
+    html += '<div class="hero-stats" style="margin:8px 0 14px"><div class="stat"><span class="k">設定した目標タイム</span><span class="v mono">'+escapeHtml(plan.meta.targetLabel||'—')+'</span></div><div class="stat"><span class="k">走力の目安</span><span class="v mono">'+forecastEstimateLabel(forecast)+'</span></div></div>';
     html += '<div class="forecast-range">'
-      + '<div class="forecast-goal"><span class="fg-label">好調時</span><span class="fg-time mono">'+secToHMSLabel(forecast.challengeGoalSec)+'</span></div>'
-      + '<div class="forecast-goal main"><span class="fg-label">現在予測</span><span class="fg-time mono">'+secToHMSLabel(forecast.recommendedGoalSec)+'</span></div>'
-      + '<div class="forecast-goal"><span class="fg-label">安全目安</span><span class="fg-time mono">'+secToHMSLabel(forecast.safeGoalSec)+'</span></div>'
+      + '<div class="forecast-goal"><span class="fg-label">フルへの準備度</span><span class="fg-time">'+escapeHtml(readiness.label)+'</span></div>'
+      + '<div class="forecast-goal main"><span class="fg-label">データの確かさ</span><span class="fg-time">'+escapeHtml(FORECAST_CONFIDENCE_LABEL[forecast.confidence]||'参考値')+'</span></div>'
       + '</div>';
-    html += '<div class="forecast-confidence">'+(FORECAST_CONFIDENCE_LABEL[forecast.confidence]||'')+'</div>';
+    html += '<div class="forecast-confidence">'+escapeHtml(readiness.summary)+'</div>';
     if(forecast.mainFactors && forecast.mainFactors.length){
       html += '<ul class="forecast-factors">'+forecast.mainFactors.map(function(f){
         return '<li class="'+forecastImpactClass(f.impact)+'"><span class="ff-label">'+escapeHtml(f.label)+'</span><span class="ff-value">'+escapeHtml(f.value)+'</span></li>';
@@ -3726,15 +3676,61 @@
     if((workout.duplicate_candidate_ids||[]).length) parts.push('重複の可能性あり（未統合のため別記録として保持）');
     return parts.join('、');
   }
-  async function loadCoachPlanLogs(){
+  // Race Forecastとコーチが同じ実走・予定日別ログを使うための共有読み込み口。
+  // 予定日別ログは旧データの互換用であり、共通Workoutと紐付くものは後段で除外する。
+  async function loadRunningPlanLogs(){
     const pairs=await Promise.all((state.plans||[]).map(async function(plan){
       try{ return [plan.id,await Store.getLogs(plan.id)]; }catch(e){ return [plan.id,{}]; }
     }));
     return pairs.reduce(function(result,pair){ result[pair[0]]=pair[1]||{}; return result; },{});
   }
+  function planItemForWorkout(workout){
+    const plan=(state.plans||[]).find(function(p){ return p.id===workout.plan_id; });
+    return plan&&workout.scheduled_item_date ? findItemByDate(plan,workout.scheduled_item_date) : null;
+  }
+  function runningEvidence(plan, planLogs, completed, today){
+    const windowStart=addDays(today,-28), workouts=allWorkouts();
+    const activities=workouts.map(function(workout){
+      const found=planItemForWorkout(workout), meta=workout.metadata||{};
+      return {
+        id:workout.id, date:workoutDateKey(workout), distanceKm:Number(workout.distance_meters||0)/1000,
+        durationSec:Number(workout.duration_seconds||0), paceSec:Number(workout.average_pace_seconds_per_km)||workoutPaceSeconds(null,Number(workout.distance_meters||0),Number(workout.duration_seconds||0)),
+        type:found&&found.it&&found.it.type||null, planId:workout.plan_id||null,
+        rpe:meta.rpe||null, pain:meta.pain||null, source:workout.source, fromCommon:true
+      };
+    });
+    // 旧ログのうち、既に同じ予定日に共通Workoutがあるものは補完対象から外す。
+    // これにより、Health同期後の予定日別ログを二重に集計しない。
+    (state.plans||[]).forEach(function(p){
+      const logs=(planLogs&&planLogs[p.id])||{};
+      Object.keys(logs).forEach(function(date){
+        const log=logs[date]||{};
+        const linked=workouts.some(function(w){ return w.id===log.workoutId || (w.plan_id===p.id&&w.scheduled_item_date===date); });
+        if(linked) return;
+        const found=findItemByDate(p,date);
+        activities.push({ id:'legacy:'+p.id+':'+date, date:date, distanceKm:Number(log.distanceKm||0), durationSec:Math.round(Number(log.durationMin||0)*60), paceSec:hmsToSeconds(String(log.avgPace||''))||0, type:found&&found.it&&found.it.type||null, planId:p.id, rpe:log.rpe||null, pain:log.pain||null, source:log.source||'manual', fromCommon:false });
+      });
+    });
+    const recent=activities.filter(function(a){ const d=parseISO(a.date); return d&&d>=windowStart&&d<=today; });
+    const totalKm=recent.reduce(function(sum,a){ return sum+a.distanceKm; },0);
+    const runDays=new Set(recent.map(function(a){ return a.date; }).filter(Boolean));
+    const planActivities=recent.filter(function(a){ return a.planId===plan.id; });
+    const maxRunKm=recent.reduce(function(max,a){ return Math.max(max,a.distanceKm||0); },0);
+    const mpActivities=planActivities.filter(function(a){ return a.type==='mp'&&a.paceSec>0; });
+    let maxPainLevel=0;
+    recent.forEach(function(a){
+      const d=parseISO(a.date), pain=a.pain;
+      if(!d || d<addDays(today,-14) || !pain) return;
+      maxPainLevel=Math.max(maxPainLevel,typeof pain==='object'&&pain.level!=null?Number(pain.level)||0:2);
+    });
+    const planItems=flattenPlanItems(plan), windowItems=planItems.filter(function(p){ const d=parseISO(p.date); return p.date&&['mp','easy','long'].indexOf(p.type)>=0&&d&&d>=windowStart&&d<=today; });
+    const currentLogs=(planLogs&&planLogs[plan.id])||{};
+    const completedCount=windowItems.filter(function(p){ return (completed||{})['w'+p.wi+'-'+p.ii]||currentLogs[p.date]||planActivities.some(function(a){ return a.date===p.date; }); }).length;
+    return { activities:activities, recent:recent, totalKm:totalKm, weeklyAvgKm:totalKm/4, runDays:runDays.size, maxRunKm:maxRunKm, mpActivities:mpActivities, maxPainLevel:maxPainLevel, plannedCount:windowItems.length, completedCount:completedCount, adherence:windowItems.length?completedCount/windowItems.length:null };
+  }
   function coachRunningContextLines(plan, allPlanLogs){
     const lines=[], today=todayISO(), todayDate=todayLocal();
-    const workouts=allWorkouts();
+    const evidence=runningEvidence(plan,allPlanLogs,state.completed,todayDate), workouts=evidence.activities.filter(function(a){ return a.fromCommon; }).map(function(a){ return (state.workouts||[]).find(function(w){ return w.id===a.id; }); }).filter(Boolean);
     const ninetyDaysAgo=addDays(todayDate,-90), older=workouts.filter(function(w){ const d=workoutDate(w); return d&&d<ninetyDaysAgo; });
     const recent=workouts.filter(function(w){ const d=workoutDate(w); return d&&d>=ninetyDaysAgo; });
     const totalDistance=workouts.reduce(function(sum,w){ return sum+Number(w.distance_meters||0); },0);
@@ -3767,7 +3763,7 @@
       const logs=(allPlanLogs&&allPlanLogs[p.id])||{};
       Object.keys(logs).forEach(function(date){
         const log=logs[date]||{};
-        if(log.workoutId && workouts.some(function(w){ return w.id===log.workoutId; })) return;
+        if(workouts.some(function(w){ return w.id===log.workoutId || (w.plan_id===p.id&&w.scheduled_item_date===date); })) return;
         const dt=parseISO(date);
         if(!dt || dt<ninetyDaysAgo) return;
         const item=findItemByDate(p,date);
@@ -3875,7 +3871,8 @@
     if(longest.km) lines.push('現在の最長ロング走: '+formatKm(longest.km)+'('+longest.source+')');
     const forecast = latestForecastFor(plan.id);
     if(forecast){
-      lines.push('直近のRACE FORECAST: 目標'+secToHMSLabel(forecast.recommendedGoalSec)+'(CHALLENGE '+secToHMSLabel(forecast.challengeGoalSec)+'〜SAFE '+secToHMSLabel(forecast.safeGoalSec)+'、確信度: '+(FORECAST_CONFIDENCE_LABEL[forecast.confidence]||forecast.confidence)+')');
+      const readiness=forecast.readiness||{};
+      lines.push('直近のRACE FORECAST: 走力の目安 '+forecastEstimateLabel(forecast)+'、フルへの準備度 '+(readiness.label||'更新中')+'、データの確かさ '+(FORECAST_CONFIDENCE_LABEL[forecast.confidence]||forecast.confidence));
     }
     lines.push.apply(lines, recentLogSummaryLines());
     return lines;
@@ -4120,7 +4117,7 @@
     // リクエスト開始時のコーチを固定する。途中で設定を変更しても、この返答の文章と表示は一致する。
     const personaKey=coachPersonaKey((state.profile||{}).coachPersona);
     state.adjust.personaKey=personaKey;
-    const planLogs=await loadCoachPlanLogs();
+    const planLogs=await loadRunningPlanLogs();
     const runningContext=coachRunningContextLines(plan,planLogs);
     const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey, runningContext);
     adjustController = new AbortController();
@@ -4294,7 +4291,7 @@
     let feedbackText = null;
     try{
       const instruction = buildLogInstruction(item, log);
-      const planLogs=await loadCoachPlanLogs();
+      const planLogs=await loadRunningPlanLogs();
       const runningContext=coachRunningContextLines(plan,planLogs);
       const prompt = buildAdjustPrompt(plan, instruction, todayISO(), null, personaKey, runningContext);
       const result = await CoachService.request(prompt, {modelTier:'default', cache:false});
@@ -4740,7 +4737,7 @@
         state.completed=c; state.logs=l||{};
         if(f) state.forecast[id] = f;
         render();
-        if(!latestForecastFor(id)){
+        if(forecastNeedsRefresh(state.plans.find(function(pp){ return pp.id===id; }))){
           const p = state.plans.find(function(pp){ return pp.id===id; });
           if(p) recomputeAndSaveForecast(p).then(function(){ render(); });
         }
@@ -5267,7 +5264,7 @@
       state.onboarding={screen:onb.profileCompleted||hasExistingData?'quest':'profile',step:0,profileStep:0,questType:null,draft:onb.draft||{},replay:false,busy:false};
     }
     render();
-    if(!latestForecastFor(state.currentId)){
+    if(forecastNeedsRefresh(currentPlan())){
       const curPlan = currentPlan();
       if(curPlan) recomputeAndSaveForecast(curPlan).then(function(){ render(); });
     }

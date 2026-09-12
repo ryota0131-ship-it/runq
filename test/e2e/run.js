@@ -235,6 +235,10 @@ async function main() {
 
       check('[1] アプリがAI無しでも起動する(CURRENT QUESTが表示される)', (await page.locator('text=CURRENT QUEST').count()) > 0);
       check('[1] window.claude が無い(=Claude Artifact外)環境であること', await page.evaluate(() => typeof window.claude === 'undefined'));
+      await page.waitForFunction(() => (document.querySelector('.forecast-card') || {}).innerText && document.querySelector('.forecast-card').innerText.includes('直近4週の実走'));
+      const forecastText = await page.locator('.forecast-card').innerText();
+      check('[予測] Health同期済み14kmを直近4週の実走として集計する', forecastText.includes('直近4週の実走') && forecastText.includes('14km'));
+      check('[予測] データ不足時は秒単位・好調時/安全目安で断定しない', forecastText.includes('走力の目安') && !forecastText.includes('好調時') && !forecastText.includes('安全目安') && !forecastText.includes('データ十分に基づく予想'));
 
       // コーチタブへ
       const coachNav = page.locator('.bottom-nav *').filter({ hasText: 'コーチ' }).first();
