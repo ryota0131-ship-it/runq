@@ -81,6 +81,7 @@ function seedPlan() {
     injuryNote: '',
     constitutionNote: '',
     scheduleNote: '',
+    onboarding: { version: 1, walkthroughCompleted: true, profileCompleted: true, draft: null },
   };
   return { plan, profile };
 }
@@ -262,7 +263,7 @@ async function main() {
       const mypageNav = page.locator('.bottom-nav *').filter({ hasText: 'マイページ' }).first();
       await mypageNav.click({ force: true });
       await page.waitForTimeout(300);
-      check('[9] コーチAPIエラー後もマイページ等、他の機能は利用できる', (await page.locator('text=RUNNER PROFILE').count()) > 0);
+      check('[9] コーチAPIエラー後もマイページ等、他の機能は利用できる', (await page.locator('text=ランナープロフィール').count()) > 0);
 
       await context.close();
     }
@@ -387,6 +388,13 @@ async function main() {
       check('[HealthKit] Running Workoutを共通Workoutとして保存する', healthData.workouts.length === 1 && healthData.workouts[0].source === 'apple_health' && healthData.workouts[0].distance_meters === 8240 && healthData.workouts[0].average_heart_rate === 150 && healthData.workouts[0].max_heart_rate === 155);
       check('[HealthKit] 同日の予定メニューへ自動反映する', healthData.logs[today] && healthData.logs[today].source === 'apple_health' && healthData.progress['w0-0'] === true);
       check('[HealthKit] 連携状態と最終同期日時を保存する', healthData.profile.healthConnections.appleHealth.enabled === true && !!healthData.profile.healthConnections.appleHealth.lastSyncedAt);
+      await page.locator('[data-action="mypage-nav"][data-view="main"]').click();
+      const mypageText = await page.locator('.form-card').innerText();
+      check('[マイページ] 今月の集計と最近のワークアウトに共通Workoutを表示する', mypageText.includes('今月のランニング') && mypageText.includes('8km') && mypageText.includes('最近のワークアウト'));
+      await page.locator('[data-action="mypage-nav"][data-view="workout-history"]').click();
+      check('[マイページ] すべての記録画面へ遷移できる', (await page.locator('.form-card').innerText()).includes('これまでの記録'));
+      await page.locator('[data-action="open-workout-detail"]').first().click();
+      check('[マイページ] ワークアウト詳細に実績と予定の関係を表示する', (await page.locator('.form-card').innerText()).includes('ワークアウト詳細') && (await page.locator('.form-card').innerText()).includes('予定：イージー'));
       await context.close();
     }
 
@@ -398,10 +406,11 @@ async function main() {
       // 最長ロング走)が設定済み(profileTrainingReady())でないと表示されず、代わりに
       // 「先にランニングプロフィールを設定してください」という別画面になる。
       // このシナリオはプラン作成そのものを検証するため、事前にプロフィールを投入しておく
-      const { profile: seededProfile } = seedPlan();
-      await context.addInitScript((profile) => {
+      const { profile: seededProfile, plan: seededPlan } = seedPlan();
+      await context.addInitScript(({ profile, plan }) => {
         localStorage.setItem('paceplan.profile', JSON.stringify(profile));
-      }, seededProfile);
+        localStorage.setItem('paceplan.plans', JSON.stringify([plan]));
+      }, { profile: seededProfile, plan: seededPlan });
       await page.goto(baseUrl + '/', { waitUntil: 'load' });
       await page.waitForTimeout(300);
 
@@ -433,6 +442,31 @@ async function main() {
       check('[日付] レース週: 表示期間はレース後も含む月曜〜日曜', raceWeek.dateRange === '9/21〜9/27');
       check('[日付] レース週: レース日をまたぐトレーニングを生成しない', datedRaceItems.every((date) => date <= '2026-09-23') && datedRaceItems.includes('2026-09-23'));
 
+      await context.close();
+    }
+
+    console.log('=== scenario 6: 初回ウォークスルーとレースなしQUEST ===');
+    {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto(baseUrl + '/', { waitUntil: 'load' });
+      check('[初回導線] 新規利用者にウォークスルーを表示する', await page.locator('.onboarding').count() === 1 && (await page.locator('.onboarding').innerText()).includes('目標から'));
+      await page.locator('[data-action="onboarding-next"]').click();
+      await page.locator('[data-action="onboarding-next"]').click();
+      await page.locator('[data-action="onboarding-next"]').click();
+      await page.locator('input[name="ob-name"]').fill('テストランナー');
+      await page.locator('#onboarding-profile-form button[type="submit"]').click();
+      await page.locator('#onboarding-profile-form button[type="submit"]').click();
+      await page.locator('[data-action="onboarding-day"][data-day="1"]').click();
+      await page.locator('#onboarding-profile-form button[type="submit"]').click();
+      await page.locator('#onboarding-profile-form button[type="submit"]').click();
+      await page.locator('[data-action="onboarding-quest-type"][data-type="first_5k"]').click();
+      await page.locator('[data-action="onboarding-quest-next"]').click();
+      await page.locator('#onboarding-quest-form button[type="submit"]').click();
+      await page.locator('[data-action="onboarding-create"]').click();
+      await page.waitForTimeout(150);
+      const firstRun = await page.evaluate(() => ({ plans: JSON.parse(localStorage.getItem('paceplan.plans') || '[]'), profile: JSON.parse(localStorage.getItem('paceplan.profile') || '{}') }));
+      check('[初回導線] 5km QUESTを生成し、プロフィールと完了状態を保存する', firstRun.plans.length === 1 && firstRun.plans[0].meta.questType === 'first_5k' && firstRun.profile.onboarding.profileCompleted === true);
       await context.close();
     }
   } finally {

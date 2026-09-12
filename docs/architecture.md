@@ -186,7 +186,23 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 - 現在は認証機構を持たないV1のため、公開Vercel URLでのAPIコスト濫用を完全には防げない。本格公開前に認証と共有レート制限を導入するまで、Vercel Firewall等で公開範囲を制限する。
 - 開発・本番でのAPI URL切り替え・CORS等は、現時点では過剰に作り込まず、必要になった段階で最小限の設定を追加する方針とする。
 
-## 5. Activity Import(HealthKit / Health Connect / Garmin / Strava)の基盤
+## 5. 初回導線・ネイティブ・Activity Import
+
+### 5.1 初回導線・QUESTの保存方針
+
+初回表示の進行状態は新しい保存先を増やさず、既存の`profile/main`（Webでは`paceplan.profile`）の`onboarding`へ後方互換で保持する。
+
+- `onboarding.version`、`walkthroughCompleted`、`profileCompleted`、`draft`を保存する。既存プロフィールを読む際は既定値を補うため、既存データを壊さない。
+- ウォークスルーの再表示はマイページから可能で、再表示時にプロフィールやプランを変更しない。
+- レースなしのQUESTは従来の`plans/{id}`と同じ形を使い、`meta.questType`を`first_5k`、`first_10k`、`habit`として保存する。レース形式の既存プランは`questType`未設定のまま`race`として扱う。
+- レースなしプランは`generateBeginnerPlan()`で決定論的に生成する。開始日以前のメニューは作らず、週表示は月曜から日曜までとする。AI CoachやRace Forecastに基礎数値の生成を委ねない。
+- 旧デモプランは`id: aqualine-2026`かつ`meta.source: seed`に一致するものだけを起動時に削除する。ユーザー作成のプランや練習記録を一括削除しない。
+
+### 5.2 ネイティブ起動画面
+
+iOSは`LaunchScreen.storyboard`でRUNQ.名とタグラインを表示する。起動画面はOSが表示する静的な画面であり、HealthKitや保存済みプロフィールにはアクセスしない。起動後の初回判定・ウォークスルーはWebView側で共通に処理するため、iOS/Android/Webでデータの扱いは共通である。
+
+### 5.3 Activity Import(HealthKit / Health Connect / Garmin / Strava)の基盤
 
 共通Workoutを`workouts/main.entries[]`に追加した。手動登録・スクリーンショット登録は従来どおり予定日別の`logs/{planId}`へ保存したうえで、同じ実績を共通Workoutにも正規化して保存する。既存画面・既存データを壊さないため、`logs`を置き換えない。
 
@@ -195,6 +211,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 - `matchWorkoutToPlan(workout)`が同日予定を単純に探し、`plan_id`・`scheduled_item_ref`・`completion_status:'matched'`を保存する。高度なAI判定は行わない。
 - 認証未導入のため`user_id`はプロフィール内の端末ローカルID(`workoutUserId`)を使う。将来認証を導入する際は、既存の共通Workoutを保持したままAuthのIDへ移行する。
 - マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。
+- マイページの振り返り表示・月別履歴・ワークアウト詳細は、追加の保存先を作らず`workouts/main.entries[]`を読み取り専用で集計する。予定との関係は、共通Workoutの`plan_id`と`scheduled_item_date`から既存プランのメニューを参照する。距離差は予定説明文に明示された距離がある場合だけ表示し、推測で評価しない。
 - `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、Running Workoutのみを過去90日分ページング取得する。iOSではHealthKit、AndroidではHealth Connectを同じAdapterで扱う。
 - 初回連携・手動同期では、ワークアウト・心拍・距離・消費カロリーの読み取り権限を要求する。心拍は各Workoutの時間範囲でサンプルを読み、平均・最大を決定論的に算出する。GPSルート・ケイデンス・標高・心拍ゾーンは未取得。
 - 自動登録ON時、同日の予定メニューに一致したWorkoutだけを既存の予定日別ログと完了状態にも反映する。ユーザーが手動／スクショで保存済みのログは端末連携で上書きしない。
