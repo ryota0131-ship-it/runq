@@ -45,14 +45,23 @@ function knowledgeGuidance(){
   }).join('\n');
 }
 
-function urgentSafetyResponse(prompt){
-  const text = String(prompt || '');
-  const urgent = /(胸(?:が|の)?痛|胸痛|強い(?:息苦し|息切れ)|呼吸が苦し|めまい|失神|意識(?:が|を).*(?:遠|失))/i;
-  if(!urgent.test(text)) return null;
+function detectUrgentSymptoms(message){
+  const text = String(message || '');
+  const symptoms = [];
+  if(/胸(?:が|の)?痛|胸痛/i.test(text)) symptoms.push('chest_pain');
+  if(/強い(?:息苦し|息切れ)|呼吸が苦し/i.test(text)) symptoms.push('severe_breathlessness');
+  if(/めまい|失神|意識(?:が|を).*(?:遠|失)/i.test(text)) symptoms.push('dizziness_or_fainting');
+  return symptoms;
+}
+
+function urgentSafetyResponse(message){
+  const symptoms = detectUrgentSymptoms(message);
+  if(!symptoms.length) return null;
   return {
     mode: 'advice',
-    summary: '今は走るのを中止してください。胸の痛み・強い息苦しさ・めまいなどは緊急性があり得るため、症状が続く・強い場合は救急要請を含めて速やかに医療機関へ相談してください。',
-    risk: '安全確認が必要な症状が含まれています。'
+    summary: '今は走るのを中止してください。胸の痛み・強い息苦しさ・めまいなどは緊急性があり得るため、症状が続く・強い場合は救急要請を含めて速やかに医療機関へ相談してください。症状が今もあるか、治まったかも教えてください。',
+    risk: '安全確認が必要な症状が含まれています。',
+    safety: { symptoms: symptoms }
   };
 }
 
@@ -249,7 +258,11 @@ async function handler(req, res, opts) {
 
   // 緊急性を疑う語はモデルの判断を待たず、固定の安全回答を返す。
   // これにより知識参照・外部APIの失敗時も危険な運動継続を促さない。
-  const urgentResponse = urgentSafetyResponse(prompt);
+  // promptには会話履歴・プランが含まれるため、安全ガードの対象には絶対に使わない。
+  // クライアントが送る今回の発言だけを safetyMessage として受け取り、旧クライアントでは
+  // promptをフォールバックにする。
+  const safetyMessage = (body && typeof body.safetyMessage === 'string') ? body.safetyMessage : prompt;
+  const urgentResponse = urgentSafetyResponse(safetyMessage);
   if (urgentResponse) {
     res.status(200).json(urgentResponse);
     return;
@@ -308,6 +321,7 @@ module.exports.RESPONSE_SCHEMA = RESPONSE_SCHEMA;
 module.exports.SAFETY_RULES = SAFETY_RULES;
 module.exports.knowledgeGuidance = knowledgeGuidance;
 module.exports.urgentSafetyResponse = urgentSafetyResponse;
+module.exports.detectUrgentSymptoms = detectUrgentSymptoms;
 module.exports.coachKnowledge = coachKnowledge;
 // Vercelのデフォルトの関数実行時間(Hobbyプランは既定10秒)だと、options応答
 // (変更後の完全なプランJSONを生成する必要があり時間がかかりやすい)が間に合わず

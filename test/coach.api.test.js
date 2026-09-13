@@ -90,6 +90,25 @@ async function main() {
     assert.strictEqual(called, false);
   });
 
+  await test('会話履歴に胸痛があっても、今回の安全メッセージが通常なら固定緊急回答を再送しない', async () => {
+    const req = makeReq({ prompt: '会話履歴: 胸が痛い\n今回の質問: 今日のメニューは？', safetyMessage: '今日のメニューは？' });
+    const res = makeRes();
+    let called = false;
+    await coach.handler(req, res, {
+      apiKey: 'test-key',
+      fetchImpl: async () => { called = true; return fakeOpenAIFetch({ outputText: '{"mode":"advice","summary":"今日は休養です"}' })(); },
+    });
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(res.body.summary, '今日は休養です');
+    assert.strictEqual(called, true);
+  });
+
+  await test('踵の痛みや短い相づちは胸痛の緊急ガードを発火させない', async () => {
+    assert.strictEqual(coach.urgentSafetyResponse('踵が痛い'), null);
+    assert.strictEqual(coach.urgentSafetyResponse('ん'), null);
+    assert.deepStrictEqual(coach.detectUrgentSymptoms('胸が痛くて強い息苦しさがある'), ['chest_pain', 'severe_breathlessness']);
+  });
+
   await test('知識ベースは出典メタデータと安全ルールを読み込める', async () => {
     assert.ok(Array.isArray(coach.coachKnowledge.sources));
     assert.ok(coach.coachKnowledge.sources.length >= 4);

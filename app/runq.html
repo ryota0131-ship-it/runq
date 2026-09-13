@@ -3951,7 +3951,7 @@
         httpRes = await fetch(apiEndpoint('/api/coach'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: prompt, modelTier: opts.modelTier || 'default' }),
+          body: JSON.stringify({ prompt: prompt, safetyMessage: opts.safetyMessage || '', modelTier: opts.modelTier || 'default' }),
           signal: opts.signal
         });
       }catch(networkErr){
@@ -3984,6 +3984,49 @@
       return selectCoachProvider().request(prompt, opts);
     }
   };
+
+  // 緊急症状は「今回の発言」だけを検出し、会話履歴の文言を再検出しない。
+  // 症状ごとの状態遷移はユーザーメッセージに保存し、別部位の改善を誤って解除しない。
+  function urgentSymptomsInMessage(text){
+    const value=String(text||''), symptoms=[];
+    if(/胸(?:が|の)?痛|胸痛/i.test(value)) symptoms.push('chest_pain');
+    if(/強い(?:息苦し|息切れ)|呼吸が苦し/i.test(value)) symptoms.push('severe_breathlessness');
+    if(/めまい|失神|意識(?:が|を).*(?:遠|失)/i.test(value)) symptoms.push('dizziness_or_fainting');
+    return symptoms;
+  }
+  function activeSafetyEvents(messages){
+    const events={};
+    (messages||[]).forEach(function(message){
+      const event=message&&message.safetyEvent;
+      if(!event || !event.id) return;
+      if(event.action==='detected') events[event.id]=Object.assign({},event);
+      else if(events[event.id]) events[event.id]=Object.assign({},events[event.id],event);
+    });
+    return Object.keys(events).map(function(id){ return events[id]; }).filter(function(event){ return event.status!=='resolved'; });
+  }
+  function evaluateSafetyMessage(instruction, messages){
+    const active=activeSafetyEvents(messages).slice(-1)[0];
+    const text=String(instruction||'');
+    const named=urgentSymptomsInMessage(text);
+    // 「胸の痛みは治まった」は症状語を含むが、新しい発症ではなく既存症状の解決確認として先に扱う。
+    if(active && /大丈夫|治(?:った|まった)|おさま(?:った|りました)/.test(text) && named.length){
+      return {event:{id:active.id,action:'resolved',status:'resolved',resolvedAt:new Date().toISOString(),resolvedSymptoms:named},localReply:'胸の痛み・息苦しさ・めまいが治まったことを確認しました。今日は無理に走らず、症状が戻る・再発する場合は医療機関へ相談してください。次の相談から通常どおり練習を一緒に考えられます。'};
+    }
+    if(named.length){
+      return {event:{id:'safety_'+Date.now().toString(36),action:'detected',symptoms:named,detectedAt:new Date().toISOString(),status:'active'},localReply:null};
+    }
+    if(!active) return {event:null,localReply:null};
+    if(/まだ|続(?:く|いて)|治まらない|痛い|苦しい|悪化/.test(text)){
+      return {event:{id:active.id,action:'ongoing',status:'active',updatedAt:new Date().toISOString()},localReply:'胸の痛み・強い息苦しさ・めまいの症状が続いているなら、今日は走らず、速やかに医療機関へ相談してください。強い症状や悪化がある場合は救急要請も検討してください。'};
+    }
+    if(/大丈夫|治(?:った|まった)|おさま(?:った|りました)/.test(text)){
+      if(!active.clarificationAsked){
+        return {event:{id:active.id,action:'clarification_requested',status:'active',clarificationAsked:true,updatedAt:new Date().toISOString()},localReply:'胸の痛み・強い息苦しさ・めまいのどの症状が治まった、という意味でしょうか？ その症状名を教えてください。'};
+      }
+    }
+    // 関係ない短文や別部位の話では、過去の緊急案内を再送しない。
+    return {event:null,localReply:null};
+  }
 
   // コーチ(チャット相談・記録後フィードバック共通)にプロンプトとして渡す背景情報。
   // Phase4でPB・シューズ・直近FORECAST・直近ログ傾向を追加(要件: コーチの参照情報拡張)
@@ -4070,6 +4113,9 @@
   // 直近の会話をAIへの参考文脈として簡潔な行の配列にする(フォローアップの相談に対応するため)
   function recentCoachHistoryLines(messages){
     return (messages||[]).slice(-10).map(function(m){
+      // 過去の緊急症状と固定安全回答は構造化状態で管理する。
+      // 通常の会話履歴へ再注入すると、今回の発言と無関係に同じ案内を生成し得るため除外する。
+      if(m.safetyEvent || m.safetyResponse) return null;
       if(m.role==='user') return 'ランナー: '+m.text;
       if(m.kind==='advice') return 'コーチ: '+m.text;
       if(m.kind==='confirmed') return 'コーチ: (プランに反映済み)'+m.text;
@@ -4284,7 +4330,7 @@
       let result;
       resetAdjustStreamPreview();
       try{
-        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
+        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', safetyMessage:instruction, cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
         if(!result || typeof result!=='object') throw {code:'invalid_json'};
       }catch(firstErr){
         if(firstErr && firstErr.code==='timeout') throw firstErr;
@@ -4292,7 +4338,7 @@
         if(!retryableCode) throw firstErr;
         // リトライ時は前回の(失敗した)プレビューを引きずらないよう一旦クリアする
         resetAdjustStreamPreview();
-        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
+        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', safetyMessage:instruction, cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
         if(!result || typeof result!=='object') throw {code:'invalid_json'};
       }
 
@@ -4334,7 +4380,7 @@
       // advice-only: no schedule change
       state.adjust.busy = false;
       state.adjust.error = null;
-      addCoachMessage({ role:'coach', kind:'advice', text: (result && typeof result.summary==='string') ? result.summary : '今のプランのままで大丈夫です', coachPersona:personaKey, basis:decisionBasis });
+      addCoachMessage({ role:'coach', kind:'advice', text: (result && typeof result.summary==='string') ? result.summary : '今のプランのままで大丈夫です', coachPersona:personaKey, basis:decisionBasis, safetyResponse:!!(result&&result.safety) });
       render();
     }catch(e){
       state.adjust.busy = false;
@@ -5174,7 +5220,14 @@
       state.adjust.error = null;
       state.adjust.startedAt = Date.now();
       state.adjust.streamPreview = null;
-      addCoachMessage({ role:'user', text: instruction });
+      const safety=evaluateSafetyMessage(instruction,state.coach.messages);
+      addCoachMessage({ role:'user', text: instruction, safetyEvent:safety.event||null });
+      if(safety.localReply){
+        state.adjust.busy=false;
+        addCoachMessage({ role:'coach', kind:'advice', text:safety.localReply, coachPersona:coachPersonaKey((state.profile||{}).coachPersona), basis:{version:COACHING_RULES.version,reasons:['今回の発言と、症状ごとに保存した継続状態を確認しました。'],sourceIds:['mhlw-physical-activity-guide-2023']}, safetyEvent:safety.event||null });
+        render();
+        return;
+      }
       render();
       runAdjust(instruction);
       return;
