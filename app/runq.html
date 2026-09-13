@@ -25,11 +25,12 @@
     --shadow:rgba(11,31,59,0.08);
     --focus:#0066ff;
     --logo-chip:transparent;
-    --runq-safe-top:env(safe-area-inset-top, 0px);
+    --runq-safe-top:0px;
+    --app-header-height:58px;
   }
-  /* Capacitor上ではiOSのステータスバーがWebViewに重なることがある。
-     実機では最低限の余白を確保し、スクロール時もヘッダーがコンテンツを守る。 */
-  :root[data-runq-native="true"]{ --runq-safe-top:max(38px, env(safe-area-inset-top, 0px)); }
+  /* Capacitor実機だけはステータスバー領域まで描画されるため、その分をヘッダーに含める。
+     アプリ内ブラウザは既に親アプリが安全領域を確保するため、二重に足さない。 */
+  :root[data-runq-native="true"]{ --runq-safe-top:env(safe-area-inset-top, 0px); }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       --bg:#0b1220;
@@ -97,7 +98,7 @@
     background:var(--bg);
     color:var(--text);
     font-family:"Noto Sans JP",-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-    padding:calc(18px + var(--runq-safe-top)) 16px calc(96px + env(safe-area-inset-bottom));
+    padding:calc(var(--app-header-height) + var(--runq-safe-top) + 16px) 16px calc(136px + env(safe-area-inset-bottom));
     -webkit-font-smoothing:antialiased;
     overflow-x:hidden;
   }
@@ -109,7 +110,7 @@
   input, select{ font-family:inherit; }
 
   /* ---------- top bar ---------- */
-  .topbar{ position:sticky; top:var(--runq-safe-top); z-index:40; display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:42px; padding:6px 0 10px; background:var(--bg); }
+  .topbar{ position:fixed; top:0; left:0; right:0; z-index:40; display:flex; align-items:center; justify-content:space-between; gap:16px; height:calc(var(--app-header-height) + var(--runq-safe-top)); padding:calc(var(--runq-safe-top) + 10px) 16px 10px; background:var(--bg); border-bottom:1px solid color-mix(in srgb, var(--border) 65%, transparent); }
   .brand{ display:flex; flex-direction:column; gap:2px; }
   .brand-logo{ display:inline-flex; align-items:center; padding:6px 12px; border-radius:12px; background:var(--logo-chip); }
   .brand-logo img{ display:block; height:26px; width:auto; }
@@ -275,7 +276,7 @@
      他のタブ(ホーム/プラン/マイページ)のレイアウトには一切影響しない。 */
   body.mode-coach{ padding:0; height:100vh; overflow:hidden; }
   body.mode-coach .wrap{ height:100%; max-width:100%; margin:0; gap:0; }
-  body.mode-coach .topbar{ position:static; flex:0 0 auto; padding:calc(16px + var(--runq-safe-top)) 16px 10px; }
+  body.mode-coach .topbar{ position:static; height:auto; flex:0 0 auto; padding:calc(16px + var(--runq-safe-top)) 16px 10px; }
   body.mode-coach .bottom-nav{ position:static; flex:0 0 auto; box-shadow:none; }
   body.mode-coach .wrap > .info-card{ flex:1 1 auto; min-height:0; margin:0 16px; overflow-y:auto; }
   body.mode-coach .coach-chat-card{
@@ -729,7 +730,7 @@
   .onboarding-actions{display:flex;gap:10px;align-items:center}.onboarding-actions .btn-primary{flex:1}.onboarding-skip{border:0;background:none;color:var(--text-muted);font:inherit;font-size:13px;padding:10px;cursor:pointer}
   .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.choice{border:1px solid var(--border);border-radius:15px;background:var(--surface);padding:15px;text-align:left;color:var(--text);font:inherit;cursor:pointer}.choice strong{display:block;font-size:15px}.choice span{display:block;color:var(--text-muted);font-size:11px;margin-top:5px;line-height:1.45}.choice.selected{border-color:var(--accent);background:var(--accent-soft)}
   .onboarding-progress{height:4px;background:var(--border);border-radius:999px;margin:0 0 24px}.onboarding-progress i{display:block;height:100%;background:var(--accent);border-radius:inherit}.onboarding-review{display:grid;gap:10px;margin:16px 0}.onboarding-review div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border);padding:9px 0;font-size:13px}.onboarding-review span{color:var(--text-muted)}
-  body.mode-onboarding{padding-bottom:calc(22px + env(safe-area-inset-bottom));}
+  body.mode-onboarding{padding-top:calc(18px + var(--runq-safe-top));padding-bottom:calc(22px + env(safe-area-inset-bottom));}
   @media(max-width:480px){.onboarding{padding-top:4px}.onboarding-card{padding:24px 18px}.onboarding h1{font-size:24px}}
 </style>
 
@@ -2544,7 +2545,6 @@
   function mypageMainHTML(){
     const workouts=allWorkouts();
     let html = '<div class="form-card">';
-    html += '<h2>マイページ</h2>';
     html += mypageToastHTML();
     html += '<div class="mypage-grid">';
     html += currentGoalCardHTML();
