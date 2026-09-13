@@ -76,6 +76,31 @@ async function main() {
     assert.ok(JSON.stringify(res.body).indexOf('test-key') === -1);
   });
 
+  await test('胸痛など緊急性を疑う相談はOpenAIを呼ばず固定の安全回答を返す', async () => {
+    const req = makeReq({ prompt: '走っていたら胸が痛くて、めまいもします' });
+    const res = makeRes();
+    let called = false;
+    await coach.handler(req, res, {
+      apiKey: 'test-key',
+      fetchImpl: async () => { called = true; throw new Error('should not call'); },
+    });
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(res.body.mode, 'advice');
+    assert.ok(/中止/.test(res.body.summary));
+    assert.strictEqual(called, false);
+  });
+
+  await test('知識ベースは出典メタデータと安全ルールを読み込める', async () => {
+    assert.ok(Array.isArray(coach.coachKnowledge.sources));
+    assert.ok(coach.coachKnowledge.sources.length >= 4);
+    coach.coachKnowledge.sources.forEach((source) => {
+      assert.ok(source.id && source.title && source.publisher && source.year && source.url);
+      assert.ok(source.audience && source.summary && source.evidenceStrength && source.version);
+    });
+    assert.ok(coach.SAFETY_RULES.length >= 4);
+    assert.ok(/mhlw-physical-activity-guide-2023/.test(coach.knowledgeGuidance()));
+  });
+
   await test('mode:optionsの既存レスポンス形式(options[].{label,summary,plan})をそのまま透過する', async () => {
     const optionsPayload = {
       mode: 'options',

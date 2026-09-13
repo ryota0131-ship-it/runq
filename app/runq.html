@@ -306,17 +306,14 @@
   .week-progress .fill{ height:100%; background:var(--easy); }
   .week-progress .txt{ font-family:"Zen Kaku Gothic New",sans-serif; font-size:11px; color:var(--text-muted); }
 
-  .item-row{ display:grid; grid-template-columns:26px 58px 96px 1fr; gap:12px; align-items:start; padding:11px 0; border-top:1px solid var(--border); }
+  .item-row{ display:grid; grid-template-columns:68px 96px 1fr; gap:12px; align-items:start; padding:11px 0; border-top:1px solid var(--border); }
   .item-row:first-of-type{ border-top:none; }
   @media (max-width:560px){
     .item-row{ display:flex; flex-wrap:wrap; align-items:center; column-gap:10px; row-gap:8px; padding:12px 0; }
-    .item-row .item-check{ flex:0 0 auto; padding-top:0; }
     .item-row .item-day{ flex:0 0 auto; }
     .item-row .chip{ flex:0 0 auto; }
     .item-row .item-body{ flex:1 1 100%; min-width:0; }
   }
-  .item-check{ padding-top:2px; }
-  .item-check input{ width:17px; height:17px; accent-color:var(--accent); cursor:pointer; }
   .item-day{ font-family:"Zen Kaku Gothic New",sans-serif; font-size:12px; color:var(--text-muted); line-height:1.35; }
   .item-day .d{ display:block; font-weight:600; color:var(--text); }
   .chip{ align-self:start; font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:12px; text-align:center; line-height:1.3; }
@@ -332,7 +329,9 @@
   .item-title{ font-weight:600; font-size:13.5px; }
   .item-desc{ font-size:13px; color:var(--text-muted); line-height:1.55; margin-top:2px; }
   .item-row.done .item-title, .item-row.done > .item-body > .item-desc{ color:var(--text-muted); }
-  .complete-badge{ display:inline-flex; align-items:center; border-radius:999px; padding:3px 7px; background:var(--easy-soft); color:var(--easy); font-size:10px; font-weight:700; letter-spacing:.04em; }
+  .complete-badge,.skipped-badge,.partial-badge{ display:inline-flex; align-items:center; border-radius:999px; padding:3px 7px; margin-top:4px; font-size:10px; font-weight:700; letter-spacing:.04em; white-space:nowrap; }
+  .complete-badge{ background:var(--easy-soft); color:var(--easy); }
+  .skipped-badge,.partial-badge{ background:var(--surface-2); color:var(--text-muted); }
   .peak-tag{ font-size:10px; font-weight:700; letter-spacing:0.06em; color:var(--mp); border:1px solid var(--mp); border-radius:999px; padding:1px 7px; }
   .warn-flag{ display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; color:var(--warn); background:var(--warn-soft); padding:5px 9px; border-radius:8px; }
   .warn-flag svg{ flex:0 0 auto; }
@@ -414,6 +413,10 @@
   .log-edit-btn{ border:none; background:transparent; color:var(--accent); font-size:11.5px; font-weight:600; cursor:pointer; padding:0; }
   .feedback-callout{ margin-top:6px; background:var(--accent-soft); color:var(--accent-strong); border-radius:8px; padding:8px 12px; font-size:12.5px; line-height:1.5; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .feedback-callout.busy{ color:var(--text-muted); background:var(--surface-2); }
+  .coach-basis{ width:100%; margin-top:6px; font-size:11px; color:var(--text-muted); }
+  .coach-basis summary{ display:inline-flex; cursor:pointer; color:var(--accent); font-weight:700; }
+  .coach-basis p{ margin:6px 0; }
+  .coach-basis small{ display:block; margin-top:6px; color:var(--text-faint); line-height:1.45; }
   .log-form{ margin-top:10px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
   .log-image-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding-bottom:10px; border-bottom:1px dashed var(--border); }
   .log-image-btn{ position:relative; border:1px solid var(--accent); background:var(--accent-soft); color:var(--accent-strong); border-radius:999px; padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer; }
@@ -645,7 +648,7 @@
   .this-week-card,.forecast-card{ padding:18px 20px; }
   .this-week-card > h3,.forecast-card > h3{ display:none; }
   .this-week-card{ gap:10px; }
-  .week-mini-item{ grid-template-columns:46px 1fr 22px; padding:9px 0; }
+  .week-mini-item{ grid-template-columns:46px 1fr 54px; padding:9px 0; }
   .week-mini-item.today{ margin:0 -6px; padding:9px 6px; background:var(--accent-soft); }
   .week-progress-line{ margin-top:2px; }
   .this-week-card .btn-secondary{ align-self:flex-start; padding:8px 0; border:none; background:transparent; color:var(--accent); }
@@ -685,13 +688,15 @@
   .todays-point .tp-text{ font-size:13px; color:var(--text); line-height:1.5; }
   .this-week-card{ display:flex; flex-direction:column; gap:12px; }
   .week-mini-list{ display:flex; flex-direction:column; gap:2px; }
-  .week-mini-item{ display:grid; grid-template-columns:52px 1fr 22px; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border); }
+  .week-mini-item{ display:grid; grid-template-columns:52px 1fr 54px; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border); }
   .week-mini-item .chip{ justify-self:start; }
   .week-mini-item:first-child{ border-top:none; }
   .week-mini-item.today{ background:var(--accent-soft); margin:0 -10px; padding:8px 10px; border-radius:8px; border-top:none; }
   .week-mini-item.done .wmi-day{ color:var(--text-faint); }
   .wmi-day{ font-family:"Zen Kaku Gothic New",sans-serif; font-size:12px; color:var(--text-muted); }
-  .wmi-check{ color:var(--easy); font-weight:700; text-align:center; }
+  .wmi-status{ min-height:16px; color:var(--text-faint); font-size:10px; font-weight:700; text-align:right; white-space:nowrap; }
+  .wmi-status.completed{ color:var(--easy); }
+  .wmi-status.skipped,.wmi-status.partial{ color:var(--text-muted); }
   .week-progress-line{ font-size:12px; color:var(--text-muted); }
   .week-progress-line .wpl-kicker{ font-size:10px; letter-spacing:0.1em; color:var(--text-faint); margin-right:6px; }
   .home-coach-link{ display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:0; }
@@ -1163,7 +1168,6 @@
    *   plan             対象プラン(plans/{id}のオブジェクト)
    *   pbs              profile.pbs(自己ベスト配列)
    *   logs             対象プランのログ({date: {...}})
-   *   completed        対象プランの進捗({"w{wi}-{ii}": true})
    *   today            基準日(Dateオブジェクト。省略時はtodayLocal())
    *   fallbackTargetSec 自己ベスト未登録時に使う基準タイム(秒)。通常はplan.meta.targetLabelを渡す
    *   prevForecast     直近のforecastスナップショット({predictedSec, ...}) — 平滑化用
@@ -1176,7 +1180,6 @@
     if(!raceDistanceKm) return null;
 
     const pbs = input.pbs || [];
-    const completed = input.completed || {};
     const today = input.today || todayLocal();
     const prevForecast = input.prevForecast || null;
     const raceDate = parseISO(plan.meta.raceDate);
@@ -1184,7 +1187,7 @@
     const windowStart = addDays(today, -28);
     const planItems = flattenPlanItems(plan);
     const mainFactors = [];
-    const evidence=input.evidence||runningEvidence(plan,input.planLogs||{},completed,today);
+    const evidence=input.evidence||runningEvidence(plan,input.planLogs||{},today);
 
     // 1) speed baseline — 自己ベストからの換算(リーゲルの式)。無ければ申告済みの目標タイムを基準に
     const pb = bestPbForDistance(raceDistanceKm, pbs);
@@ -1310,11 +1313,10 @@
     const fallbackTargetSec = parseTargetLabelToSec(plan.meta.targetLabel);
     const prevForecast = latestForecastFor(plan.id);
     const planLogs=await loadRunningPlanLogs();
-    const evidence=runningEvidence(plan,planLogs,state.completed||{},todayLocal());
+    const evidence=runningEvidence(plan,planLogs,todayLocal());
     const result = estimateRacePerformance({
       plan: plan,
       pbs: (state.profile && state.profile.pbs) || [],
-      completed: state.completed || {},
       today: todayLocal(),
       fallbackTargetSec: fallbackTargetSec,
       prevForecast: prevForecast,
@@ -1893,17 +1895,32 @@
     return '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1.5 15 14.5H1L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M8 6.2v3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="11.9" r="0.9" fill="currentColor"/></svg>';
   }
 
-  function checkableTypes(item, raceDatePassed){
-    if(item.type==='mp'||item.type==='easy'||item.type==='long'||item.type==='preRace'||item.type==='event') return true;
-    if(item.type==='race') return raceDatePassed;
-    return false;
-  }
-
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
   function isLoggable(it){ return !!it.date && it.type!=='rest'; }
+
+  // 予定の完了は手動チェックではなく、保存済みの実績からのみ導く。
+  // state.completed は過去版との互換用に保持するが、表示・進捗・集計の根拠には使わない。
+  function plannedWorkoutForItem(plan, it){
+    if(!plan || !it || !it.date) return null;
+    return allWorkouts().find(function(workout){
+      return workout.plan_id===plan.id && workout.scheduled_item_date===it.date && workout.completion_status!=='skipped';
+    }) || null;
+  }
+  function itemCompletionState(plan, it){
+    if(!isLoggable(it)) return {status:'none', log:null, workout:null};
+    const log=(state.logs||{})[it.date] || null;
+    if(log){
+      if(log.completionType==='skipped') return {status:'skipped', log:log, workout:null};
+      if(log.completionType==='partial') return {status:'partial', log:log, workout:null};
+      return {status:'completed', log:log, workout:null};
+    }
+    const workout=plannedWorkoutForItem(plan,it);
+    return workout ? {status:'completed', log:null, workout:workout} : {status:'none', log:null, workout:null};
+  }
+  function isItemCompleted(plan, it){ return itemCompletionState(plan,it).status==='completed'; }
 
   function findItemByDate(plan, dateStr){
     for(let wi=0; wi<plan.weeks.length; wi++){
@@ -2201,7 +2218,7 @@
       imported_at: log.loggedAt,
       plan_id: plan.id,
       scheduled_item_date:dateStr,
-      metadata:{note:log.note,rpe:log.rpe,pain:log.pain,feedback:log.feedback,feedback_coach_persona:log.feedbackCoachPersona||null,image_import:log.imageImport||null}
+      metadata:{note:log.note,rpe:log.rpe,pain:log.pain,feedback:log.feedback,feedback_basis:log.feedbackBasis||null,feedback_coach_persona:log.feedbackCoachPersona||null,image_import:log.imageImport||null}
     };
   }
 
@@ -2593,7 +2610,7 @@
     const candidates=(workout.duplicate_candidate_ids||[]).map(function(id){return (state.workouts||[]).find(function(w){return w.id===id;});}).filter(Boolean);
     const metadata=workout.metadata||{}, feedback=metadata.feedback;
     const candidateHTML=candidates.length?'<div class="workout-detail-plan"><div class="li-main">同じランニングの可能性があります</div><div class="li-sub">日付・距離だけでは統合していません。開始時刻、所要時間、距離を確認してください。</div>'+candidates.map(function(w){ return '<div class="li-sub" style="margin-top:8px;">'+escapeHtml(workoutSourceLabel(w.source)+' '+workoutDateLabel(w)+' '+formatKm(Number(w.distance_meters||0)/1000)+' '+workoutDurationLabel(w.duration_seconds))+'<br><button type="button" class="btn-secondary" style="margin-top:6px;" data-action="request-workout-merge" data-primary="'+escapeHtml(workout.id)+'" data-duplicate="'+escapeHtml(w.id)+'">内容を確認して統合する</button></div>'; }).join('')+'</div>':'';
-    const feedbackHTML=feedback?'<div class="workout-detail-plan"><div class="coach-inline-title">'+coachMascotHTML(metadata.feedback_coach_persona,'normal','small')+'<div class="li-main">コーチからのフィードバック</div></div><div class="li-sub">'+escapeHtml(feedback)+'</div></div>':'';
+    const feedbackHTML=feedback?'<div class="workout-detail-plan"><div class="coach-inline-title">'+coachMascotHTML(metadata.feedback_coach_persona,'normal','small')+'<div class="li-main">コーチからのフィードバック</div></div><div class="li-sub">'+escapeHtml(feedback)+'</div>'+coachBasisHTML(metadata.feedback_basis)+'</div>':'';
     const pain=metadata.pain||null;
     const reflectionRows=[];
     if(metadata.note) reflectionRows.push(['メモ',metadata.note]);
@@ -2998,25 +3015,21 @@
     const lf=state.logForm;
     const feedback=log.feedback || (lf.feedbackBusy===dateStr ? null : null);
     return '<div class="log-saved" id="log-saved-'+dateStr+'"><h4>おつかれさまでした！記録を保存しました</h4><div class="log-summary-txt mono">'+escapeHtml(logSummaryLine(log))+'</div>'
-      + '<div class="feedback-callout'+(lf.feedbackBusy===dateStr?' busy':'')+'">'+coachMascotHTML(log.feedbackCoachPersona||((state.profile||{}).coachPersona),lf.feedbackBusy===dateStr?'thinking':'cheer','small')+(lf.feedbackBusy===dateStr?'<span>コーチが振り返りを作成しています…</span>':feedback?'<span><strong>コーチからのフィードバック</strong><br>'+escapeHtml(feedback)+'</span>':lf.feedbackError?'<span>フィードバックを取得できませんでした。記録は保存されています。<button type="button" class="workout-text-link" data-action="retry-log-feedback" data-date="'+dateStr+'">再試行</button></span>':'<span>コーチからのフィードバックを準備しています。</span>')+'</div>'
+      + '<div class="feedback-callout'+(lf.feedbackBusy===dateStr?' busy':'')+'">'+coachMascotHTML(log.feedbackCoachPersona||((state.profile||{}).coachPersona),lf.feedbackBusy===dateStr?'thinking':'cheer','small')+(lf.feedbackBusy===dateStr?'<span>コーチが振り返りを作成しています…</span>':feedback?'<span><strong>コーチからのフィードバック</strong><br>'+escapeHtml(feedback)+'</span>'+coachBasisHTML(log.feedbackBasis):lf.feedbackError?'<span>フィードバックを取得できませんでした。記録は保存されています。<button type="button" class="workout-text-link" data-action="retry-log-feedback" data-date="'+dateStr+'">再試行</button></span>':'<span>コーチからのフィードバックを準備しています。</span>')+'</div>'
       + '<div class="log-saved-actions"><button type="button" class="btn-secondary" data-action="open-log" data-date="'+dateStr+'">記録を編集</button><button type="button" class="btn-secondary" data-action="consult-item" data-date="'+dateStr+'">コーチに相談する</button><button type="button" class="btn-secondary" data-action="close-log">閉じる</button></div></div>';
   }
 
   function itemRowHTML(plan, wi, ii, it, today){
-    const passed = it.date ? today>=parseISO(it.date) : false;
-    const canCheck = checkableTypes(it, passed);
-    const key = 'w'+wi+'-'+ii;
-    const isDone = !!state.completed[key];
     const loggable = isLoggable(it);
-    const log = loggable ? state.logs[it.date] : null;
+    const completion=itemCompletionState(plan,it);
+    const isDone = completion.status==='completed';
+    const log = loggable ? completion.log : null;
     const formOpen = loggable && state.logForm.openDate===it.date;
 
     let html = '<div class="item-row'+(isDone?' done':'')+'">';
-    html += '<div class="item-check">'+(canCheck? '<input type="checkbox" data-action="toggle" data-key="'+key+'" '+(isDone?'checked':'')+' aria-label="'+escapeHtml(it.title)+' 完了">' : '')+'</div>';
-    html += '<div class="item-day">'+it.day+(it.date?'<span class="d">'+fmtMD(parseISO(it.date))+'</span>':'')+'</div>';
+    html += '<div class="item-day">'+it.day+(it.date?'<span class="d">'+fmtMD(parseISO(it.date))+'</span>':'')+(completion.status==='completed'?'<span class="complete-badge">✓ 完了</span>':completion.status==='skipped'?'<span class="skipped-badge">見送り</span>':completion.status==='partial'?'<span class="partial-badge">一部実施</span>':'')+'</div>';
     html += '<div class="chip '+it.type+'">'+escapeHtml(it.title)+'</div>';
     html += '<div class="item-body"><div class="item-title-row">'+(it.peak?'<span class="peak-tag">PEAK</span>':'')+'</div>';
-    if(isDone) html += '<span class="complete-badge">完了</span>';
     if(it.desc) html += '<div class="item-desc">'+escapeHtml(it.desc)+'</div>';
     if(it.flag==='heel') html += '<div class="warn-flag">'+warnIcon()+'<span>'+escapeHtml(it.flagText||'踵の状態を確認')+'</span></div>';
 
@@ -3030,6 +3043,7 @@
           html += '<div class="feedback-callout busy">'+coachMascotHTML((state.profile||{}).coachPersona,'thinking','small')+'<span>コーチが確認中…</span></div>';
         } else if(log.feedback){
           html += '<div class="feedback-callout">'+coachMascotHTML(log.feedbackCoachPersona||((state.profile||{}).coachPersona),'normal','small')+'<span><strong>コーチからのフィードバック</strong><br>'+escapeHtml(log.feedback)+'</span>'
+            + coachBasisHTML(log.feedbackBasis)
             + (state.logUndo && state.logUndo.forDate===it.date ? '<button class="undo-btn" data-action="undo-log-adjust">元に戻す</button>' : '')
             + '</div>';
         }
@@ -3046,6 +3060,8 @@
           html += '<button type="button" class="btn-secondary" data-action="dismiss-log-proposal">今回は見送る</button>';
           html += '</div>';
         }
+      } else if(completion.workout){
+        html += '<div class="log-summary"><span class="log-summary-txt mono">実績: '+escapeHtml(coachWorkoutActualLabel(completion.workout))+'</span><button type="button" class="log-edit-btn" data-action="open-log" data-date="'+it.date+'">内容を確認</button></div>';
       } else {
         const isToday=it.date===toISO(today), isFuture=it.date>toISO(today);
         if(it.type==='race'){
@@ -3122,8 +3138,8 @@
   function planViewHTML(plan){
     if(!plan) return planPillsHTML()+'<div class="info-card">プランがありません。「プラン作成」から作成してください。</div>';
     if(plan.meta && plan.meta.questType && plan.meta.questType!=='race'){
-      let total=0,done=0; plan.weeks.forEach(function(w,wi){w.items.forEach(function(it,ii){if(isLoggable(it)){total++;if(state.completed['w'+wi+'-'+ii])done++;}});});
-      return '<main class="wrap">'+planPillsHTML()+'<div class="hero"><div class="hero-meta"><div class="quest-kicker">CURRENT QUEST</div><div class="hero-race">'+escapeHtml(plan.meta.name)+'</div><div class="hero-sub">'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</div></div><div class="phase-side"><div class="phase-badge">'+done+' / '+total+' メニュー完了</div></div></div>'+plan.weeks.map(function(w,wi){return '<section class="info-card"><h3>'+escapeHtml(w.label)+' <span class="li-sub">'+escapeHtml(w.phase)+'</span></h3><div class="week-list">'+w.items.map(function(it,ii){const k='w'+wi+'-'+ii;return '<label class="list-row"><input type="checkbox" data-action="toggle" data-key="'+k+'" '+(state.completed[k]?'checked':'')+'><span><strong>'+escapeHtml(it.day)+' '+escapeHtml(fmtMD(parseISO(it.date)))+'　'+escapeHtml(it.title)+'</strong><span class="li-sub" style="display:block">'+escapeHtml(it.desc)+'</span></span></label>';}).join('')+'</div></section>';}).join('')+'</main>';
+      let total=0,done=0; plan.weeks.forEach(function(w){w.items.forEach(function(it){if(isLoggable(it)){total++;if(isItemCompleted(plan,it))done++;}});});
+      return '<main class="wrap">'+planPillsHTML()+'<div class="hero"><div class="hero-meta"><div class="quest-kicker">CURRENT QUEST</div><div class="hero-race">'+escapeHtml(plan.meta.name)+'</div><div class="hero-sub">'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</div></div><div class="phase-side"><div class="phase-badge">'+done+' / '+total+' メニュー完了</div></div></div>'+plan.weeks.map(function(w,wi){return '<section class="info-card"><h3>'+escapeHtml(w.label)+' <span class="li-sub">'+escapeHtml(w.phase)+'</span></h3><div class="week-list">'+w.items.map(function(it,ii){return itemRowHTML(plan,wi,ii,it,todayLocal());}).join('')+'</div></section>';}).join('')+'</main>';
     }
     const today = todayLocal();
     const raceDate = parseISO(plan.meta.raceDate);
@@ -3149,9 +3165,9 @@
     let total=0, done=0;
     plan.weeks.forEach((wk,wi)=>{
       wk.items.forEach((it,ii)=>{
-        if(checkableTypes(it, today>=parseISO(it.date||plan.meta.raceDate))){
+        if(isLoggable(it)){
           total++;
-          if(state.completed['w'+wi+'-'+ii]) done++;
+          if(isItemCompleted(plan,it)) done++;
         }
       });
     });
@@ -3227,8 +3243,7 @@
       const expanded = isCurrent || !!state.expandedWeeks[wi];
       let wTotal=0, wDone=0;
       wk.items.forEach((it,ii)=>{
-        const passed = it.date ? today>=parseISO(it.date) : false;
-        if(checkableTypes(it, passed)){ wTotal++; if(state.completed['w'+wi+'-'+ii]) wDone++; }
+        if(isLoggable(it)){ wTotal++; if(isItemCompleted(plan,it)) wDone++; }
       });
       html += '<div class="week-card'+(isCurrent?' current':'')+(isPast?' past':'')+(expanded?'':' collapsed')+'">';
       html += '<div class="week-head"><div class="week-head-left"><span class="week-num">'+wk.label.toUpperCase()+'</span><span class="week-phase">'+escapeHtml(wk.phase)+'</span><span class="week-range mono">'+wk.dateRange+'</span>'+(isCurrent?'<span class="today-chip">今週</span>':'')+'</div>'
@@ -3248,7 +3263,7 @@
       + '<div class="info-card"><h3>注意事項</h3><ul>'+plan.extras.cautions.map(f=>'<li>'+escapeHtml(f)+'</li>').join('')+'</ul></div>'
       + '</div>';
 
-    html += '<div class="foot-note">進捗はチェックすると自動で保存されます</div>';
+    html += '<div class="foot-note">実績を記録すると、予定の進捗に反映されます</div>';
     return html;
   }
 
@@ -3416,15 +3431,14 @@
     let total=0, done=0;
     html += '<div class="week-mini-list">';
     wk.items.forEach(function(it, ii){
-      const passed = it.date ? todayStr>=it.date : false;
-      const checkable = checkableTypes(it, passed);
-      const isDone = !!(checkable && state.completed['w'+wi+'-'+ii]);
-      if(checkable){ total++; if(isDone) done++; }
+      const completion=itemCompletionState(plan,it);
+      const isDone = completion.status==='completed';
+      if(isLoggable(it)){ total++; if(isDone) done++; }
       const isToday = it.date===todayStr;
       html += '<div class="week-mini-item'+(isToday?' today':'')+(isDone?' done':'')+'">'
         + '<span class="wmi-day">'+it.day+'</span>'
         + '<span class="chip '+it.type+'">'+escapeHtml(it.title)+'</span>'
-        + '<span class="wmi-check">'+(isDone?'&#10003;':'')+'</span>'
+        + '<span class="wmi-status '+completion.status+'">'+(isDone?'✓ 完了':completion.status==='skipped'?'見送り':completion.status==='partial'?'一部実施':'')+'</span>'
         + '</div>';
     });
     html += '</div>';
@@ -3495,6 +3509,42 @@
     analyst:{label:'リツ',typeLabel:'冷静な分析型',description:'「律」のように、事実・理由・次の行動を落ち着いて整理します。',example:'14kmを予定のペース範囲で完了しています。次の練習のため、きつさも確認しましょう。',prompt:'話し方は冷静な分析型。丁寧語で、事実→理由→次の行動の順に簡潔に伝える。専門用語を並べず、冷たい採点をしない。'},
     cheer:{label:'カイ',typeLabel:'元気な応援型',description:'海のように明るく、達成を一緒に喜んで次につなげます。',example:'14km、走りきったね！今日の手応えを残して、次につなげていこう。',prompt:'話し方は元気な応援型。明るい友人口調で「〜だね！」「〜していこう！」を控えめに使う。根性論や達成保証はしない。'}
   };
+  // コーチの判断で扱う項目をコード側に明示する。AIはこの範囲の事実を説明・提案に使うが、
+  // 距離や日程などの確定値は既存の決定論的ロジックとnormalizeAdjustedPlan()で検証する。
+  const COACHING_RULES={
+    version:'2026-09-13',
+    safety:'胸痛・強い息苦しさ・めまい等は運動中止。痛み・体調不良・強い疲労では負荷を上げない。診断や治療はしない。',
+    reviewInputs:['直近の実走距離・時間・ペース・頻度','最長距離と週ごとの量','予定の実施状況','RPE・痛み・疲労・メモ','走れる曜日・時間・生活制約','目標距離・目標日・目標タイム・自己ベスト'],
+    loadPolicy:'固定の増加率を機械的に適用せず、実績・疲労・痛み・継続状況を組み合わせて、休養や維持も選択肢にする。',
+    sourceIds:['who-physical-activity-2020','mhlw-physical-activity-guide-2023','running-injury-training-parameters-2022','training-load-running-injury-2018']
+  };
+  const COACH_SOURCE_LABEL={
+    'who-physical-activity-2020':'WHO 身体活動ガイドライン（2020）',
+    'mhlw-physical-activity-guide-2023':'厚生労働省 身体活動・運動ガイド2023',
+    'running-injury-training-parameters-2022':'ランニング障害と練習量の系統的レビュー（2022）',
+    'training-load-running-injury-2018':'走行負荷変化と障害の系統的レビュー（2018）'
+  };
+  function coachDecisionBasis(plan, runningContext){
+    const evidence=trainingEvidenceSummary();
+    const reasons=['RUNQ.に保存された実走、予定、プロフィール設定を確認しました。'];
+    const sourceIds=['who-physical-activity-2020'];
+    if(evidence.pain || /痛み|不調|疲労/.test(String(runningContext||''))){
+      reasons.push('痛み・不調・疲労の入力があるため、負荷を上げず休養または軽い内容を優先します。');
+      sourceIds.push('mhlw-physical-activity-guide-2023','running-injury-training-parameters-2022');
+    } else if(evidence.count<3){
+      reasons.push('実走の件数がまだ少ないため、走力を断定せず保守的に提案します。');
+      sourceIds.push('mhlw-physical-activity-guide-2023');
+    } else {
+      reasons.push('単一の距離や1回のペースではなく、最近の実走・継続状況・予定を合わせて確認します。');
+      sourceIds.push('running-injury-training-parameters-2022','training-load-running-injury-2018');
+    }
+    return {version:COACHING_RULES.version,reasons:reasons,sourceIds:Array.from(new Set(sourceIds)),sourceLabel:'RUNQ.の実走・予定・本人入力を優先'};
+  }
+  function coachBasisHTML(basis){
+    if(!basis || !Array.isArray(basis.reasons) || !basis.reasons.length) return '';
+    const sources=(basis.sourceIds||[]).map(function(id){ return COACH_SOURCE_LABEL[id]||id; }).join('／');
+    return '<details class="coach-basis"><summary>なぜ？</summary><div>'+basis.reasons.map(function(reason){ return '<p>'+escapeHtml(reason)+'</p>'; }).join('')+(sources?'<small>参照の目安: '+escapeHtml(sources)+'</small>':'')+'</div></details>';
+  }
   function coachPersona(key){ const selected=key||((state.profile&&state.profile.coachPersona)||'companion'); return COACH_PERSONAS[selected]||COACH_PERSONAS.companion; }
   function coachPersonaKey(key){ return COACH_PERSONAS[key] ? key : 'companion'; }
   function coachMascotHTML(key, mood, size){
@@ -3505,7 +3555,7 @@
   function coachCompanionSettingsHTML(){ const current=coachPersonaKey(state.profile&&state.profile.coachPersona); return '<div class="info-card coach-companion-settings"><h3>あなたのコーチ</h3><div class="li-sub">コーチによって口調は変わりますが、判断基準やプランは変わりません。</div><div class="companion-choice-list">'+Object.keys(COACH_PERSONAS).map(function(key){const p=COACH_PERSONAS[key];return '<button type="button" class="companion-choice'+(current===key?' selected':'')+'" data-action="select-coach-persona" data-persona="'+key+'" aria-pressed="'+(current===key?'true':'false')+'">'+coachMascotHTML(key,'normal','choice')+'<span class="companion-choice-copy"><strong>'+p.label+' コーチ</strong><span class="companion-type">'+p.typeLabel+'</span><span>'+p.description+'</span><small>「'+p.example+'」</small></span><span class="companion-choice-state">'+(current===key?'選択中':'選ぶ')+'</span></button>';}).join('')+'</div></div>'; }
   function planReviewAssessment(plan){
     const today=todayLocal(), from=addDays(today,-14), items=flattenPlanItems(plan).filter(function(x){return x.date&&parseISO(x.date)>=from&&parseISO(x.date)<=today&&['easy','long','mp'].indexOf(x.type)>=0;});
-    const done=items.filter(function(x){return state.logs[x.date]||state.completed['w'+x.wi+'-'+x.ii];}).length;
+    const done=items.filter(function(x){ return isItemCompleted(plan,(plan.weeks[x.wi]||{items:[]}).items[x.ii]); }).length;
     const evidence=trainingEvidenceSummary();
     if(evidence.pain) return {kind:'reduce',reason:'直近の記録に痛み・違和感があります。負荷を増やさず、未実施分を詰め込まない調整を提案します。'};
     if(items.length>=3&&done/items.length<0.5) return {kind:'reduce',reason:'直近2週間は予定の実施が少なめです。理由は断定せず、次週を少し軽くする案を用意しました。'};
@@ -3661,11 +3711,12 @@
       } else if(!m.chosenOptionId){
         html += '<div class="chat-stale-note">'+(m.resolved ? '(この提案は見送られました)' : '(ページの再読み込み後のため、この提案はもう選択できません。もう一度相談してみてください)')+'</div>';
       }
-      html += '</div></div>';
+      html += coachBasisHTML(m.basis)+'</div></div>';
       return html;
     }
     const kindClass = m.kind==='error' ? ' chat-error' : (m.kind==='dismissed' ? ' chat-muted' : '');
     let html = '<div class="chat-msg chat-coach">'+mascot+'<div class="chat-bubble'+kindClass+'">'+escapeHtml(m.text||'');
+    html += coachBasisHTML(m.basis);
     if(m.kind==='confirmed' && m.undo){
       html += '<button type="button" class="undo-btn" data-action="undo-adjust" data-msgid="'+m.id+'">この変更を取り消す</button>';
     }
@@ -3768,7 +3819,7 @@
     const plan=(state.plans||[]).find(function(p){ return p.id===workout.plan_id; });
     return plan&&workout.scheduled_item_date ? findItemByDate(plan,workout.scheduled_item_date) : null;
   }
-  function runningEvidence(plan, planLogs, completed, today){
+  function runningEvidence(plan, planLogs, today){
     const windowStart=addDays(today,-28), workouts=allWorkouts();
     const activities=workouts.map(function(workout){
       const found=planItemForWorkout(workout), meta=workout.metadata||{};
@@ -3805,12 +3856,16 @@
     });
     const planItems=flattenPlanItems(plan), windowItems=planItems.filter(function(p){ const d=parseISO(p.date); return p.date&&['mp','easy','long'].indexOf(p.type)>=0&&d&&d>=windowStart&&d<=today; });
     const currentLogs=(planLogs&&planLogs[plan.id])||{};
-    const completedCount=windowItems.filter(function(p){ return (completed||{})['w'+p.wi+'-'+p.ii]||currentLogs[p.date]||planActivities.some(function(a){ return a.date===p.date; }); }).length;
+    const completedCount=windowItems.filter(function(p){
+      const legacyLog=currentLogs[p.date];
+      if(legacyLog && legacyLog.completionType!=='skipped' && legacyLog.completionType!=='partial') return true;
+      return planActivities.some(function(a){ return a.date===p.date; });
+    }).length;
     return { activities:activities, recent:recent, totalKm:totalKm, weeklyAvgKm:totalKm/4, runDays:runDays.size, maxRunKm:maxRunKm, mpActivities:mpActivities, maxPainLevel:maxPainLevel, plannedCount:windowItems.length, completedCount:completedCount, adherence:windowItems.length?completedCount/windowItems.length:null };
   }
   function coachRunningContextLines(plan, allPlanLogs){
     const lines=[], today=todayISO(), todayDate=todayLocal();
-    const evidence=runningEvidence(plan,allPlanLogs,state.completed,todayDate), workouts=evidence.activities.filter(function(a){ return a.fromCommon; }).map(function(a){ return (state.workouts||[]).find(function(w){ return w.id===a.id; }); }).filter(Boolean);
+    const evidence=runningEvidence(plan,allPlanLogs,todayDate), workouts=evidence.activities.filter(function(a){ return a.fromCommon; }).map(function(a){ return (state.workouts||[]).find(function(w){ return w.id===a.id; }); }).filter(Boolean);
     const ninetyDaysAgo=addDays(todayDate,-90), older=workouts.filter(function(w){ const d=workoutDate(w); return d&&d<ninetyDaysAgo; });
     const recent=workouts.filter(function(w){ const d=workoutDate(w); return d&&d>=ninetyDaysAgo; });
     const totalDistance=workouts.reduce(function(sum,w){ return sum+Number(w.distance_meters||0); },0);
@@ -3976,15 +4031,16 @@
       JSON.stringify(payload),
       '',
       '# 判断ルール(必ず考慮すること)',
+      '0. 安全: '+COACHING_RULES.safety,
+      '0-1. 参照情報: '+COACHING_RULES.reviewInputs.join('／')+'。'+COACHING_RULES.loadPolicy,
       '1. 期分け: 復帰期→ベース構築期→ピーク期→テーパー期の順に負荷が上がり、最後に下がる。phaseの文言はこの考え方に沿わせる。',
       '2. 週間パターン: 曜日構成(どの曜日にMP走/イージー/ロング走/完全休養を置くか)は現在のプランの構成を尊重しつつ、ランナーの生活制約があればそれを優先する。',
-      '3. 週間距離増加率: 前週比で概ね+10〜25%を目安とし、+20%を超える増加は避ける。',
-      '4. 高負荷後の回復日数: 30km級・高強度のロング走の後は中3〜4日の回復(強度の低い日)を挟むことを推奨する。',
-      '5. 補給練習タイミング: 開始60〜75分から、以降30〜45分ごとにジェル等の補給を練習に組み込む。',
-      '6. 怪我既往への配慮: 既往症・怪我パターンの申告がある場合、または体調不良・違和感の申告があった場合、該当時期のメニューを10〜20%減らす方向で検討する。',
-      '7. イベント衝突時の調整: 高負荷練習(ロング走・MP走)とイベント(大会、旅行、繁忙期など)の間隔が3日未満になる場合はリスクとして明示し、間隔を空ける代替日程を提案する。',
-      '8. 今日('+todayStr+')より前の日付の項目(実施済み)は内容を変更しない。日付がない項目(完全休養など)は今後分とみなしてよい。',
-      '9. meta.raceDate(レース日)やmeta.targetLabel(目標タイム)など、依頼と無関係な値は変えない。',
+      '3. 負荷の調整: 一律の増加率は使わず、直近の実走、最長距離、実施状況、疲労・痛み、生活制約を合わせて判断する。痛みや強い疲労がある場合は、増量より休養・維持・軽減を優先する。',
+      '4. 高負荷後は次の強い練習を詰め込まず、本人の手応えと予定を確認して回復日を置く。',
+      '5. 補給は長時間走で必要になり得るが、具体的な量や間隔を断定せず、既往・体調・実施経験に合わせて段階的に試す。',
+      '6. イベント衝突時の調整: 高負荷練習(ロング走・MP走)とイベント(大会、旅行、繁忙期など)の間隔が短い場合はリスクを明示し、間隔を空ける代替日程を提案する。',
+      '7. 今日('+todayStr+')より前の日付の項目(実施済み)は内容を変更しない。日付がない項目(完全休養など)は今後分とみなしてよい。',
+      '8. meta.raceDate(レース日)やmeta.targetLabel(目標タイム)など、依頼と無関係な値は変えない。',
       '',
       '# 対応フロー',
       '- まず、依頼が「相談・質問」(〜した方がいい?、〜は妥当?など、意見を求めるだけでスケジュール変更を伴わないもの。「速く走るコツは?」「フォームの改善点は?」のような、プランの日程と直接関係しない一般的なランニングの質問も含む)かどうかを判断する。',
@@ -4199,6 +4255,7 @@
     state.adjust.personaKey=personaKey;
     const planLogs=await loadRunningPlanLogs();
     const runningContext=coachRunningContextLines(plan,planLogs);
+    const decisionBasis=coachDecisionBasis(plan,runningContext);
     const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey, runningContext);
     adjustController = new AbortController();
     const deadline = Date.now() + ADJUST_TIMEOUT_MS;
@@ -4268,7 +4325,7 @@
           risk: (typeof result.risk==='string') ? result.risk : '',
           options: options,
           resolved:false, chosenOptionId:null, chosenLabel:null,
-          instruction: instruction, prevPlan: prevPlan, prevCompleted: prevCompleted, normalizedPrev: normalizedPrev, coachPersona:personaKey
+          instruction: instruction, prevPlan: prevPlan, prevCompleted: prevCompleted, normalizedPrev: normalizedPrev, coachPersona:personaKey, basis:decisionBasis
         });
         render();
         return;
@@ -4277,7 +4334,7 @@
       // advice-only: no schedule change
       state.adjust.busy = false;
       state.adjust.error = null;
-      addCoachMessage({ role:'coach', kind:'advice', text: (result && typeof result.summary==='string') ? result.summary : '今のプランのままで大丈夫です', coachPersona:personaKey });
+      addCoachMessage({ role:'coach', kind:'advice', text: (result && typeof result.summary==='string') ? result.summary : '今のプランのままで大丈夫です', coachPersona:personaKey, basis:decisionBasis });
       render();
     }catch(e){
       state.adjust.busy = false;
@@ -4369,10 +4426,12 @@
     state.logForm.feedbackBusy = item.date;
     render();
     let feedbackText = null;
+    let decisionBasis = null;
     try{
       const instruction = buildLogInstruction(item, log);
       const planLogs=await loadRunningPlanLogs();
       const runningContext=coachRunningContextLines(plan,planLogs);
+      decisionBasis=coachDecisionBasis(plan,runningContext);
       const prompt = buildAdjustPrompt(plan, instruction, todayISO(), null, personaKey, runningContext);
       const result = await CoachService.request(prompt, {modelTier:'default', cache:false});
       if(!result || typeof result!=='object') throw {code:'invalid_json'};
@@ -4404,12 +4463,12 @@
       const savedFeedback=entries[item.date]&&entries[item.date].feedback || null;
       const resolvedFeedback=feedbackText || savedFeedback;
       if(feedbackText) state.logForm.feedbackError = null;
-      if(entries[item.date]) entries[item.date] = Object.assign({}, entries[item.date], { feedback: resolvedFeedback, feedbackCoachPersona:feedbackText?personaKey:(entries[item.date].feedbackCoachPersona||null) });
+      if(entries[item.date]) entries[item.date] = Object.assign({}, entries[item.date], { feedback: resolvedFeedback, feedbackCoachPersona:feedbackText?personaKey:(entries[item.date].feedbackCoachPersona||null), feedbackBasis:feedbackText?decisionBasis:(entries[item.date].feedbackBasis||null) });
       state.logs = entries;
       if(currentPlan()) Store.setLogs(currentPlan().id, entries);
       if(entries[item.date] && entries[item.date].workoutId){
         const idx=(state.workouts||[]).findIndex(function(w){return w.id===entries[item.date].workoutId;});
-        if(idx>=0){ state.workouts[idx]=Object.assign({},state.workouts[idx],{metadata:Object.assign({},state.workouts[idx].metadata||{},{feedback:resolvedFeedback,feedback_coach_persona:feedbackText?personaKey:((state.workouts[idx].metadata||{}).feedback_coach_persona||null)}),updated_at:new Date().toISOString()}); Store.setWorkouts(state.workouts); }
+        if(idx>=0){ state.workouts[idx]=Object.assign({},state.workouts[idx],{metadata:Object.assign({},state.workouts[idx].metadata||{},{feedback:resolvedFeedback,feedback_basis:feedbackText?decisionBasis:((state.workouts[idx].metadata||{}).feedback_basis||null),feedback_coach_persona:feedbackText?personaKey:((state.workouts[idx].metadata||{}).feedback_coach_persona||null)}),updated_at:new Date().toISOString()}); Store.setWorkouts(state.workouts); }
       }
       state.logForm.feedbackBusy = null;
       render();
@@ -4478,7 +4537,7 @@
     if(selected){
       const idx=state.workouts.findIndex(function(w){return w.id===selected.id;});
       if(idx>=0){
-        state.workouts[idx]=Object.assign({},selected,{metadata:Object.assign({},selected.metadata||{},{note:entries[dateStr].note,rpe:entries[dateStr].rpe,pain:entries[dateStr].pain,feedback:entries[dateStr].feedback,feedback_coach_persona:entries[dateStr].feedbackCoachPersona||null,image_import:entries[dateStr].imageImport||null}),plan_id:plan.id,scheduled_item_date:dateStr,completion_status:'matched',updated_at:new Date().toISOString()});
+        state.workouts[idx]=Object.assign({},selected,{metadata:Object.assign({},selected.metadata||{},{note:entries[dateStr].note,rpe:entries[dateStr].rpe,pain:entries[dateStr].pain,feedback:entries[dateStr].feedback,feedback_basis:entries[dateStr].feedbackBasis||null,feedback_coach_persona:entries[dateStr].feedbackCoachPersona||null,image_import:entries[dateStr].imageImport||null}),plan_id:plan.id,scheduled_item_date:dateStr,completion_status:'matched',updated_at:new Date().toISOString()});
         savedWorkout=state.workouts[idx]; await Store.setWorkouts(state.workouts);
       }
     } else {
@@ -5068,13 +5127,6 @@
   });
 
   document.getElementById('app').addEventListener('change', function(e){
-    if(e.target.matches('[data-action="toggle"]')){
-      const key = e.target.dataset.key;
-      state.completed[key] = e.target.checked;
-      render();
-      Store.setProgress(state.currentId, state.completed);
-      return;
-    }
     if(e.target.matches('[data-action="log-image"]')){
       const file = e.target.files && e.target.files[0];
       if(!file) return;

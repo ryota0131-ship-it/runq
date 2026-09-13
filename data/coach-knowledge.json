@@ -1,0 +1,54 @@
+{
+  "version": "2026-09-13",
+  "lastReviewed": "2026-09-13",
+  "sources": [
+    {
+      "id": "who-physical-activity-2020",
+      "title": "WHO Guidelines on Physical Activity and Sedentary Behaviour",
+      "publisher": "World Health Organization",
+      "year": 2020,
+      "url": "https://www.who.int/publications/i/item/9789240015128",
+      "audience": "成人・高齢者を含む一般の人",
+      "summary": "身体活動は個人の状態に合わせて段階的に始める。高齢者では体力・バランスを含む活動を考慮する。",
+      "useCases": ["初心者", "久しぶりの運動", "高齢者"],
+      "evidenceStrength": "国際ガイドライン",
+      "version": "2020"
+    },
+    {
+      "id": "mhlw-physical-activity-guide-2023",
+      "title": "健康づくりのための身体活動・運動ガイド2023",
+      "publisher": "厚生労働省",
+      "year": 2023,
+      "url": "https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/kenkou/undou/index.html",
+      "audience": "日本の成人・高齢者・運動を始める人",
+      "summary": "個人差を踏まえて、可能な活動から始める。体調不良、強い足腰の痛み、胸痛、めまいなどは運動前の確認事項として扱う。",
+      "useCases": ["安全確認", "初心者", "体調不良", "高齢者"],
+      "evidenceStrength": "公的ガイドライン",
+      "version": "2023"
+    },
+    {
+      "id": "running-injury-training-parameters-2022",
+      "title": "The Association Between Running Injuries and Training Parameters: A Systematic Review",
+      "publisher": "Sports Medicine - Open / PubMed Central",
+      "year": 2022,
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9528699/",
+      "audience": "市民ランナー・コーチ",
+      "summary": "単一の走行距離・頻度・増加率だけで障害リスクを断定できる根拠は限定的。最近の負荷、痛み、継続状況を合わせて個別に判断する。",
+      "useCases": ["負荷調整", "痛み", "プラン見直し"],
+      "evidenceStrength": "システマティックレビュー",
+      "version": "2022"
+    },
+    {
+      "id": "training-load-running-injury-2018",
+      "title": "Is There Evidence for an Association Between Changes in Training Load and Running-Related Injuries? A Systematic Review",
+      "publisher": "International Journal of Sports Physical Therapy / PubMed Central",
+      "year": 2018,
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6253751/",
+      "audience": "市民ランナー・コーチ",
+      "summary": "走行負荷の急な変化と障害の関係は一律ではない。固定的な増加率ではなく、本人の既往、疲労、実施状況を確認して調整する。",
+      "useCases": ["負荷調整", "復帰", "再計画"],
+      "evidenceStrength": "システマティックレビュー",
+      "version": "2018"
+    }
+  ]
+}

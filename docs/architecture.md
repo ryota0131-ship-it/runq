@@ -46,7 +46,7 @@ async savePlan(plan){
 
 - `db`が使える場合(=Claude Artifactとして開いている場合)のドキュメントパス:
   - `plans/{planId}` — Quest + Race + TrainingPlanが一体化したドキュメント
-  - `progress/{planId}` — チェックボックスの完了状況
+  - `progress/{planId}` — 旧版の手動チェック状態（後方互換のため保持するが、現在の表示・集計・コーチ判断の根拠にはしない）
   - `logs/{planId}` — 練習記録(Workout Result)。日付キー
   - `forecast/{planId}` — RACE FORECASTの履歴(直近20件)
   - `coachLog/{planId}` — AIコーチの会話履歴(直近30件にローテーション。提案の完全なプランJSON・undo用スナップショットは容量対策で非永続化)
@@ -86,7 +86,7 @@ Workout Result (logs/{planId}["{date}"])
  ├─ rpe (1〜4 or null)
  ├─ pain { level: 0〜3, parts: [部位名] } or null
  ├─ completionType ('as_planned' | 'partial' | 'skipped' or null)
- ├─ feedback, loggedAt
+ ├─ feedback, feedbackBasis { version, reasons[], sourceIds[] }, loggedAt
  └─ 既存の予定日別表示・入力との後方互換のため保持する
 
 Common Workout (workouts/main.entries[])
@@ -108,12 +108,28 @@ Race Forecast (forecast/{planId})
      (直近20件保持。estimateRacePerformance()が生成)
 
 AI Coach / Plan Change Proposal (coachLog/{planId}、および実行時のstate)
- ├─ messages: [{ id, role:'user'|'coach', kind, text, ... }]
+ ├─ messages: [{ id, role:'user'|'coach', kind, text, basis?, ... }]
  │    kind: advice | options | confirmed | dismissed | error
  ├─ options提案の完全なplan本体・confirmed後のundo用スナップショットは
  │    容量対策のためstateのみ保持(非永続化)
- └─ Plan変更確定時は Training Plan (plans/{planId}) を更新し、history[]に追記
+└─ Plan変更確定時は Training Plan (plans/{planId}) を更新し、history[]に追記
 ```
+
+### 完了状態の正本
+
+予定メニューの完了は、手動チェックではなく、`logs/{planId}[date]` またはその予定日に紐づいた `workouts/main` の実走から導く。`completionType:'as_planned'`（または旧データで種別未設定）の実績は「✓ 完了」、`partial` は「一部実施」、`skipped` は「見送り」として表示する。週・全体進捗、Race Forecast、プラン見直し、コーチの実施率も同じ基準を使う。
+
+## 3.1 コーチ知識・安全レイヤー
+
+コーチの知識は `data/coach-knowledge.json` に要約とメタデータだけを保持する。各出典にはタイトル、発行元、年、URL、対象者、要約、利用場面、根拠の強さ、確認日、バージョンを含め、著作物の全文は保存しない。追加・更新はこのJSONを編集して行える。
+
+`api/coach.js` は次の三層を分離する。
+
+1. `SAFETY_RULES` — システム指示より優先する固定ルール。胸痛・強い息苦しさ・めまい・失神を含む相談は、LLMを呼ばず固定の安全案内を返す。
+2. `COACHING_RULES`（`app/runq.html`） — 実走、頻度、最長距離、RPE、痛み、予定実施、制約、目標を合わせて扱う構造化方針。単一の増加率を絶対条件にしない。
+3. `data/coach-knowledge.json` — 公的ガイドライン・系統的レビューの要約参照。実行時に外部検索へ依存せず、取得失敗時も安全ルールは有効。
+
+回答の本文は短いコーチ会話のままにし、`basis` に保存した判断理由と参照IDは利用者が「なぜ？」を開いたときだけ表示する。RUNQ内のプロフィール、目標、プラン、今後予定、共通Workout、予定日別ログ、RPE・痛み・メモを、`coachRunningContextLines()` を通じて最優先で参照する。
 
 ## 4. AI Coach の構成(Coach Service / LLM Provider抽象化。OpenAI API対応済み)
 
