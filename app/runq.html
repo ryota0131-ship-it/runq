@@ -191,6 +191,13 @@
   .undo-btn{ background:transparent; border:1px solid currentColor; color:inherit; border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer; flex:0 0 auto; }
   .btn-secondary{ background:transparent; border:1px solid var(--border); color:var(--text-muted); border-radius:999px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; }
   .btn-secondary:hover{ color:var(--text); border-color:var(--text-muted); }
+  .plan-focus-bar{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 auto 14px; max-width:860px; padding:12px 14px; border:1px solid var(--border); border-radius:14px; background:var(--surface); }
+  .plan-focus-bar strong{ display:block; font-size:15px; margin-top:2px; }
+  .plan-focus-bar small{ display:block; color:var(--text-faint); margin-top:2px; font-size:11.5px; }
+  .plan-focus-actions{ display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; }
+  .plan-focus-actions .btn-secondary{ padding:7px 10px; font-size:12px; }
+  .plan-management-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .plan-management-actions .btn-secondary,.plan-management-actions .btn-danger{ padding:7px 10px; font-size:12px; }
   .risk-callout{ display:flex; align-items:flex-start; gap:8px; background:var(--warn-soft); color:var(--warn); border-radius:10px; padding:10px 14px; font-size:13px; line-height:1.55; margin-bottom:12px; }
   .risk-callout svg{ flex:0 0 auto; margin-top:2px; }
   .option-list{ display:flex; flex-direction:column; gap:10px; }
@@ -208,6 +215,7 @@
   .chat-msg{ display:flex; }
   .chat-msg.chat-user{ justify-content:flex-end; }
   .chat-msg.chat-coach{ justify-content:flex-start; align-items:flex-end; gap:6px; }
+  .chat-system-message{ align-self:center; max-width:92%; padding:5px 10px; border-radius:999px; background:var(--surface-2); color:var(--text-faint); font-size:11.5px; text-align:center; }
   .chat-bubble{ max-width:85%; background:var(--surface-2); color:var(--text); border-radius:14px 14px 14px 4px; padding:10px 14px; font-size:13.5px; line-height:1.55; white-space:pre-wrap; }
   .chat-msg.chat-user .chat-bubble{ background:var(--accent); color:#fff; border-radius:14px 14px 4px 14px; }
   .chat-bubble.chat-error{ background:var(--warn-soft); color:var(--warn); }
@@ -1687,7 +1695,6 @@
         await db.doc('progress/'+id).delete();
         await db.doc('logs/'+id).delete();
         await db.doc('forecast/'+id).delete();
-        await db.doc('coachLog/'+id).delete();
         return;
       }
       try{
@@ -1696,7 +1703,8 @@
         localStorage.removeItem('paceplan.progress.'+id);
         localStorage.removeItem('paceplan.logs.'+id);
         localStorage.removeItem('paceplan.forecast.'+id);
-        localStorage.removeItem('paceplan.coachLog.'+id);
+        // コーチの会話はプランではなくユーザーに紐付く。削除したプランについての
+        // 過去の相談も、ユーザーの会話履歴として残す。
       }catch(e){}
     },
     async getProgress(id){
@@ -1745,6 +1753,22 @@
       if(db){ await db.doc('coachLog/'+id).set({messages}); return; }
       try{ localStorage.setItem('paceplan.coachLog.'+id, JSON.stringify(messages)); }catch(e){}
     },
+    // メインのコーチ会話はユーザー単位。現行V1では認証がないため、端末内の
+    // workoutUserIdをキーにし、将来の認証IDへそのまま置き換えられる形にする。
+    async getUserCoachThread(userId){
+      const key='user-'+String(userId||'main');
+      if(db){
+        const snap=await db.doc('coachLog/'+key).get();
+        return snap.exists ? Object.assign({messages:[],migratedPlanIds:[]},snap.data()||{}) : {messages:[],migratedPlanIds:[]};
+      }
+      try{ return Object.assign({messages:[],migratedPlanIds:[]},JSON.parse(localStorage.getItem('paceplan.coachLog.'+key)||'{}')); }catch(e){ return {messages:[],migratedPlanIds:[]}; }
+    },
+    async setUserCoachThread(userId, thread){
+      const key='user-'+String(userId||'main');
+      const data={messages:(thread&&thread.messages)||[],migratedPlanIds:(thread&&thread.migratedPlanIds)||[]};
+      if(db){ await db.doc('coachLog/'+key).set(data); return; }
+      try{ localStorage.setItem('paceplan.coachLog.'+key,JSON.stringify(data)); }catch(e){}
+    },
     // 手動・スクリーンショット・HealthKit等を横断する共通Workoutの保存先。
     // 既存の予定日別logsを置換せず、取り込み元IDによる重複防止の正本として追加する。
     async getWorkouts(){
@@ -1756,7 +1780,7 @@
       try{ localStorage.setItem('paceplan.workouts', JSON.stringify(entries)); }catch(e){}
     },
     async getProfile(){
-      const empty = { name:null, profilePhoto:null, coachPersona:'companion', injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, onboarding:{version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
+      const empty = { name:null, profilePhoto:null, coachPersona:'companion', activePlanId:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, onboarding:{version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
       const withDefaults = function(raw){
         const profile = Object.assign({}, empty, raw||{});
         const connections = (raw&&raw.healthConnections)||{};
@@ -1799,9 +1823,8 @@
     healthImportNotice: null,
     formError: {},
     adjust: { busy:false, error:null, draft:'', hidden:false, startedAt:null, streamPreview:null, context:null, personaKey:null },
-    // AIコーチのチャットスレッド(Phase7)。messagesは{role, kind, text, ...}の配列。
-    // loadedForは現在メッセージが読み込み済みのplan idで、プラン切り替え時に読み直すためのガード
-    coach: { messages:[], loadedFor:null, loading:false },
+    // AIコーチはユーザー専属の1人。会話はプランではなくユーザー単位で保持する。
+    coach: { messages:[], loadedForUser:null, loading:false, migratedPlanIds:[] },
     viewMode: 'week',
     calendarMonth: null,
     calendarSelected: null,
@@ -1837,9 +1860,46 @@
     workoutDetailId: null,
     profilePhotoState: {busy:false,error:null,draft:null},
     planReviewUndo: null
+    ,planSwitchOpen: false
+    ,managedPlanId: null
+    ,planEditOpen: false
   };
 
   function currentPlan(){ return state.plans.find(p=>p.id===state.currentId) || state.plans[0]; }
+
+  function planStatus(plan){
+    const status=(plan&&plan.meta&&plan.meta.status)||'active';
+    if(status==='paused') return {key:'paused',label:'休止中'};
+    if(status==='archived'||status==='completed') return {key:'archived',label:'完了・アーカイブ'};
+    const race=plan&&plan.meta&&plan.meta.raceDate?parseISO(plan.meta.raceDate):null;
+    if(race&&race<todayLocal()) return {key:'completed',label:'完了'};
+    return {key:'active',label:'進行中'};
+  }
+
+  async function setActivePlan(id, announce){
+    const next=state.plans.find(function(plan){ return plan.id===id; });
+    if(!next || state.currentId===id) return;
+    const previous=currentPlan();
+    state.currentId=id;
+    state.profile.activePlanId=id;
+    state.planHistoryOpen=false;
+    state.forecastDetailsOpen=false;
+    state.adjust.draft=''; state.adjust.error=null; state.adjust.context=null;
+    state.logForm={ openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy:null };
+    state.logUndo=null; state.logProposal=null; state.calendarSelected=null;
+    await Store.setProfile(state.profile);
+    const loaded=await Promise.all([Store.getProgress(id),Store.getLogs(id),Store.getForecast(id)]);
+    state.completed=loaded[0]||{}; state.logs=loaded[1]||{};
+    if(loaded[2]) state.forecast[id]=loaded[2];
+    if(announce){
+      // プラン画面から先に切り替えた場合でも、未読込のユーザー会話を空配列で
+      // 上書きしないよう、システム表示を追加する前に必ずスレッドを読み込む。
+      await loadCoachThread();
+      addCoachMessage({role:'system',kind:'system',text:'主目標を「'+(next.meta.name||'このプラン')+'」に切り替えました。'+(previous?'これまでの会話と実績はそのまま引き継がれます。':'')});
+    }
+    render();
+    if(forecastNeedsRefresh(next)) recomputeAndSaveForecast(next).then(function(){ render(); });
+  }
 
   const ONBOARDING_VERSION = 1;
   function onboardingSave(patch){
@@ -2011,6 +2071,10 @@
   }
 
   function modalHTML(){
+    if(state.planSwitchOpen){
+      const plans=plansForManagement();
+      return '<div class="modal-backdrop" data-action="close-plan-switcher"><div class="modal-card" data-action="noop"><h3>主目標を切り替える</h3><p>会話や実績はそのまま、コーチが最も重視する目標だけを切り替えます。</p><div class="option-list">'+plans.filter(function(plan){return planStatus(plan).key==='active';}).map(function(plan){return '<button type="button" class="option-card" data-action="set-active-plan" data-id="'+escapeHtml(plan.id)+'"><div class="option-label">'+escapeHtml(plan.meta.name||'プラン')+(plan.id===state.currentId?' <span class="chosen-tag">主目標</span>':'')+'</div><div class="option-summary">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(plan.meta.distanceLabel||'距離未設定')+'</div></button>';}).join('')+'</div><div class="modal-actions"><button type="button" class="btn-secondary" data-action="open-plan-manager">目標・大会を管理する</button><button type="button" class="btn-primary" data-action="close-plan-switcher">閉じる</button></div></div></div>';
+    }
     if(state.infoModal==='forecast'){
       return '<div class="modal-backdrop" data-action="close-info-modal"><div class="modal-card" data-action="noop"><h3>レース予測の見方</h3><p><strong>走力の目安</strong>は、自己ベストと複数回のペース走など、再現性を確認できる実走から算出します。</p><p><strong>フルへの準備度</strong>は、最長走・週ごとの距離・体調記録を別に確認する指標です。走力があっても、長い距離への準備が十分とは限りません。</p><p><strong>データの確かさ</strong>は実走の件数と期間を表します。少ない間は幅のある参考値として表示し、目標達成を保証するものではありません。</p><div class="modal-actions"><button type="button" class="btn-primary" data-action="close-info-modal">閉じる</button></div></div></div>';
     }
@@ -2025,7 +2089,7 @@
     return '<div class="modal-backdrop" data-action="cancel-delete-modal">'
       + '<div class="modal-card" data-action="noop">'
       + '<h3>プランを削除しますか？</h3>'
-      + '<p>「'+escapeHtml(name)+'」を削除します。進捗・実績記録もすべて削除され、元に戻せません。本当に削除しますか？</p>'
+      + '<p>「'+escapeHtml(name)+'」を削除します。進捗と予定日別の記録は元に戻せません。コーチとの過去の会話は、他の目標についての文脈として残ります。本当に削除しますか？</p>'
       + '<div class="modal-actions">'
       + '<button type="button" class="btn-secondary" data-action="cancel-delete-modal">キャンセル</button>'
       + '<button type="button" class="btn-danger" data-action="confirm-delete-plan" data-id="'+state.deleteModal+'">削除する</button>'
@@ -2441,6 +2505,44 @@
     return '<button type="button" class="mypage-menu-row"'+attrs+'><span class="mypage-menu-leading">'+mypageIconHTML(icon)+'<span class="mypage-menu-copy"><span class="li-main">'+escapeHtml(title)+'</span>'+(sub?'<span class="li-sub" style="display:block;margin-top:2px;">'+escapeHtml(sub)+'</span>':'')+'</span></span><span class="mypage-menu-chevron">＞</span></button>';
   }
   const WEEKDAY_OPTIONS = WEEKDAY_JA.map(function(label,i){ return {value:i, label:label+'曜'}; });
+  function planDateLabel(plan){
+    const meta=plan.meta||{};
+    if(meta.raceDate){ const date=parseISO(meta.raceDate); return date?fmtMD(date)+'（'+WEEKDAY_JA[date.getDay()]+'）':''; }
+    if(meta.startDate) return '開始 '+fmtMD(parseISO(meta.startDate));
+    return '期間未設定';
+  }
+  function plansForManagement(){
+    const active=state.currentId;
+    const score=function(plan){
+      if(plan.id===active) return 0;
+      const status=planStatus(plan).key;
+      if(status==='active'&&plan.meta&&plan.meta.raceDate) return 1;
+      if(status==='active') return 2;
+      return 3;
+    };
+    return (state.plans||[]).slice().sort(function(a,b){
+      const diff=score(a)-score(b); if(diff) return diff;
+      const ad=a.meta&&a.meta.raceDate||'9999-12-31', bd=b.meta&&b.meta.raceDate||'9999-12-31';
+      return ad.localeCompare(bd);
+    });
+  }
+  function planManagementCardHTML(plan){
+    const meta=plan.meta||{}, status=planStatus(plan), active=plan.id===state.currentId;
+    return '<div class="info-card"><div class="workout-section-head"><div><h3>'+escapeHtml(meta.name||'名称未設定のプラン')+'</h3><div class="li-sub">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(meta.distanceLabel||'距離未設定')+' ・ '+escapeHtml(meta.targetLabel||'目標タイム未設定')+'</div></div><span class="phase-badge">'+(active?'主目標':escapeHtml(status.label))+'</span></div><div class="plan-management-actions"><button type="button" class="btn-secondary" data-action="open-plan-detail" data-id="'+escapeHtml(plan.id)+'">詳細を見る</button><button type="button" class="btn-secondary" data-action="set-active-plan" data-id="'+escapeHtml(plan.id)+'" '+(active?'disabled':'')+'>主目標に設定</button></div></div>';
+  }
+  function goalsPlansHTML(){
+    const plans=plansForManagement();
+    const active=plans.filter(function(plan){return plan.id===state.currentId;}), upcoming=plans.filter(function(plan){return plan.id!==state.currentId&&planStatus(plan).key==='active';}), inactive=plans.filter(function(plan){return planStatus(plan).key!=='active';});
+    const section=function(title,items){return items.length?'<section class="mypage-grid"><div class="settings-section-title">'+title+'</div>'+items.map(planManagementCardHTML).join('')+'</section>':'';};
+    return '<div class="form-card">'+mypageBackHeaderHTML('目標・大会')+mypageToastHTML()+section('現在の主目標',active)+section('今後の大会・プラン',upcoming)+section('完了・休止中のプラン',inactive)+'<div class="form-actions"><button type="button" class="btn-primary" data-action="tab" data-tab="create">新しいプランを作成</button></div></div>';
+  }
+  function planDetailHTML(){
+    const plan=(state.plans||[]).find(function(item){return item.id===state.managedPlanId;});
+    if(!plan) return goalsPlansHTML();
+    const meta=plan.meta||{}, status=planStatus(plan), active=plan.id===state.currentId;
+    const edit=state.planEditOpen?'<form id="plan-settings-form" class="mypage-edit-block" data-id="'+escapeHtml(plan.id)+'"><div class="field"><label>名前</label><input name="name" value="'+escapeHtml(meta.name||'')+'"></div><div class="field"><label>大会日・目標日</label><input name="raceDate" type="date" value="'+escapeHtml(meta.raceDate||'')+'"></div><div class="field"><label>距離表示</label><input name="distanceLabel" value="'+escapeHtml(meta.distanceLabel||'')+'"></div><div class="field"><label>目標タイム</label><input name="targetLabel" value="'+escapeHtml(meta.targetLabel||'')+'"></div><div class="form-actions"><button class="btn-primary" type="submit">保存する</button><button class="btn-secondary" type="button" data-action="toggle-plan-edit">キャンセル</button></div></form>':'';
+    return '<div class="form-card">'+mypageBackHeaderHTML('目標・大会の詳細')+'<div class="mypage-grid"><div class="info-card"><h2>'+escapeHtml(meta.name||'名称未設定のプラン')+'</h2><div class="li-sub">'+escapeHtml(planDateLabel(plan))+'</div><div class="hero-stats"><div class="stat"><span class="k">距離</span><span class="v">'+escapeHtml(meta.distanceLabel||'—')+'</span></div><div class="stat"><span class="k">目標タイム</span><span class="v mono">'+escapeHtml(meta.targetLabel||'—')+'</span></div><div class="stat"><span class="k">状態</span><span class="v">'+(active?'主目標':escapeHtml(status.label))+'</span></div></div><div class="plan-management-actions"><button type="button" class="btn-secondary" data-action="toggle-plan-edit">編集する</button><button type="button" class="btn-secondary" data-action="set-active-plan" data-id="'+escapeHtml(plan.id)+'" '+(active?'disabled':'')+'>主目標に設定する</button><button type="button" class="btn-secondary" data-action="toggle-plan-status" data-id="'+escapeHtml(plan.id)+'" data-status="'+(status.key==='paused'?'active':'paused')+'">'+(status.key==='paused'?'再開する':'休止する')+'</button><button type="button" class="btn-secondary" data-action="toggle-plan-status" data-id="'+escapeHtml(plan.id)+'" data-status="archived">完了・アーカイブする</button><button type="button" class="btn-danger" data-action="open-delete-modal" data-id="'+escapeHtml(plan.id)+'">削除する</button></div>'+edit+'</div></div></div>';
+  }
   // 指定距離の自己ベストを「厳密一致」で1件返す(bestPbForDistanceは近い距離も許容するのでRUNNER PROFILEのPB一覧表示には使わない)
   function bestPbExact(distanceKm){
     const pbs = (state.profile && state.profile.pbs) || [];
@@ -2462,6 +2564,8 @@
     if(view==='runner-profile') return runnerProfileScreenHTML();
     if(view==='workout-history') return workoutHistoryHTML();
     if(view==='workout-detail') return workoutDetailHTML();
+    if(view==='goals-plans') return goalsPlansHTML();
+    if(view==='plan-detail') return planDetailHTML();
     return mypageMainHTML();
   }
 
@@ -2569,6 +2673,8 @@
     html += '<div class="info-card"><div class="workout-section-head"><h3>最近のワークアウト</h3><button type="button" class="workout-text-link" data-action="mypage-nav" data-view="workout-history">すべて見る</button></div><div class="recent-workouts">'+(workouts.length?workouts.slice(0,3).map(workoutRowHTML).join(''):'<div class="workout-empty">走った記録が追加されると、ここで振り返れます。</div>')+'</div></div>';
     html += personalBestCardHTML();
     html += coachCompanionSettingsHTML();
+    html += '<div class="settings-section-title">目標と大会</div>';
+    html += mypageSettingsRowHTML('goals-plans','目標・大会','主目標、今後の大会、完了したプランを管理','training');
     html += '<div class="settings-section-title">ランニングプロフィール</div>';
     html += mypageSettingsRowHTML('runner-profile','ランナープロフィール','走力・自己ベスト・プロフィール','profile');
     html += myShoesCardHTML();
@@ -3105,26 +3211,9 @@
   }
 
   function planPillsHTML(){
-    const ordered = orderedPlansForDisplay();
-    let html = '<div class="plan-row">';
-    for(let i=0;i<ordered.length;i++){
-      const p = ordered[i];
-      const active = p.id===state.currentId;
-      const deletable = state.plans.length>1;
-      html += '<div class="plan-pill'+(active?' active':'')+'" data-action="select-plan" data-id="'+p.id+'">'
-        + '<span class="dot"></span><span>'+escapeHtml(p.meta.name)+'</span>';
-      if(deletable){
-        html += '<button class="del" data-action="open-delete-modal" data-id="'+p.id+'" title="この目標を削除" aria-label="'+escapeHtml(p.meta.name)+'を削除">×</button>';
-      }
-      html += '</div>';
-      const next = ordered[i+1];
-      if(next && next.meta.linkedFromPlanId===p.id){
-        html += '<span class="plan-link-arrow">→</span>';
-      }
-    }
-    html += '<button class="plan-pill-add" data-action="tab" data-tab="create">＋ 新しいプランを作る</button>';
-    html += '</div>';
-    return html;
+    const plan=currentPlan();
+    if(!plan) return '<div class="plan-focus-bar"><span>主目標はまだありません</span><button type="button" class="btn-primary" data-action="tab" data-tab="create">新しい目標を作る</button></div>';
+    return '<div class="plan-focus-bar"><div><span class="quest-kicker">MAIN GOAL</span><strong>'+escapeHtml(plan.meta.name||'現在の主目標')+'</strong><small>主目標として表示中</small></div><div class="plan-focus-actions"><button type="button" class="btn-secondary" data-action="open-plan-switcher">切り替える</button><button type="button" class="btn-secondary" data-action="open-plan-manager">目標・大会を見る</button></div></div>';
   }
 
   function compactHistoryText(value, limit){
@@ -3632,7 +3721,7 @@
 
   /* ============================================================
      AIコーチ — チャット形式のUI(Phase7)。plans/{id}のプランをAIと自然文で相談・調整する。
-     やりとりは state.coach.messages に積み上げ、coachLog/{planId} に永続化して次回も続きから見られる。
+     やりとりは state.coach.messages に積み上げ、ユーザー単位のcoachLogへ永続化して次回も続きから見られる。
      選択肢(options)の完全なプランJSONやundo用スナップショットは容量節約のため永続化せず、
      現在のセッション中(=まだページを再読み込みしていない間)のみ選択可能とする。
   ============================================================ */
@@ -3684,6 +3773,9 @@
   // 1件のチャットメッセージをHTML化する。kind==='options'のみ特殊(リスク表示+選択肢カード)で、
   // それ以外(advice/confirmed/dismissed/error、およびuser)は単純な吹き出し表示
   function renderCoachMessage(m){
+    if(m.role==='system' || m.kind==='system'){
+      return '<div class="chat-system-message">'+escapeHtml(m.text||'')+'</div>';
+    }
     if(m.role==='user'){
       return '<div class="chat-msg chat-user"><div class="chat-bubble">'+escapeHtml(m.text||'')+'</div></div>';
     }
@@ -4056,7 +4148,36 @@
     return lines;
   }
 
-  function buildAdjustPrompt(plan, instruction, todayStr, historyLines, personaKey, runningContext){
+  function planSummaryForCoach(plan, progress, logs){
+    const meta=plan.meta||{}, status=planStatus(plan), today=todayISO();
+    const items=flattenPlanItems(plan).filter(function(item){ return isLoggable(item); });
+    const completed=items.filter(function(item){
+      const log=(logs||{})[item.date];
+      return !!((progress||{})['w'+item.wi+'-i'+item.ii] || (log&&log.completionType!=='skipped'&&log.completionType!=='partial') || plannedWorkoutForItem(plan,item));
+    }).length;
+    const next=items.filter(function(item){ return item.date&&item.date>=today; }).sort(function(a,b){ return a.date.localeCompare(b.date); })[0];
+    const raceDate=meta.raceDate||null, days=raceDate?daysBetween(todayLocal(),parseISO(raceDate)):null;
+    return {plan_id:plan.id,name:meta.name||'名称未設定のプラン',type:meta.questType&&meta.questType!=='race'?'通常目標':'大会プラン',status:status.label,active:plan.id===state.currentId,race_date:raceDate,start_date:meta.startDate||null,target_distance:meta.distanceLabel||null,target_time:meta.targetLabel||null,target_pace:meta.mpLabel||null,progress:completed+'/'+items.length,next_workout:next?(next.date+' '+next.title+(next.desc?'（'+next.desc+'）':'')):'予定なし',days_to_race:days};
+  }
+
+  async function allPlansCoachContext(planLogs){
+    const pairs=await Promise.all((state.plans||[]).map(async function(plan){ try{return [plan.id,await Store.getProgress(plan.id)];}catch(e){return [plan.id,{}];} }));
+    const progress=pairs.reduce(function(result,pair){result[pair[0]]=pair[1]||{};return result;},{});
+    const summaries=(state.plans||[]).map(function(plan){ return planSummaryForCoach(plan,progress[plan.id],(planLogs||{})[plan.id]); });
+    const dated=summaries.filter(function(summary){return !!summary.race_date;}).slice().sort(function(a,b){return a.race_date.localeCompare(b.race_date);});
+    dated.forEach(function(summary,index){ summary.schedule_relation=(index?'前の大会: '+dated[index-1].name:'最初の大会')+(index<dated.length-1?' / 次の大会: '+dated[index+1].name:''); });
+    return summaries;
+  }
+
+  function namedPlanDetailsForCoach(instruction, activePlan){
+    const text=String(instruction||'');
+    return (state.plans||[]).filter(function(plan){
+      const name=String((plan.meta||{}).name||'');
+      return plan.id!==activePlan.id && name.length>1 && text.indexOf(name)>=0;
+    }).slice(0,2).map(function(plan){ return {plan_id:plan.id,meta:plan.meta,weeks:plan.weeks,extras:plan.extras}; });
+  }
+
+  function buildAdjustPrompt(plan, instruction, todayStr, historyLines, personaKey, runningContext, allPlanSummaries, namedPlanDetails){
     const payload = {meta:plan.meta, weeks:plan.weeks, extras:plan.extras};
     const context = planContextLines(plan);
     return [
@@ -4064,6 +4185,7 @@
       coachPersona(personaKey).prompt,
       '今日の日付: '+todayStr,
       context.length ? ('ランナーの背景情報:\n- '+context.join('\n- ')) : '',
+      (allPlanSummaries&&allPlanSummaries.length) ? ('# 登録されている全目標・大会（主目標だけで判断範囲を狭めない）\n'+JSON.stringify(allPlanSummaries)) : '',
       (runningContext&&runningContext.length) ? ('# RUNQ.に保存されたランニング実績・予定\n'+runningContext.map(function(line){ return '- '+line; }).join('\n')) : '',
       (historyLines && historyLines.length) ? ('# これまでの会話の流れ(直近、参考情報。矛盾する場合は現在のプランと今回の依頼を優先する)\n- '+historyLines.join('\n- ')) : '',
       '',
@@ -4072,6 +4194,7 @@
       '',
       '# 現在のプラン(JSON)',
       JSON.stringify(payload),
+      (namedPlanDetails&&namedPlanDetails.length) ? '# 今回名前が指定された非アクティブプランの詳細(JSON)\n'+JSON.stringify(namedPlanDetails) : '',
       '',
       '# 判断ルール(必ず考慮すること)',
       '0. 安全: '+COACHING_RULES.safety,
@@ -4084,6 +4207,7 @@
       '6. イベント衝突時の調整: 高負荷練習(ロング走・MP走)とイベント(大会、旅行、繁忙期など)の間隔が短い場合はリスクを明示し、間隔を空ける代替日程を提案する。',
       '7. 今日('+todayStr+')より前の日付の項目(実施済み)は内容を変更しない。日付がない項目(完全休養など)は今後分とみなしてよい。',
       '8. meta.raceDate(レース日)やmeta.targetLabel(目標タイム)など、依頼と無関係な値は変えない。',
+      '9. 通常の練習相談では active:true の主目標を中心に扱う。大会名・プラン名が指定された場合は、その非アクティブプランを参照して回答する。変更対象が曖昧な場合は、どのプランか確認する。非アクティブプランを勝手に変更しない。',
       '',
       '# 対応フロー',
       '- まず、依頼が「相談・質問」(〜した方がいい?、〜は妥当?など、意見を求めるだけでスケジュール変更を伴わないもの。「速く走るコツは?」「フォームの改善点は?」のような、プランの日程と直接関係しない一般的なランニングの質問も含む)かどうかを判断する。',
@@ -4104,9 +4228,9 @@
   }
 
   /* ============================================================
-     AIコーチのチャットスレッド管理(Phase7)
-     messages配列がそのままチャットの表示内容になる。永続化時は容量の大きい項目
-     (options[].plan本体、確定時のundo用プランスナップショット等)を間引く
+     AIコーチのチャットスレッド管理
+     会話は「ユーザー × 1スレッド」。activePlanは現在の主目標を示すだけで、
+     スレッドを分割しない。旧 coachLog/{planId} は初回読込時に安全に統合する。
   ============================================================ */
   function genMsgId(){ return 'msg'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
@@ -4148,37 +4272,68 @@
   }
 
   function persistCoachLog(){
-    const plan = currentPlan();
-    if(!plan) return;
     const toSave = state.coach.messages.map(stripMessageForStorage);
-    Store.setCoachLog(plan.id, toSave);
+    const userId=state.profile&&state.profile.workoutUserId;
+    if(!userId) return;
+    Store.setUserCoachThread(userId,{messages:toSave,migratedPlanIds:state.coach.migratedPlanIds||[]});
   }
 
   function addCoachMessage(msg){
     msg.id = msg.id || genMsgId();
     msg.ts = msg.ts || Date.now();
     state.coach.messages.push(msg);
-    if(state.coach.messages.length>30) state.coach.messages = state.coach.messages.slice(-30);
     persistCoachLog();
     return msg;
   }
 
-  function loadCoachThread(planId){
-    if(!planId || state.coach.loadedFor===planId || state.coach.loading) return;
+  function normalizeMigratedCoachMessages(messages, planId){
+    return (messages||[]).filter(Boolean).map(function(message,index){
+      const copy=Object.assign({},message);
+      copy.id=copy.id || ('legacy_'+planId+'_'+index+'_'+(copy.ts||0));
+      copy.ts=Number(copy.ts)||0;
+      copy.contextPlanId=copy.contextPlanId||planId;
+      return copy;
+    });
+  }
+
+  async function loadCoachThread(){
+    const userId=state.profile&&state.profile.workoutUserId;
+    if(!userId || state.coach.loadedForUser===userId || state.coach.loading) return;
     state.coach.loading = true;
     render();
-    Store.getCoachLog(planId).then(function(messages){
-      if(state.currentId!==planId){ state.coach.loading = false; return; }
-      state.coach.messages = messages || [];
-      state.coach.loadedFor = planId;
+    try{
+      const thread=await Store.getUserCoachThread(userId);
+      const migrated=(thread.migratedPlanIds||[]).slice();
+      let messages=(thread.messages||[]).slice();
+      const pending=(state.plans||[]).filter(function(plan){ return migrated.indexOf(plan.id)<0; });
+      if(pending.length){
+        const legacy=await Promise.all(pending.map(async function(plan){
+          try{ return [plan.id,await Store.getCoachLog(plan.id)]; }catch(e){ return [plan.id,[]]; }
+        }));
+        const seen={};
+        messages.forEach(function(message){ seen[message.id]=true; });
+        legacy.forEach(function(pair){
+          normalizeMigratedCoachMessages(pair[1],pair[0]).forEach(function(message){
+            if(!seen[message.id]){ seen[message.id]=true; messages.push(message); }
+          });
+          migrated.push(pair[0]);
+        });
+        messages.sort(function(a,b){ return (Number(a.ts)||0)-(Number(b.ts)||0); });
+        await Store.setUserCoachThread(userId,{messages:messages.map(stripMessageForStorage),migratedPlanIds:migrated});
+      }
+      if((state.profile&&state.profile.workoutUserId)!==userId){ state.coach.loading=false; return; }
+      state.coach.messages = messages;
+      state.coach.migratedPlanIds = migrated;
+      state.coach.loadedForUser = userId;
       state.coach.loading = false;
       render();
-    }).catch(function(){
+    }catch(e){
       state.coach.messages = [];
-      state.coach.loadedFor = planId;
+      state.coach.migratedPlanIds=[];
+      state.coach.loadedForUser = userId;
       state.coach.loading = false;
       render();
-    });
+    }
   }
 
   function adjustErrorMessage(code){
@@ -4301,8 +4456,10 @@
     state.adjust.personaKey=personaKey;
     const planLogs=await loadRunningPlanLogs();
     const runningContext=coachRunningContextLines(plan,planLogs);
+    const allPlanSummaries=await allPlansCoachContext(planLogs);
+    const namedPlanDetails=namedPlanDetailsForCoach(instruction,plan);
     const decisionBasis=coachDecisionBasis(plan,runningContext);
-    const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey, runningContext);
+    const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey, runningContext, allPlanSummaries, namedPlanDetails);
     adjustController = new AbortController();
     const deadline = Date.now() + ADJUST_TIMEOUT_MS;
     let pendingDeadlineTimers = [];
@@ -4851,6 +5008,21 @@
       state.adjust.draft=btn.dataset.prompt||'';
       render();
       setTimeout(function(){ const input=document.getElementById('adjust-input'); if(input){ input.focus(); input.setSelectionRange(input.value.length,input.value.length); } },0);
+    } else if(action==='open-plan-switcher'){
+      state.planSwitchOpen=true; render();
+    } else if(action==='close-plan-switcher'){
+      state.planSwitchOpen=false; render();
+    } else if(action==='open-plan-manager'){
+      state.planSwitchOpen=false; state.mode='profile'; state.mypageView='goals-plans'; render();
+    } else if(action==='open-plan-detail'){
+      state.managedPlanId=btn.dataset.id; state.planEditOpen=false; state.mypageView='plan-detail'; render();
+    } else if(action==='toggle-plan-edit'){
+      state.planEditOpen=!state.planEditOpen; render();
+    } else if(action==='toggle-plan-status'){
+      const plan=state.plans.find(function(item){return item.id===btn.dataset.id;});
+      if(!plan) return;
+      plan.meta=Object.assign({},plan.meta,{status:btn.dataset.status});
+      Store.savePlan(plan).then(function(){ showMypageToast(btn.dataset.status==='paused'?'プランを休止しました':'プランをアーカイブしました'); render(); });
     } else if(action==='toggle-week'){
       const key=btn.dataset.week; state.expandedWeeks[key]=!state.expandedWeeks[key]; render();
     } else if(action==='toggle-policy'){
@@ -4926,26 +5098,9 @@
       form.targetM.value = String(Math.floor((sec%3600)/60));
       form.targetS.value = String(sec%60);
       refreshTargetPacePreview(form);
-    } else if(action==='select-plan'){
-      const id = btn.dataset.id;
-      state.currentId = id;
-      state.planHistoryOpen = false;
-      state.forecastDetailsOpen = false;
-      state.adjust.draft = ''; state.adjust.error = null;
-      state.coach = { messages:[], loadedFor:null, loading:false };
-      state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy:null };
-      state.logUndo = null;
-      state.logProposal = null;
-      state.calendarSelected = null;
-      Promise.all([Store.getProgress(id), Store.getLogs(id), Store.getForecast(id)]).then(([c,l,f])=>{
-        state.completed=c; state.logs=l||{};
-        if(f) state.forecast[id] = f;
-        render();
-        if(forecastNeedsRefresh(state.plans.find(function(pp){ return pp.id===id; }))){
-          const p = state.plans.find(function(pp){ return pp.id===id; });
-          if(p) recomputeAndSaveForecast(p).then(function(){ render(); });
-        }
-      });
+    } else if(action==='select-plan' || action==='set-active-plan'){
+      state.planSwitchOpen=false;
+      setActivePlan(btn.dataset.id,true);
     } else if(action==='open-delete-modal'){
       state.deleteModal = btn.dataset.id;
       render();
@@ -4967,9 +5122,13 @@
       Store.deletePlan(id).then(()=>{
         state.plans = state.plans.filter(p=>p.id!==id);
         if(state.forecast[id]) delete state.forecast[id];
-        if(state.currentId===id) state.currentId = state.plans[0] && state.plans[0].id;
+        if(state.currentId===id){
+          state.currentId = state.plans[0] && state.plans[0].id;
+          state.profile.activePlanId=state.currentId||null;
+          Store.setProfile(state.profile);
+        }
         state.deleteModal = null;
-        if(state.coach.loadedFor===id){ state.coach = { messages:[], loadedFor:null, loading:false }; }
+        state.mypageView='goals-plans'; state.planEditOpen=false;
         if(state.logUndo && state.logUndo.planId===id){ state.logUndo=null; }
         if(state.logProposal){ state.logProposal=null; }
         return state.currentId ? Promise.all([Store.getProgress(state.currentId), Store.getLogs(state.currentId)]) : Promise.resolve([{},{}]);
@@ -5256,6 +5415,14 @@
       render();
       return;
     }
+    if(e.target.id==='plan-settings-form'){
+      e.preventDefault();
+      const f=e.target, plan=state.plans.find(function(item){return item.id===f.dataset.id;});
+      if(!plan) return;
+      plan.meta=Object.assign({},plan.meta,{name:f.name.value.trim()||plan.meta.name,raceDate:f.raceDate.value||plan.meta.raceDate||null,distanceLabel:f.distanceLabel.value.trim()||plan.meta.distanceLabel,targetLabel:f.targetLabel.value.trim()||plan.meta.targetLabel});
+      Store.savePlan(plan).then(function(){ state.planEditOpen=false; showMypageToast('プランを保存しました'); render(); });
+      return;
+    }
     if(e.target.id==='training-settings-form'){
       e.preventDefault();
       const f = e.target;
@@ -5436,8 +5603,6 @@
     }
     state.plans = plans;
     state.currentId = plans[0] && plans[0].id;
-    try{ state.completed = await Store.getProgress(state.currentId); }catch(e){ state.completed = {}; }
-    try{ state.logs = await Store.getLogs(state.currentId); }catch(e){ state.logs = {}; }
     try{ state.profile = await Store.getProfile(); }catch(e){ /* keep default */ }
     // 認証導入前でもWorkoutを同一端末の利用者に紐付けられるよう、端末内IDを一度だけ発行する。
     if(!state.profile.workoutUserId){
@@ -5445,6 +5610,16 @@
       // 初回起動時のプロフィール初期化が、直後の設定変更を古い値で上書きしないよう完了を待つ。
       await Store.setProfile(state.profile);
     }
+    // 既存ユーザーは従来の先頭プランを主目標として一度だけ引き継ぐ。
+    // 以後はprofile.activePlanIdが、会話を分割しない「現在の主目標」を表す。
+    if(state.profile.activePlanId && plans.some(function(plan){ return plan.id===state.profile.activePlanId; })){
+      state.currentId=state.profile.activePlanId;
+    }else if(state.currentId){
+      state.profile.activePlanId=state.currentId;
+      await Store.setProfile(state.profile);
+    }
+    try{ state.completed = await Store.getProgress(state.currentId); }catch(e){ state.completed = {}; }
+    try{ state.logs = await Store.getLogs(state.currentId); }catch(e){ state.logs = {}; }
     try{
       const loadedWorkouts=await Store.getWorkouts();
       const annotated=annotateExistingDuplicateCandidates(loadedWorkouts);

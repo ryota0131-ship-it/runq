@@ -9,6 +9,7 @@
     "start": "npm run dev",
     "test": "node test/coach.api.test.js && node test/run-extract.api.test.js",
     "test:coach-safety": "node test/coach-safety-conversation.test.js",
+    "test:coach-thread": "node test/coach-user-thread.test.js",
     "test:e2e": "node test/e2e/run.js"
   },
   "engines": {

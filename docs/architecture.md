@@ -49,10 +49,10 @@ async savePlan(plan){
   - `progress/{planId}` — 旧版の手動チェック状態（後方互換のため保持するが、現在の表示・集計・コーチ判断の根拠にはしない）
   - `logs/{planId}` — 練習記録(Workout Result)。日付キー
   - `forecast/{planId}` — RACE FORECASTの履歴(直近20件)
-  - `coachLog/{planId}` — AIコーチの会話履歴(直近30件にローテーション。提案の完全なプランJSON・undo用スナップショットは容量対策で非永続化)
+  - `coachLog/user-{workoutUserId}` — ユーザー専属コーチのメイン会話。`activePlanId`で会話を分けない。旧`coachLog/{planId}`は初回読込時に時系列で統合し、元ログは削除しない。提案の完全なプランJSON・undo用スナップショットは容量対策で非永続化
   - `profile/main` — Runner Profile(PB・シューズ・Training Settings等、全プラン共通)
   - `workouts/main` — 取り込み元を問わない共通Workoutの配列(予定日別ログを置換しない正本)
-- `db`が使えない場合(ローカル起動時・Vercel等の静的ホスティング時など)は、上記に対応する`localStorage`キー(`paceplan.plans`, `paceplan.progress.{id}`, `paceplan.logs.{id}`, `paceplan.forecast.{id}`, `paceplan.coachLog.{id}`, `paceplan.profile`, `paceplan.workouts`)に読み書きする。ブラウザ・端末をまたいだ同期は行われない。
+- `db`が使えない場合(ローカル起動時・Vercel等の静的ホスティング時など)は、上記に対応する`localStorage`キー(`paceplan.plans`, `paceplan.progress.{id}`, `paceplan.logs.{id}`, `paceplan.forecast.{id}`, `paceplan.coachLog.user-{workoutUserId}`, `paceplan.profile`, `paceplan.workouts`)に読み書きする。ブラウザ・端末をまたいだ同期は行われない。
 
 ### 重要な制約
 
@@ -107,9 +107,10 @@ Race Forecast (forecast/{planId})
                mainFactors[], confidence, algorithmVersion, generatedAt }]
      (直近20件保持。estimateRacePerformance()が生成)
 
-AI Coach / Plan Change Proposal (coachLog/{planId}、および実行時のstate)
- ├─ messages: [{ id, role:'user'|'coach', kind, text, basis?, ... }]
- │    kind: advice | options | confirmed | dismissed | error
+AI Coach / Plan Change Proposal (coachLog/user-{workoutUserId}、および実行時のstate)
+ ├─ messages: [{ id, role:'user'|'coach'|'system', kind, text, basis?, contextPlanId?, ... }]
+ │    kind: advice | options | confirmed | dismissed | error | system
+ ├─ migratedPlanIds[] … 旧プラン別会話を一度だけ統合した対象。元ログは保持する
  ├─ options提案の完全なplan本体・confirmed後のundo用スナップショットは
  │    容量対策のためstateのみ保持(非永続化)
 └─ Plan変更確定時は Training Plan (plans/{planId}) を更新し、history[]に追記
@@ -176,6 +177,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 - **コーチの人格は保存・表示層で分離**: `profile/main.coachPersona`に`companion`（ナギ コーチ）/ `analyst`（リツ コーチ）/ `cheer`（カイ コーチ）を保存する。`buildAdjustPrompt()`はリクエスト開始時に固定した人格の口調指示だけを加え、判断ルール・コンテキスト・JSON形式は共通に保つ。チャット履歴とWorkoutの`metadata.feedback_coach_persona`には生成時のコーチを保存するため、後でコーチを変更しても過去の表示は書き換わらない。
 - `app/assets/coach/`には、提供された確定デザインから背景だけを透明化したコーチの静止PNG（通常・考え中・喜び）を置く。白いお腹や顔の白は透明化しない。画像は`aria-hidden`の装飾として扱い、テキストの状態表示を必ず併記する。
 - **実走・予定の共通コンテキスト**: `loadRunningPlanLogs()`と`runningEvidence()`が、重複統合済みの`workouts/main.entries[]`を正本として、直近90日の実走（距離・時間・ペース・心拍・RPE・痛み・メモ・取得元・予定との紐付け）、当日の予定、今後7日間の予定を要約して渡す。90日より前の実走は全体集計に留める。旧来の`logs/{planId}`は、`workoutId`または予定日で共通Workoutに紐付いていない記録だけを補完情報として渡すため、同じ走行を二重に判断しない。コーチ呼び出しの直前に全プランの予定日別ログを読み直し、画面を開いたまま記録・同期した内容も会話へ反映する。
+- **全プランの要約**: `allPlansCoachContext()`が、登録済みの各プランについてID、名称、種別、状態、主目標かどうか、大会日、開始日、距離、目標タイム、想定ペース、進捗、次回練習、大会までの日数、前後の大会を構造化して毎回渡す。詳細JSONは主目標だけに絞り、今回の発言に大会・プラン名が明示された場合だけ`namedPlanDetailsForCoach()`が該当する非アクティブプランの詳細を追加する。これにより、コーチは通常は主目標を優先しつつ、名称を指定された非アクティブプランや複数大会の関係も回答できる。対象が曖昧な変更は確認し、非アクティブプランを自動変更しない。
 - **Race Forecastも同じ実走を使用**: `recomputeAndSaveForecast()`は`runningEvidence()`を使い、Health同期・画像・手動登録を含む直近4週の合計、実走日数、最長実走、MP走を共通の根拠として算出する。PBなどから見る走力の目安と、ロング走・週間走行量・痛みから見るフルへの準備度を別フィールドで保存する。痛みは走力タイムの自動減点には使わず、負荷調整の注意として扱う。データ量に応じて表示を丸め、少ない場合は秒単位や好調時／安全目安を表示しない。
 - **レスポンス形式は既存のまま**: `{mode:'advice'|'options', summary, risk, options[].{label,summary,plan}}`。新しい独自スキーマを作るのではなく、Claude Artifact版が既に返していた形式をOpenAI側にも合わせている。下流(`buildAdjustPrompt`の解釈・`applyPlanChange`等)は無変更で動く。
 - **画像解析はCoachとは分離**: `extractFromImage`はClaude Artifactでは従来の`sampleFn`を使い、通常Web/Vercelでは`/api/run-extract`を使う。コーチ相談の`CoachService`に画像を混在させないため、既存のコーチ応答形式・プラン変更フローには影響しない。
