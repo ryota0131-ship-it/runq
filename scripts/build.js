@@ -24,6 +24,8 @@ const OUT_DIR = path.join(ROOT, 'dist');
 const OUT_FILE = path.join(OUT_DIR, 'index.html');
 const ASSET_SRC = path.join(ROOT, 'app', 'assets');
 const ASSET_OUT = path.join(OUT_DIR, 'assets');
+const RACE_CATALOG_SRC = path.join(ROOT, 'app', 'race-catalog.generated.js');
+const RACE_CATALOG_OUT = path.join(OUT_DIR, 'race-catalog.generated.js');
 
 const fragment = fs.readFileSync(SRC, 'utf8');
 
@@ -61,5 +63,6 @@ if (fs.existsSync(ASSET_SRC)) {
   fs.rmSync(ASSET_OUT, { recursive: true, force: true });
   fs.cpSync(ASSET_SRC, ASSET_OUT, { recursive: true });
 }
+if (fs.existsSync(RACE_CATALOG_SRC)) fs.copyFileSync(RACE_CATALOG_SRC, RACE_CATALOG_OUT);
 
 console.log(`built ${path.relative(ROOT, OUT_FILE)} (${wrapped.length} bytes) from ${path.relative(ROOT, SRC)}`);

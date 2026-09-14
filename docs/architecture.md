@@ -258,11 +258,21 @@ HealthKit / Health Connect / Strava / Garmin
   -> workouts/main
 ```
 
-## 6. 秘密情報・環境変数
+## 6. Race Catalog（大会候補）
+
+大会候補は`data/race-catalog.json`を正本とするRUNQ独自マスタであり、RUNNET等の大会一覧を取得・保存する処理は実装しない。`app/race-catalog.generated.js`は同JSONから生成するブラウザ向けコピーで、`npm run build`時に`dist/`へコピーする。`app/runq.html`はこのローカルデータだけを検索するため、Web・Capacitor・ローカルファイル表示で同じ候補を扱える。
+
+- `series[]`は名称、よみ、別名、開催地、主な距離、公式サイト、状態を持つ年をまたぐ大会シリーズ。`editions[]`は`race_series_id`、年、公式発表済みの開催日、募集期間、確認状態、出典URLを持つ年度情報である。日程が未発表なら`held_on:null`のままとし、前年から推測しない。
+- `LocalRaceCatalogProvider`が現在の検索元。将来の正式連携は同じ検索結果形を返す`ExternalRaceCatalogProvider`として追加し、既存プランは`meta.raceCatalog`の`race_series_id` / `race_edition_id`で参照を維持する。
+- `scripts/import-race-catalog.js --file <csv> --dry-run`で検証だけを行い、`--dry-run`なしではseries/editionをupsertしてブラウザ用コピーも更新する。CSVテンプレートは`data/race-catalog-template.csv`。正規化した名称・開催地・距離・公式URLでシリーズ重複を検出し、年・日付は年度情報として別管理する。
+- 手入力大会は`profile/main.raceCatalogSubmissions[]`（Webでは`paceplan.profile`）へ`user_submitted`として本人の端末／アカウント範囲だけに保存する。共通候補に自動昇格せず、将来の運営確認で`master_verified`、不適切・重複なら`rejected`、終了なら`archived`にできる。
+- 「まずは5km」など大会を伴わないQUESTは既存の`meta.questType`を使い、大会カタログには入れない。
+
+## 7. 秘密情報・環境変数
 
 `app/runq.html`(クライアント側)にAPIキー等の秘密情報はハードコードされていない(確認済み)。`OPENAI_API_KEY`は`api/coach.js`および`api/run-extract.js`のサーバー側からのみ`process.env`として読み込まれ、クライアントへ返さない。外部ネットワーク呼び出しはGoogle Fontsの読み込みと、サーバー側からの`https://api.openai.com/v1/responses`呼び出しのみ。`.env.example`および README の「環境変数」を参照。
 
-## 7. デプロイ
+## 8. デプロイ
 
 - **現状**: Claude Artifactとして公開(`app/runq.html`の内容をArtifactツールで公開)。ユーザーが実際に使っているのはこちら。この経路では`ClaudeArtifactProvider`が使われ、`OPENAI_API_KEY`等は一切関与しない。
 - **今回のGitHub移行後**: `app/runq.html`をGitHub上の正本として管理し、Claude Artifactへの公開は引き続きこのファイルの内容をそのまま使う運用とする。
