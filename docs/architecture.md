@@ -222,7 +222,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 
 - `onboarding.version`、`walkthroughCompleted`、`profileCompleted`、`draft`を保存する。既存プロフィールを読む際は既定値を補うため、既存データを壊さない。
 - ウォークスルーの再表示はマイページから可能で、再表示時にプロフィールやプランを変更しない。
-- レースなしのQUESTは従来の`plans/{id}`と同じ形を使い、`meta.questType`を`first_5k`、`first_10k`、`habit`として保存する。レース形式の既存プランは`questType`未設定のまま`race`として扱う。
+- レースなしのQUESTは従来の`plans/{id}`と同じ形を使い、`meta.questType`を`first_5k`、`first_10k`、`habit`、`fitness_weight`として保存する。新規プランは目的を`meta.plan_goal_type`（`race` / `beginner` / `fitness_weight`）にも保存し、既存のレース形式プランは`questType`未設定でも`race`として後方互換で扱う。
 - レースなしプランは`generateBeginnerPlan()`で決定論的に生成する。開始日以前のメニューは作らず、週表示は月曜から日曜までとする。AI CoachやRace Forecastに基礎数値の生成を委ねない。
 - 旧デモプランは`id: aqualine-2026`かつ`meta.source: seed`に一致するものだけを起動時に削除する。ユーザー作成のプランや練習記録を一括削除しない。
 
@@ -267,6 +267,15 @@ HealthKit / Health Connect / Strava / Garmin
 - `scripts/import-race-catalog.js --file <csv> --dry-run`で検証だけを行い、`--dry-run`なしではseries/editionをupsertしてブラウザ用コピーも更新する。CSVテンプレートは`data/race-catalog-template.csv`。正規化した名称・開催地・距離・公式URLでシリーズ重複を検出し、年・日付は年度情報として別管理する。
 - 手入力大会は`profile/main.raceCatalogSubmissions[]`（Webでは`paceplan.profile`）へ`user_submitted`として本人の端末／アカウント範囲だけに保存する。共通候補に自動昇格せず、将来の運営確認で`master_verified`、不適切・重複なら`rejected`、終了なら`archived`にできる。
 - 「まずは5km」など大会を伴わないQUESTは既存の`meta.questType`を使い、大会カタログには入れない。
+
+## 6.1 Share Cards（共有カード）
+
+共有カードは`workouts/main.entries[]`の共通Workout、紐付く予定、プラン、保存済みフィードバックからクライアント側で再現する。PNG・選択写真はDBやStorageへ保存しない。
+
+- `PHOTO` / `COACH` / `ROAD TO RACE` の3テンプレートをCanvasで1080×1920（9:16）へ描画する。写真が無い、または読み込めない場合もRUNQ配色のカードを生成する。GPSルートは共通Workoutに未保存のため初期版では描画しない。
+- 完了画面は軽量なHTML/CSSプレビューだけを表示し、高解像度Canvasは共有画面を開いた後に生成する。過去のWorkout詳細からも同じ元データを使って再共有できる。
+- WebではWeb Share APIの`File`共有を優先し、未対応環境は一時Blobのダウンロードへフォールバックする。ネイティブでは`@capacitor/filesystem`のCacheへ一時PNGを書き、`@capacitor/share`へ渡す。共有先が遅延してファイルを読む場合に備えて共有呼び出し直後には削除せず、次回共有時に直前の一時ファイルを削除する。永続データには保存しない。
+- 右下のロゴはホーム共通ヘッダーと同じ`RUNQ_LOGO_SRC`をCanvasに描画する。共有用途の短文は既存フィードバックを最大58文字に整形するだけで、共有のための追加AI呼び出しは行わない。
 
 ## 7. 秘密情報・環境変数
 

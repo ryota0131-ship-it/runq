@@ -7,7 +7,7 @@
     "build": "node scripts/build.js",
     "dev": "npm run build && node scripts/dev-server.js",
     "start": "npm run dev",
-    "test": "node test/coach.api.test.js && node test/run-extract.api.test.js && node test/race-catalog.test.js",
+    "test": "node test/coach.api.test.js && node test/run-extract.api.test.js && node test/race-catalog.test.js && node test/share-card.test.js",
     "test:coach-safety": "node test/coach-safety-conversation.test.js",
     "test:coach-thread": "node test/coach-user-thread.test.js",
     "test:e2e": "node test/e2e/run.js"
@@ -23,7 +23,9 @@
     "@capacitor/android": "^8.5.1",
     "@capacitor/cli": "^8.5.1",
     "@capacitor/core": "^8.5.1",
+    "@capacitor/filesystem": "^8.1.3",
     "@capacitor/ios": "^8.5.1",
+    "@capacitor/share": "^8.0.1",
     "@capgo/capacitor-health": "^8.10.6"
   }
 }

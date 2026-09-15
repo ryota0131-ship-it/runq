@@ -370,6 +370,8 @@
   .switch-row label{ font-size:13px; color:var(--text); }
   .switch-row .hint{ display:block; margin-top:2px; }
   .form-actions{ grid-column:1/-1; display:flex; align-items:center; gap:14px; margin-top:6px; }
+  #gen-form .form-actions .btn-primary{ min-width:164px; white-space:nowrap; flex:0 0 auto; }
+  #gen-form .form-actions .form-note{ font-size:12px; line-height:1.45; color:var(--text-muted); }
   .btn-primary{ background:var(--accent); color:#fff; border:none; border-radius:999px; padding:12px 26px; font-weight:700; font-size:14px; cursor:pointer; }
   .btn-primary:hover{ filter:brightness(1.06); }
   .btn-primary:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
@@ -417,6 +419,7 @@
   .log-summary{ margin-top:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--surface-2); border-radius:8px; padding:6px 10px; }
   .log-summary-txt{ font-size:12px; color:var(--text); }
   .log-edit-btn{ border:none; background:transparent; color:var(--accent); font-size:11.5px; font-weight:600; cursor:pointer; padding:0; }
+  .log-share-btn{ border:none; border-left:1px solid var(--border); background:transparent; color:var(--accent); font-size:11.5px; font-weight:600; cursor:pointer; padding:0 0 0 10px; }
   .feedback-callout{ margin-top:6px; background:var(--accent-soft); color:var(--accent-strong); border-radius:8px; padding:8px 12px; font-size:12.5px; line-height:1.5; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .feedback-callout.busy{ color:var(--text-muted); background:var(--surface-2); }
   .coach-basis{ width:100%; margin-top:6px; font-size:11px; color:var(--text-muted); }
@@ -436,6 +439,27 @@
   .log-saved{ margin-top:10px; padding:14px; border:1px solid var(--border); border-radius:12px; background:var(--surface-2); }
   .log-saved h4{ margin:0 0 7px; font-size:15px; }
   .log-saved-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .share-preview{ position:relative; overflow:hidden; margin-top:14px; min-height:122px; border-radius:12px; padding:14px; color:#fff; background:linear-gradient(145deg,#071a37,#17599a); cursor:pointer; }
+  .share-preview::after{ content:""; position:absolute; inset:auto -20% -45% 35%; height:150px; border:2px solid rgba(255,255,255,.25); border-radius:50%; transform:rotate(-14deg); }
+  .share-preview > *{ position:relative; z-index:1; }
+  .share-preview-kicker{ font-size:10px; letter-spacing:.14em; font-weight:700; opacity:.8; }
+  .share-preview-distance{ font-family:"Zen Kaku Gothic New",sans-serif; font-size:31px; font-weight:900; line-height:1.1; margin-top:5px; }
+  .share-preview-sub{ font-size:11px; opacity:.85; margin-top:5px; }
+  .share-preview-action{ position:absolute; right:12px; bottom:12px; border:1px solid rgba(255,255,255,.55); border-radius:999px; padding:6px 10px; font-size:11px; background:rgba(255,255,255,.12); }
+  .share-modal{ max-width:480px; max-height:calc(100dvh - 32px); overflow:auto; padding:18px; }
+  .share-modal-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .share-modal-head h3{ margin:0; }
+  .share-canvas-wrap{ aspect-ratio:9/16; width:min(100%,300px); margin:0 auto; background:#0b1f3b; border-radius:14px; overflow:hidden; box-shadow:0 10px 24px rgba(11,31,59,.24); }
+  .share-canvas-wrap canvas{ display:block; width:100%; height:100%; }
+  .share-template-tabs{ display:flex; gap:6px; overflow-x:auto; margin:14px 0 10px; padding-bottom:2px; }
+  .share-template-tab{ flex:1 0 auto; border:1px solid var(--border); border-radius:999px; padding:8px 12px; background:var(--surface); color:var(--text-muted); font-size:11px; font-weight:800; letter-spacing:.08em; }
+  .share-template-tab.active{ border-color:var(--accent); background:var(--accent); color:#fff; }
+  .share-photo-control{ display:flex; align-items:center; gap:8px; padding:9px 0; font-size:12px; color:var(--text-muted); }
+  .share-photo-control label{ color:var(--accent); font-weight:700; cursor:pointer; }
+  .share-photo-control input{ display:none; }
+  .share-status{ min-height:18px; color:var(--text-muted); font-size:12px; text-align:center; margin:5px 0; }
+  .share-modal-actions{ display:flex; gap:8px; margin-top:10px; }
+  .share-modal-actions .btn-primary{ flex:1; }
   .log-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
   @media (max-width:480px){ .log-grid{ grid-template-columns:1fr; } }
   .log-form textarea{ width:100%; border:1px solid var(--border); background:var(--bg); color:var(--text); border-radius:8px; padding:8px 10px; font-size:16px; font-family:inherit; resize:vertical; min-height:40px; }
@@ -487,6 +511,7 @@
   /* ---------- my page: 新レイアウト(RUNNER PROFILE / MY SHOES / RUNNING TOOLS / TRAINING SETTINGS / SETTINGS) ---------- */
   .runner-profile-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
   .runner-profile-head h3{ margin:0; }
+  .training-summary-card .runner-profile-head h3{ white-space:nowrap; font-size:17px; }
   .runner-profile-head .li-remove{ border:none; background:transparent; color:var(--text-faint); font-size:13px; cursor:pointer; flex:0 0 auto; white-space:nowrap; }
   .runner-profile-head .li-remove:hover{ color:var(--accent); }
   .runner-pb-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px; }
@@ -540,8 +565,9 @@
   .running-week-dot.active i{ background:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
   .workout-text-link{ border:0; padding:0; background:transparent; color:var(--accent-strong); font:inherit; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
   .recent-workouts{ margin-top:8px; }
-  .workout-row{ width:100%; display:block; text-align:left; background:transparent; color:inherit; border:0; border-top:1px solid var(--border); padding:14px 0; cursor:pointer; font:inherit; }
-  .workout-row:first-child{ border-top:0; }
+  .workout-row-wrap{ border-top:1px solid var(--border); padding:14px 0; }
+  .recent-workouts .workout-row-wrap:first-child,.history-month .workout-row-wrap:first-of-type{ border-top:0; }
+  .workout-row{ width:100%; display:block; text-align:left; background:transparent; color:inherit; border:0; padding:0; cursor:pointer; font:inherit; }
   .workout-row-top,.workout-row-values{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
   .workout-row-date{ color:var(--text-muted); font-size:12px; }
   .workout-row-title{ font-size:14px; font-weight:750; }
@@ -550,6 +576,8 @@
   .workout-row-values span{ color:var(--text-muted); font-family:"Zen Kaku Gothic New",sans-serif; font-size:12px; white-space:nowrap; }
   .workout-row-note{ color:var(--text-muted); font-size:12px; margin-top:7px; }
   .workout-row-note.matched{ color:var(--easy); }
+  .workout-row-actions{ display:flex; justify-content:flex-end; margin-top:10px; }
+  .workout-row-share{ min-height:32px; padding:5px 10px; border:1px solid var(--border); border-radius:999px; background:#fff; color:var(--blue); font:700 12px/1 "Zen Kaku Gothic New",sans-serif; }
   .workout-empty{ color:var(--text-muted); font-size:13px; padding:10px 0 2px; }
   .history-range{ display:flex; gap:6px; overflow:auto; margin:10px 0 16px; padding-bottom:2px; }
   .history-range button{ flex:0 0 auto; border:1px solid var(--border); background:var(--surface-2); border-radius:999px; color:var(--text-muted); padding:7px 11px; font:inherit; font-size:12px; cursor:pointer; }
@@ -679,9 +707,21 @@
   .race-filter.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .race-results{ display:flex; flex-direction:column; gap:6px; max-height:210px; overflow:auto; }
   .race-result{ width:100%; text-align:left; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--text); padding:9px 10px; }
+  .race-result.selected{ border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
+  .race-result.selected strong::after{ content:"✓ 選択中"; float:right; color:var(--accent); font-size:11px; }
   .race-result strong{ display:block; font-size:13px; }
   .race-result small{ display:block; margin-top:3px; color:var(--text-muted); font-size:11px; line-height:1.45; }
   .race-result .race-verified{ color:var(--easy); }
+  .race-selected-summary{ margin-top:8px; color:var(--accent-strong); font-size:12px; font-weight:700; }
+  .race-filter-row{ display:flex; flex-wrap:wrap; gap:7px; overflow:visible; }
+  .goal-type-list{ display:grid; grid-template-columns:1fr; gap:8px; margin:16px 0; }
+  .goal-type-card{ display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); text-align:left; }
+  .goal-type-card.selected{ border-color:var(--accent); background:var(--accent-soft); }
+  .goal-type-icon{ font-size:22px; flex:0 0 auto; }
+  .goal-type-card strong,.goal-type-card small{ display:block; }
+  .goal-type-card small{ color:var(--text-muted); margin-top:3px; line-height:1.4; }
+  .training-summary-lines{ display:grid; gap:7px; color:var(--text-muted); font-size:13px; line-height:1.45; }
+  .training-summary-lines strong{ color:var(--text); font-weight:750; }
   .race-manual-toggle{ margin-top:9px; border:0; background:transparent; color:var(--accent); padding:5px 0; font-weight:700; font-size:12px; }
   .race-manual-fields{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; }
   .race-manual-fields label{ display:block; font-size:11px; color:var(--text-muted); margin-bottom:3px; }
@@ -714,15 +754,17 @@
   .todays-point .tp-text{ font-size:13px; color:var(--text); line-height:1.5; }
   .this-week-card{ display:flex; flex-direction:column; gap:12px; }
   .week-mini-list{ display:flex; flex-direction:column; gap:2px; }
-  .week-mini-item{ display:grid; grid-template-columns:52px 1fr 54px; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border); }
+  .week-mini-item{ display:grid; grid-template-columns:52px 1fr auto; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border); }
   .week-mini-item .chip{ justify-self:start; }
   .week-mini-item:first-child{ border-top:none; }
   .week-mini-item.today{ background:var(--accent-soft); margin:0 -10px; padding:8px 10px; border-radius:8px; border-top:none; }
   .week-mini-item.done .wmi-day{ color:var(--text-faint); }
+  .wmi-share{ border:0; border-radius:999px; background:var(--accent-soft); color:var(--accent); min-height:30px; padding:5px 9px; font:700 11px/1 "Zen Kaku Gothic New",sans-serif; }
   .wmi-day{ font-family:"Zen Kaku Gothic New",sans-serif; font-size:12px; color:var(--text-muted); }
   .wmi-status{ min-height:16px; color:var(--text-faint); font-size:10px; font-weight:700; text-align:right; white-space:nowrap; }
   .wmi-status.completed{ color:var(--easy); }
   .wmi-status.skipped,.wmi-status.partial{ color:var(--text-muted); }
+  @media(max-width:390px){ #gen-form .form-actions{ align-items:flex-start; flex-direction:column; gap:8px; } #gen-form .form-actions .btn-primary{ min-width:174px; } .race-picker-head{ align-items:flex-start; flex-direction:column; } }
   .week-progress-line{ font-size:12px; color:var(--text-muted); }
   .week-progress-line .wpl-kicker{ font-size:10px; letter-spacing:0.1em; color:var(--text-faint); margin-right:6px; }
   .home-coach-link{ display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:0; }
@@ -1044,9 +1086,10 @@
     }).slice(0,12);
   }
   function raceResultHTML(race){
-    const edition=raceEditionFor(race), date=edition&&edition.held_on ? edition.held_on : '開催日未発表';
-    const verified=edition&&edition.verification_status==='verified' ? '情報確認済み' : '日程は公式発表待ち';
-    return '<button type="button" class="race-result" data-action="select-race-candidate" data-race-id="'+escapeHtml(race.id)+'"><strong>'+escapeHtml(race.name)+'</strong><small>'+escapeHtml(date)+' ・ '+escapeHtml([race.prefecture,race.city].filter(Boolean).join(' '))+' ・ '+escapeHtml((race.distances||[]).map(formatKm).join(' / '))+'</small><small class="race-verified">'+verified+'</small></button>';
+    const edition=raceEditionFor(race), date=edition&&edition.held_on ? new Date(edition.held_on+'T00:00:00').toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'}) : '';
+    const parts=[date,[race.prefecture,race.city].filter(Boolean).join(' '),(race.distances||[]).map(formatKm).join(' / ')].filter(Boolean);
+    const selected=state.raceSelection===race.id;
+    return '<button type="button" class="race-result '+(selected?'selected':'')+'" aria-pressed="'+(selected?'true':'false')+'" data-action="select-race-candidate" data-race-id="'+escapeHtml(race.id)+'"><strong>'+escapeHtml(race.name)+'</strong><small>'+escapeHtml(parts.join(' ・ '))+'</small></button>';
   }
   function updateRaceSearchResults(){
     const input=document.getElementById('f_race_search'), results=document.getElementById('race-search-results');
@@ -1179,7 +1222,7 @@
      claude/run-quest-v1-plan.md の「⑧ RACE FORECAST 実装案」を参照。
   ============================================================ */
   // 表示する根拠と評価基準を更新したため、既存のスナップショットも次回起動時に再計算する。
-  const FORECAST_ALGO_VERSION = 'v3';
+  const FORECAST_ALGO_VERSION = 'v4';
 
   function parsePaceLabel(label){
     if(!label) return null;
@@ -1326,8 +1369,23 @@
     const recommendedGoalSec = roundToNiceGoal(finalSec, raceDistanceKm);
 
     const confidence = evidence.recent.length>=10&&evidence.runDays>=7&&!!pb&&maxLongRun>=raceDistanceKm*0.45&&mpLogCount>=2 ? 'high' : evidence.recent.length>=4&&!!pb ? 'medium' : 'low';
-    const readinessLevel=evidence.maxPainLevel>=3?'caution':(maxLongRun>=raceDistanceKm*longTarget.min&&evidence.weeklyAvgKm>=raceDistanceKm*0.8?'ready':'building');
-    const readiness={ level:readinessLevel, label:readinessLevel==='ready'?'準備が進んでいます':readinessLevel==='caution'?'負荷を増やさないでください':'準備中', summary:readinessLevel==='ready'?'ロング走と週間走行量が、フルに向けた目安に近づいています。':readinessLevel==='caution'?'痛み・不調の記録があります。走力の目安とは別に、回復を優先してプランを見直しましょう。':'走力の目安と、フルを最後まで走るための準備量は別です。ロング走と週間の実走を少しずつ積み上げましょう。', longRunRatio:longRatio, weeklyAvgKm:evidence.weeklyAvgKm, workoutCount:evidence.recent.length, runDays:evidence.runDays };
+    let readinessLevel='starting', readinessLabel='準備開始', readinessSummary='まずは週の運動を無理なく続け、走った記録を2〜3件積み上げましょう。';
+    const nextLong=Math.min(raceDistanceKm*longTarget.min, Math.max(maxLongRun+2, raceDistanceKm*.4));
+    if(evidence.maxPainLevel>=3){
+      readinessLevel='caution'; readinessLabel='回復を優先'; readinessSummary='強めの痛み・不調の記録があります。距離や強度を上げず、症状が続く場合は医療機関へ相談してください。';
+    } else if(evidence.recent.length>=2){
+      readinessLevel='base'; readinessLabel='基礎づくり'; readinessSummary='現在の最長 '+formatKm(maxLongRun)+'。まずは無理なく '+formatKm(nextLong)+' 前後のロング走を目指しましょう。';
+      if(maxLongRun>=raceDistanceKm*.35 && evidence.weeklyAvgKm>=raceDistanceKm*.22){
+        readinessLevel='growing'; readinessLabel='距離を伸ばしている'; readinessSummary='ロング走と週の実走が積み上がっています。次は '+formatKm(Math.min(raceDistanceKm*longTarget.min,maxLongRun+2))+' 前後を、疲労を残さず走れるか確認しましょう。';
+      }
+      if(maxLongRun>=raceDistanceKm*.5 && evidence.weeklyAvgKm>=raceDistanceKm*.4 && evidence.runDays>=4){
+        readinessLevel='progressing'; readinessLabel='フル準備が進んでいる'; readinessSummary='距離と継続の土台ができています。ロング走を急に伸ばさず、週の実走を安定させていきましょう。';
+      }
+      if(maxLongRun>=raceDistanceKm*longTarget.min && evidence.weeklyAvgKm>=raceDistanceKm*.6 && evidence.runDays>=6){
+        readinessLevel='ready'; readinessLabel='レース準備良好'; readinessSummary='ロング走・週間の実走・継続性が目安に近づいています。直前は疲労をためず、予定どおりに整えましょう。';
+      }
+    }
+    const readiness={ level:readinessLevel, label:readinessLabel, summary:readinessSummary, longRunRatio:longRatio, weeklyAvgKm:evidence.weeklyAvgKm, workoutCount:evidence.recent.length, runDays:evidence.runDays };
 
     return {
       predictedSec: finalSec,
@@ -1911,7 +1969,10 @@
     planReviewUndo: null,
     raceCatalogCategory: 'recommended',
     raceManualOpen: false,
-    raceSelection: null
+    raceSelection: null,
+    createPurpose: 'race',
+    createBeginnerGoal: 'first_5k',
+    share: { open:false, workoutId:null, template:'photo', photoDataUrl:null, busy:false, error:null }
     ,planSwitchOpen: false
     ,managedPlanId: null
     ,planEditOpen: false
@@ -1993,11 +2054,11 @@
     const start=parseISO(cfg.startDate), firstMonday=mondayOfWeek(start), weeks=[];
     const available=(cfg.availableWeekdays||['1','3','6']).map(Number).sort(function(a,b){return a-b;});
     const count=Math.max(4,Math.min(12,Number(cfg.weeks)||8));
-    const labels={first_5k:'まずは5km',first_10k:'10kmチャレンジ',habit:'ランニング習慣'};
+    const labels={first_5k:'まずは5km',first_10k:'10kmチャレンジ',habit:'まずは30分動き続ける',fitness_weight:'体力づくりのランニング習慣'};
     for(let w=0;w<count;w++){
       const weekStart=new Date(firstMonday); weekStart.setDate(weekStart.getDate()+w*7);
       const items=[]; const level=w+1;
-      available.forEach(function(day,idx){ const date=new Date(weekStart); date.setDate(date.getDate()+day); if(date<start) return; const isLong=idx===available.length-1; const minutes=cfg.questType==='habit'?Math.min(45,15+level*4):Math.min(55,18+level*4+(isLong?10:0)); const title=cfg.questType==='first_5k'?(level<3?'歩き＋ゆっくり走る':'ゆっくり走る'):(cfg.questType==='habit'?'気持ちよく走る':'イージーラン'); items.push({type:isLong?'long':'easy',day:WEEKDAY_JA[day],date:toISO(date),title:title,desc:minutes+'分。会話できる楽な強さで。',flag:null}); });
+      available.forEach(function(day,idx){ const date=new Date(weekStart); date.setDate(date.getDate()+day); if(date<start) return; const isLong=idx===available.length-1; const baseMinutes=Number(cfg.sessionMinutes)||30; const minutes=cfg.questType==='habit'?Math.min(45,15+level*4):cfg.questType==='fitness_weight'?Math.min(60,Math.max(20,baseMinutes)+Math.floor(level/2)*3):Math.min(55,18+level*4+(isLong?10:0)); const title=cfg.questType==='first_5k'?(level<3?'歩き＋ゆっくり走る':'ゆっくり走る'):(cfg.questType==='habit'?'気持ちよく走る':cfg.questType==='fitness_weight'?(level<3?'ウォーク＋イージーラン':'イージーラン'):'イージーラン'); items.push({type:isLong?'long':'easy',day:WEEKDAY_JA[day],date:toISO(date),title:title,desc:minutes+'分。会話できる楽な強さで。',flag:null}); });
       const end=new Date(weekStart);end.setDate(end.getDate()+6); weeks.push({label:'WEEK '+(w+1),phase:w<2?'習慣づくり':w<count-2?'少しずつ伸ばす':'仕上げ',dateRange:fmtMD(weekStart)+'〜'+fmtMD(end),items:items});
     }
     return {id:genId('quest_'),createdAt:Date.now(),meta:{questType:cfg.questType,name:labels[cfg.questType]||'ランニングQUEST',distanceLabel:cfg.questType==='first_10k'?'10km':cfg.questType==='first_5k'?'5km':'習慣づくり',distanceKm:cfg.questType==='first_10k'?10:5,raceDate:null,startDate:cfg.startDate,targetLabel:null,mpLabel:null,easyLabel:'楽に会話できるペース',goalWeeks:count,policy:['無理のない強度で、週ごとに少しずつ進めます。','痛みや強い疲労がある日は休み、医療上の判断は専門家へ相談してください。']},weeks:weeks,extras:{fueling:[],cautions:['痛みがある日は休養を優先してください。']},history:[]};
@@ -2031,6 +2092,15 @@
     }
     const workout=plannedWorkoutForItem(plan,it);
     return workout ? {status:'completed', log:null, workout:workout} : {status:'none', log:null, workout:null};
+  }
+  function workoutForCompletion(plan, it, completion){
+    if(completion&&completion.workout) return completion.workout;
+    const id=completion&&completion.log&&completion.log.workoutId;
+    if(id){
+      const linked=(state.workouts||[]).find(function(workout){ return workout.id===id; });
+      if(linked) return linked;
+    }
+    return plannedWorkoutForItem(plan,it);
   }
   function isItemCompleted(plan, it){ return itemCompletionState(plan,it).status==='completed'; }
 
@@ -2077,6 +2147,7 @@
     // 全タブに共通ヘッダーを置き、現在地を短い日本語ラベルで示す。
     // 下部ナビゲーションは既存のまま維持するため、画面遷移や情報構造は変えない。
     app.innerHTML = (state.mode==='onboarding' ? '' : topbarHTML()) + body + (state.mode==='onboarding' ? '' : bottomNavHTML()) + modalHTML();
+    if(state.share && state.share.open) requestAnimationFrame(renderShareCardPreview);
     // コーチタブはカード型のボックスに収めず全画面表示にする(操作性・可読性の向上要望)。
     // bodyにモード専用クラスを付け外しし、CSS側でこのタブの時だけレイアウトを切り替える
     document.body.classList.toggle('mode-coach', state.mode==='coach');
@@ -2123,6 +2194,10 @@
   }
 
   function modalHTML(){
+    if(state.share && state.share.open){
+      const share=state.share;
+      return '<div class="modal-backdrop" data-action="close-share"><div class="modal-card share-modal" data-action="noop"><div class="share-modal-head"><button type="button" class="mypage-back-btn" data-action="close-share">＜ 戻る</button><h3>シェア</h3><span></span></div><div class="share-canvas-wrap"><canvas id="share-card-canvas" width="1080" height="1920" aria-label="共有カードのプレビュー"></canvas></div><div class="share-template-tabs" aria-label="カードの種類">'+[['photo','PHOTO'],['coach','COACH'],['road','ROAD TO RACE']].map(function(item){return '<button type="button" class="share-template-tab '+(share.template===item[0]?'active':'')+'" data-action="select-share-template" data-template="'+item[0]+'">'+item[1]+'</button>';}).join('')+'</div><div class="share-photo-control"><label>写真を選ぶ<input type="file" id="share-photo-input" accept="image/*"></label><span>'+(share.photoDataUrl?'選択済み（この共有だけに使用）':'写真なしでも作れます')+'</span></div><div class="share-status">'+(share.busy?'シェアカードを作成中…':share.error?escapeHtml(share.error):'記録は保存済みです。画像は端末上で一時生成します。')+'</div><div class="share-modal-actions"><button type="button" class="btn-secondary" data-action="close-share">閉じる</button><button type="button" class="btn-primary" data-action="share-card" '+(share.busy?'disabled':'')+'>共有する</button></div></div></div>';
+    }
     if(state.planSwitchOpen){
       const plans=plansForManagement();
       return '<div class="modal-backdrop" data-action="close-plan-switcher"><div class="modal-card" data-action="noop"><h3>主目標を切り替える</h3><p>会話や実績はそのまま、コーチが最も重視する目標だけを切り替えます。</p><div class="option-list">'+plans.filter(function(plan){return planStatus(plan).key==='active';}).map(function(plan){return '<button type="button" class="option-card" data-action="set-active-plan" data-id="'+escapeHtml(plan.id)+'"><div class="option-label">'+escapeHtml(plan.meta.name||'プラン')+(plan.id===state.currentId?' <span class="chosen-tag">主目標</span>':'')+'</div><div class="option-summary">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(plan.meta.distanceLabel||'距離未設定')+'</div></button>';}).join('')+'</div><div class="modal-actions"><button type="button" class="btn-secondary" data-action="open-plan-manager">目標・大会を管理する</button><button type="button" class="btn-primary" data-action="close-plan-switcher">閉じる</button></div></div></div>';
@@ -2149,6 +2224,90 @@
   }
 
   function genId(prefix){ return prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+  /* ============================================================
+     Share cards — saved workouts are the source of truth. Generated images and
+     optional photos remain in memory / a temporary native cache only.
+  ============================================================ */
+  function shareCardContext(){
+    const workout=(state.workouts||[]).find(function(w){return w.id===state.share.workoutId;});
+    if(!workout) return null;
+    const plan=(state.plans||[]).find(function(p){return p.id===workout.plan_id;}) || currentPlan();
+    const planInfo=workoutPlanInfo(workout), item=planInfo&&planInfo.item;
+    const distance=Number(workout.distance_meters||0)/1000, duration=Number(workout.duration_seconds||0);
+    const date=workout.started_at ? new Date(workout.started_at) : workoutDate(workout);
+    const completed=(plan&&plan.weeks||[]).reduce(function(sum,week){return sum+week.items.filter(function(it){return it.date&&isItemCompleted(plan,it);}).length;},0);
+    const total=(allWorkouts()||[]).filter(function(w){return !plan || !plan.meta.startDate || workoutDate(w)>=parseISO(plan.meta.startDate);}).reduce(function(sum,w){return sum+Number(w.distance_meters||0);},0)/1000;
+    const days=plan&&plan.meta.raceDate ? Math.max(0,daysBetween(todayLocal(),parseISO(plan.meta.raceDate))) : null;
+    const feedback=String((workout.metadata||{}).feedback||'今日の積み上げが、次の一歩につながります。').replace(/\s+/g,' ').slice(0,58);
+    return {workout:workout,plan:plan,item:item,distance:distance,duration:duration,pace:workout.average_pace_seconds_per_km,date:date,total:total,completed:completed,days:days,feedback:feedback};
+  }
+  function drawShareText(ctx,text,x,y,size,weight,align){ ctx.font=(weight||'600')+' '+size+'px "Zen Kaku Gothic New", "Noto Sans JP", sans-serif'; ctx.textAlign=align||'left'; ctx.fillText(text,x,y); }
+  function drawShareWrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines){
+    const words=String(text||'').split(''); let line='', lines=[];
+    words.forEach(function(char){ const test=line+char; if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=char;}else line=test; }); if(line)lines.push(line);
+    lines.slice(0,maxLines||3).forEach(function(line,index){ctx.fillText(line,x,y+index*lineHeight);});
+  }
+  function loadShareImage(src){ return new Promise(function(resolve,reject){ const img=new Image(); img.onload=function(){resolve(img);}; img.onerror=reject; img.src=src; }); }
+  async function renderShareCardPreview(){
+    const canvas=document.getElementById('share-card-canvas'), data=shareCardContext();
+    if(!canvas||!data) return;
+    const ctx=canvas.getContext('2d'), w=canvas.width,h=canvas.height, template=state.share.template;
+    ctx.clearRect(0,0,w,h);
+    const hasPhoto=template==='photo'&&state.share.photoDataUrl;
+    if(hasPhoto){
+      try{ const img=await loadShareImage(state.share.photoDataUrl), scale=Math.max(w/img.width,h/img.height); ctx.drawImage(img,(w-img.width*scale)/2,(h-img.height*scale)/2,img.width*scale,img.height*scale); const overlay=ctx.createLinearGradient(0,0,0,h); overlay.addColorStop(0,'rgba(2,12,28,.35)'); overlay.addColorStop(.58,'rgba(2,12,28,.05)'); overlay.addColorStop(1,'rgba(2,12,28,.86)');ctx.fillStyle=overlay;ctx.fillRect(0,0,w,h); }catch(e){ ctx.fillStyle='#0b1f3b';ctx.fillRect(0,0,w,h); }
+    } else { const gradient=ctx.createLinearGradient(0,0,w,h); gradient.addColorStop(0,template==='coach'?'#123f78':'#071a37'); gradient.addColorStop(1,template==='road'?'#005bc5':'#0b1f3b');ctx.fillStyle=gradient;ctx.fillRect(0,0,w,h); }
+    ctx.fillStyle='rgba(255,255,255,.94)';
+    drawShareText(ctx,'RUNQ.',72,104,50,'900'); drawShareText(ctx,'RUN YOUR QUEST.',74,140,18,'700');
+    const dateText=data.date&&!isNaN(data.date.getTime()) ? data.date.getFullYear()+'.'+pad(data.date.getMonth()+1)+'.'+pad(data.date.getDate()) : '';
+    drawShareText(ctx,dateText,w-72,100,24,'600','right');
+    if(template==='road'){
+      drawShareText(ctx,'ROAD TO',72,300,32,'700'); drawShareWrapped(ctx,(data.plan&&data.plan.meta.name)||'NEXT QUEST',72,352,860,58,2);
+      drawShareText(ctx,'DAY '+data.completed+' / '+Math.max(data.completed+1,(data.plan&&data.plan.weeks||[]).length*2),72,515,28,'700');
+      ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(72,548,760,18);ctx.fillStyle='#fff';ctx.fillRect(72,548,Math.min(760,Math.max(60,data.completed*54)),18);
+      drawShareText(ctx,'TODAY',72,700,26,'700'); drawShareText(ctx,formatKm(data.distance),72,815,124,'900'); drawShareText(ctx,'TOTAL TRAINING '+formatKm(data.total),72,900,28,'700');
+      drawShareText(ctx,data.days==null?'積み上げ中':'あと '+data.days+'日',72,1030,54,'900');
+    } else {
+      drawShareText(ctx,template==='coach'?"TODAY'S RUN":'DISTANCE',72,340,28,'700'); drawShareText(ctx,formatKm(data.distance),72,490,144,'900');
+      drawShareText(ctx,'TIME',72,600,26,'700'); drawShareText(ctx,workoutDurationLabel(data.duration),72,670,58,'800');
+      drawShareText(ctx,'PACE',72,770,26,'700'); drawShareText(ctx,data.pace?paceSecToLabel(data.pace)+'/km':'—',72,840,58,'800');
+      if(template==='coach'){
+        ctx.fillStyle='rgba(255,255,255,.16)';ctx.fillRect(60,990,960,360);ctx.fillStyle='#fff';drawShareText(ctx,'COACH',96,1060,25,'800');ctx.font='600 37px "Noto Sans JP",sans-serif';drawShareWrapped(ctx,'「'+data.feedback+'」',96,1135,840,58,4);
+      }
+    }
+    const baseY=template==='coach'?1480:1370;
+    ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(56,baseY,968,242);ctx.fillStyle='#fff';
+    drawShareText(ctx,'TODAY\'S MENU',90,baseY+58,20,'700');drawShareText(ctx,(data.item&&data.item.title)||'RUN',90,baseY+112,36,'800');drawShareText(ctx,'✓ COMPLETED',90,baseY+164,24,'700');
+    if(data.plan&&data.days!=null){drawShareText(ctx,(data.plan.meta.name||'目標大会')+'まで あと'+data.days+'日',90,baseY+215,20,'600');}
+    try{ const logo=await loadShareImage(RUNQ_LOGO_SRC); const ratio=Math.min(210/logo.width,60/logo.height);ctx.drawImage(logo,w-72-logo.width*ratio,h-104-logo.height*ratio,logo.width*ratio,logo.height*ratio); }catch(e){drawShareText(ctx,'RUNQ.',w-72,h-72,40,'900','right');}
+  }
+  function canvasToBlob(canvas){ return new Promise(function(resolve){canvas.toBlob(resolve,'image/png');}); }
+  function blobToBase64(blob){ return new Promise(function(resolve,reject){const reader=new FileReader();reader.onload=function(){resolve(String(reader.result).split(',')[1]);};reader.onerror=reject;reader.readAsDataURL(blob);}); }
+  let pendingNativeShareFile=null;
+  async function shareCurrentCard(){
+    if(state.share.busy) return;
+    state.share.busy=true; state.share.error=null; render(); await renderShareCardPreview();
+    try{
+      if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+      await new Promise(function(resolve){ requestAnimationFrame(resolve); });
+      await renderShareCardPreview();
+      const canvas=document.getElementById('share-card-canvas'); if(!canvas) throw new Error('image_generation_failed');
+      const blob=await canvasToBlob(canvas); if(!blob || !blob.size) throw new Error('image_generation_failed');
+      const file=new File([blob],'runq-share.png',{type:'image/png'}), native=window.Capacitor&&window.Capacitor.Plugins;
+      if(native&&native.Filesystem&&native.Share){
+        if(pendingNativeShareFile){ try{ await native.Filesystem.deleteFile(pendingNativeShareFile); }catch(e){} pendingNativeShareFile=null; }
+        const path='runq-share-'+Date.now()+'.png', data=await blobToBase64(blob);
+        await native.Filesystem.writeFile({path:path,data:data,directory:'CACHE'});
+        const fileRef={path:path,directory:'CACHE'};
+        const uri=await native.Filesystem.getUri(fileRef);
+        pendingNativeShareFile=fileRef;
+        await native.Share.share({title:'RUNQ.',files:[uri.uri]});
+      } else if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){ await navigator.share({title:'RUNQ.',files:[file]});
+      } else { const url=URL.createObjectURL(blob), link=document.createElement('a');link.href=url;link.download='runq-share.png';link.click();setTimeout(function(){URL.revokeObjectURL(url);},1000); }
+    }catch(error){ if(error&&error.name!=='AbortError') state.share.error='共有を開けませんでした。もう一度お試しください。'; }
+    state.share.busy=false; render();
+  }
 
   /* ============================================================
      common Workout model
@@ -2682,10 +2841,11 @@
     const title=info&&info.item ? info.item.title : (workout.title || 'ランニング');
     const relationship=workoutRelationship(workout);
     const candidateNote=(workout.duplicate_candidate_ids||[]).length ? '<div class="workout-row-note">同じランニングの可能性があります</div>' : '';
-    return '<button type="button" class="workout-row" data-action="open-workout-detail" data-id="'+escapeHtml(workout.id)+'">'
+    return '<div class="workout-row-wrap"><button type="button" class="workout-row" data-action="open-workout-detail" data-id="'+escapeHtml(workout.id)+'">'
       + '<div class="workout-row-top"><span class="workout-row-date">'+workoutDateLabel(workout)+'</span><span class="workout-row-title">'+escapeHtml(title)+'</span></div>'
       + '<div class="workout-row-values"><strong class="mono">'+formatKm(distance)+'</strong><span>'+duration+'　'+pace+'</span></div>'
-      + '<div class="workout-row-note'+(info&&info.item?' matched':'')+'">'+escapeHtml(relationship)+'</div>'+candidateNote+'</button>';
+      + '<div class="workout-row-note'+(info&&info.item?' matched':'')+'">'+escapeHtml(relationship)+'</div>'+candidateNote+'</button>'
+      + '<div class="workout-row-actions"><button type="button" class="workout-row-share" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェア</button></div></div>';
   }
   function monthlyRunningCardHTML(workouts){
     const now=todayLocal(), thisStart=new Date(now.getFullYear(),now.getMonth(),1), previousStart=new Date(now.getFullYear(),now.getMonth()-1,1);
@@ -2778,7 +2938,8 @@
     const reflectionHTML=reflectionRows.length?'<div class="workout-detail-plan"><div class="li-main">今回の振り返り</div><div class="workout-reflection-list">'+reflectionRows.map(function(row){ return '<div class="workout-reflection-row"><span class="label">'+escapeHtml(row[0])+'</span><span>'+escapeHtml(row[1])+'</span></div>'; }).join('')+'</div></div>':'';
     const updated=workout.updated_at||workout.created_at;
     const updatedHTML=updated?'<div class="workout-detail-updated">最終更新: '+escapeHtml(new Date(updated).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div>':'';
-    return '<div class="form-card"><div class="mypage-subhead"><button type="button" class="mypage-back-btn" data-action="mypage-nav" data-view="workout-history">＜ これまでの記録</button><h2>ワークアウト詳細</h2></div><div class="workout-detail-hero"><div><div class="workout-detail-date">'+workoutDateLabel(workout)+'</div><div class="workout-detail-title">'+escapeHtml(info&&info.item?info.item.title:'ランニング')+'</div></div><div><div class="workout-detail-distance mono">'+formatKm(distance)+'</div><div class="workout-detail-source">'+escapeHtml(workoutSourceLabel(workout.source))+'</div></div></div><div class="workout-detail-grid">'+metrics.map(function(m){return '<div class="workout-detail-metric"><div class="label">'+m[0]+'</div><div class="value mono">'+m[1]+'</div></div>';}).join('')+'</div>'+planHTML+reflectionHTML+feedbackHTML+candidateHTML+updatedHTML+'</div>';
+    const shareButton='<div class="log-saved-actions"><button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェアする</button></div>';
+    return '<div class="form-card"><div class="mypage-subhead"><button type="button" class="mypage-back-btn" data-action="mypage-nav" data-view="workout-history">＜ これまでの記録</button><h2>ワークアウト詳細</h2></div><div class="workout-detail-hero"><div><div class="workout-detail-date">'+workoutDateLabel(workout)+'</div><div class="workout-detail-title">'+escapeHtml(info&&info.item?info.item.title:'ランニング')+'</div></div><div><div class="workout-detail-distance mono">'+formatKm(distance)+'</div><div class="workout-detail-source">'+escapeHtml(workoutSourceLabel(workout.source))+'</div></div></div><div class="workout-detail-grid">'+metrics.map(function(m){return '<div class="workout-detail-metric"><div class="label">'+m[0]+'</div><div class="value mono">'+m[1]+'</div></div>';}).join('')+'</div>'+planHTML+reflectionHTML+feedbackHTML+candidateHTML+shareButton+updatedHTML+'</div>';
   }
 
   function dataConnectionsHTML(){
@@ -3172,9 +3333,11 @@
   function logSavedHTML(dateStr, log){
     const lf=state.logForm;
     const feedback=log.feedback || (lf.feedbackBusy===dateStr ? null : null);
+    const previewWorkout=(state.workouts||[]).find(function(w){ return w.id===lf.selectedWorkoutId || w.id===log.workoutId; });
+    const preview=previewWorkout?'<button type="button" class="share-preview" data-action="open-share" data-workout-id="'+escapeHtml(previewWorkout.id)+'"><div class="share-preview-kicker">RUNQ. TODAY\'S RUN</div><div class="share-preview-distance mono">'+formatKm(Number(previewWorkout.distance_meters||0)/1000)+'</div><div class="share-preview-sub">'+escapeHtml(workoutDurationLabel(previewWorkout.duration_seconds))+' ・ '+escapeHtml(previewWorkout.average_pace_seconds_per_km?paceSecToLabel(previewWorkout.average_pace_seconds_per_km)+'/km':'ペース未登録')+'</div><span class="share-preview-action">シェアする</span></button>':'';
     return '<div class="log-saved" id="log-saved-'+dateStr+'"><h4>おつかれさまでした！記録を保存しました</h4><div class="log-summary-txt mono">'+escapeHtml(logSummaryLine(log))+'</div>'
       + '<div class="feedback-callout'+(lf.feedbackBusy===dateStr?' busy':'')+'">'+coachMascotHTML(log.feedbackCoachPersona||((state.profile||{}).coachPersona),lf.feedbackBusy===dateStr?'thinking':'cheer','small')+(lf.feedbackBusy===dateStr?'<span>コーチが振り返りを作成しています…</span>':feedback?'<span><strong>コーチからのフィードバック</strong><br>'+escapeHtml(feedback)+'</span>'+coachBasisHTML(log.feedbackBasis):lf.feedbackError?'<span>フィードバックを取得できませんでした。記録は保存されています。<button type="button" class="workout-text-link" data-action="retry-log-feedback" data-date="'+dateStr+'">再試行</button></span>':'<span>コーチからのフィードバックを準備しています。</span>')+'</div>'
-      + '<div class="log-saved-actions"><button type="button" class="btn-secondary" data-action="open-log" data-date="'+dateStr+'">記録を編集</button><button type="button" class="btn-secondary" data-action="consult-item" data-date="'+dateStr+'">コーチに相談する</button><button type="button" class="btn-secondary" data-action="close-log">閉じる</button></div></div>';
+      + preview + '<div class="log-saved-actions"><button type="button" class="btn-secondary" data-action="open-log" data-date="'+dateStr+'">記録を編集</button><button type="button" class="btn-secondary" data-action="consult-item" data-date="'+dateStr+'">コーチに相談する</button><button type="button" class="btn-secondary" data-action="close-log">閉じる</button></div></div>';
   }
 
   function itemRowHTML(plan, wi, ii, it, today){
@@ -3195,7 +3358,8 @@
       if(formOpen){
         html += state.logForm.status==='saved' && log ? logSavedHTML(it.date,log) : logFormHTML(it.date, log||null);
       } else if(log){
-        html += '<div class="log-summary"><span class="log-summary-txt mono">実績: '+escapeHtml(logSummaryLine(log))+'</span><button type="button" class="log-edit-btn" data-action="open-log" data-date="'+it.date+'">編集</button></div>';
+        const recordedWorkout=workoutForCompletion(plan,it,completion);
+        html += '<div class="log-summary"><span class="log-summary-txt mono">実績: '+escapeHtml(logSummaryLine(log))+'</span><button type="button" class="log-edit-btn" data-action="open-log" data-date="'+it.date+'">編集</button>'+(recordedWorkout?'<button type="button" class="log-share-btn" data-action="open-share" data-workout-id="'+escapeHtml(recordedWorkout.id)+'">シェア</button>':'')+'</div>';
         if(log.note) html += '<div class="item-desc log-note" style="margin-top:2px;">メモ: '+escapeHtml(log.note)+'</div>';
         if(state.logForm.feedbackBusy===it.date){
           html += '<div class="feedback-callout busy">'+coachMascotHTML((state.profile||{}).coachPersona,'thinking','small')+'<span>コーチが確認中…</span></div>';
@@ -3219,7 +3383,7 @@
           html += '</div>';
         }
       } else if(completion.workout){
-        html += '<div class="log-summary"><span class="log-summary-txt mono">実績: '+escapeHtml(coachWorkoutActualLabel(completion.workout))+'</span><button type="button" class="log-edit-btn" data-action="open-log" data-date="'+it.date+'">内容を確認</button></div>';
+        html += '<div class="log-summary"><span class="log-summary-txt mono">実績: '+escapeHtml(coachWorkoutActualLabel(completion.workout))+'</span><button type="button" class="log-edit-btn" data-action="open-log" data-date="'+it.date+'">内容を確認</button><button type="button" class="log-share-btn" data-action="open-share" data-workout-id="'+escapeHtml(completion.workout.id)+'">シェア</button></div>';
       } else {
         const isToday=it.date===toISO(today), isFuture=it.date>toISO(today);
         if(it.type==='race'){
@@ -3573,13 +3737,14 @@
     html += '<div class="week-mini-list">';
     wk.items.forEach(function(it, ii){
       const completion=itemCompletionState(plan,it);
+      const workout=workoutForCompletion(plan,it,completion);
       const isDone = completion.status==='completed';
       if(isLoggable(it)){ total++; if(isDone) done++; }
       const isToday = it.date===todayStr;
       html += '<div class="week-mini-item'+(isToday?' today':'')+(isDone?' done':'')+'">'
         + '<span class="wmi-day">'+it.day+'</span>'
         + '<span class="chip '+it.type+'">'+escapeHtml(it.title)+'</span>'
-        + '<span class="wmi-status '+completion.status+'">'+(isDone?'✓ 完了':completion.status==='skipped'?'見送り':completion.status==='partial'?'一部実施':'')+'</span>'
+        + (isDone&&workout?'<button type="button" class="wmi-share" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェア</button>':'<span class="wmi-status '+completion.status+'">'+(isDone?'✓ 完了':completion.status==='skipped'?'見送り':completion.status==='partial'?'一部実施':'')+'</span>')
         + '</div>';
     });
     html += '</div>';
@@ -3690,7 +3855,7 @@
   function coachPersonaKey(key){ return COACH_PERSONAS[key] ? key : 'companion'; }
   function coachMascotHTML(key, mood, size){
     const personaKey=coachPersonaKey(key), stateName=['normal','thinking','cheer'].indexOf(mood)>=0?mood:'normal';
-    return '<span class="coach-mascot coach-mascot-'+(size||'small')+'" aria-hidden="true"><img src="assets/coach/'+personaKey+'-'+stateName+'.png" alt=""></span>';
+    return '<span class="coach-mascot coach-mascot-'+(size||'small')+'" aria-hidden="true"><img src="assets/coach/'+personaKey+'-'+stateName+'.png" alt="" onerror="this.parentElement.style.display=\'none\'"></span>';
   }
   function coachLabelHTML(key){ return '<span class="coach-label">'+escapeHtml(coachPersona(key).label)+'</span>'; }
   function coachCompanionSettingsHTML(){ const current=coachPersonaKey(state.profile&&state.profile.coachPersona); return '<div class="info-card coach-companion-settings"><h3>あなたのコーチ</h3><div class="li-sub">コーチによって口調は変わりますが、判断基準やプランは変わりません。</div><div class="companion-choice-list">'+Object.keys(COACH_PERSONAS).map(function(key){const p=COACH_PERSONAS[key];return '<button type="button" class="companion-choice'+(current===key?' selected':'')+'" data-action="select-coach-persona" data-persona="'+key+'" aria-pressed="'+(current===key?'true':'false')+'">'+coachMascotHTML(key,'normal','choice')+'<span class="companion-choice-copy"><strong>'+p.label+' コーチ</strong><span class="companion-type">'+p.typeLabel+'</span><span>'+p.description+'</span><small>「'+p.example+'」</small></span><span class="companion-choice-state">'+(current===key?'選択中':'選ぶ')+'</span></button>';}).join('')+'</div></div>'; }
@@ -3782,7 +3947,7 @@
     const persona=coachPersona();
     let html = '<div class="info-card adjust-card coach-chat-card">';
     html += '<div class="coach-chat-heading">'+coachMascotHTML((state.profile||{}).coachPersona,'normal','small')+'<div><div class="li-sub">'+escapeHtml(persona.label)+' コーチが一緒に考えます</div><div class="lede">プラン、実績、体調について相談できます。</div></div></div>';
-    if(a.context) html += '<div class="todays-point"><span class="tp-label">相談中のメニュー</span><span class="tp-text">'+escapeHtml(a.context)+'</span></div>';
+    if(a.context) html += '<div class="todays-point"><span class="tp-label">相談中のメニュー <button type="button" class="workout-text-link" data-action="clear-coach-context">相談を終了</button></span><span class="tp-text">'+escapeHtml(a.context)+'</span></div>';
 
     html += '<div class="chat-thread" id="coach-thread">';
     if(c.loading && !c.messages.length){
@@ -4949,8 +5114,21 @@
     const availableLabel = (prof.availableWeekdays||[]).map(function(d){ return WEEKDAY_JA[Number(d)]; }).join('・');
     const pbLabel = (prof.pbs||[]).length ? prof.pbs.map(function(pb){ return pb.label+' '+pb.timeLabel; }).join('、') : '未登録（任意）';
     const evidence=trainingEvidenceSummary();
-    if(!profileTrainingReady(prof)){
-      return '<div class="form-card"><h2>新しいプランを作る</h2><div class="info-card"><h3>先にランニングプロフィールを設定してください</h3><p class="li-sub">週に走れる回数・曜日・現在の最長ロング走を設定すると、あなたの習慣に合わせてプランを自動配置できます。</p><button type="button" class="btn-primary" data-action="tab" data-tab="profile">マイページで設定する</button></div></div>';
+    const purpose=state.createPurpose||'race';
+    const purposeCards='<div class="goal-type-list" role="list">'
+      +[['race','🏁','大会に向けて走る','目標レースに向けて準備'],['beginner','🏃','まずは走れるようになる','自分のペースでランニングを始める'],['fitness','🔥','ダイエット・体力づくり','走る習慣でカラダを動かす']].map(function(item){return '<button type="button" class="goal-type-card '+(purpose===item[0]?'selected':'')+'" data-action="select-create-purpose" data-purpose="'+item[0]+'"><span class="goal-type-icon" aria-hidden="true">'+item[1]+'</span><span><strong>'+item[2]+'</strong><small>'+item[3]+'</small></span></button>';}).join('')+'</div>';
+    if(!profileTrainingReady(prof) && purpose==='race'){
+      return '<div class="form-card"><h2>新しいプランを作る</h2><div class="lede">まずは走り始めることや、体力づくりからでも始められます。</div>'+purposeCards+'<div class="info-card"><h3>レースのプランにはプロフィールが必要です</h3><p class="li-sub">週に走れる回数・曜日・現在の最長ロング走を設定すると、あなたの習慣に合わせてプランを自動配置できます。</p><button type="button" class="btn-primary" data-action="tab" data-tab="profile">マイページで設定する</button></div></div>';
+    }
+    if(purpose!=='race'){
+      const goal=state.createBeginnerGoal || (purpose==='fitness'?'fitness_weight':'first_5k');
+      const title=purpose==='fitness'?'体力づくりのプランを作る':'走り始めるプランを作る';
+      const lede=purpose==='fitness'?'速さよりも、無理なく動く習慣をつくります。大会や目標タイムの入力は必要ありません。':'歩きとゆっくり走る時間から、無理のない一歩を積み上げます。';
+      const goals=purpose==='fitness' ? '' : '<div class="field" style="grid-column:1/-1"><label>最初の目標</label><div class="choice-grid">'+[['habit','まずは30分動き続ける'],['first_5k','5km走れるようになる'],['first_10k','10km走れるようになる']].map(function(item){return '<button type="button" class="choice '+(goal===item[0]?'selected':'')+'" data-action="select-create-goal" data-goal="'+item[0]+'"><strong>'+item[1]+'</strong></button>';}).join('')+'</div><input type="hidden" name="beginnerGoal" value="'+escapeHtml(goal)+'"></div>';
+      const minutes=purpose==='fitness'?'<div class="field"><label for="f_fitness_minutes">1回の目安</label><select id="f_fitness_minutes" name="fitnessMinutes">'+[20,30,45,60].map(function(n){return '<option value="'+n+'" '+(n===30?'selected':'')+'>'+n+'分程度</option>';}).join('')+'</select></div>':'';
+      return '<div class="form-card"><h2>'+title+'</h2><div class="lede">'+lede+'</div>'+purposeCards
+        +'<div class="info-card training-summary-card" style="margin:14px 0;"><div class="runner-profile-head"><h3>トレーニング設定</h3><button type="button" class="li-remove" data-action="tab" data-tab="profile">プロフィールを変更 ＞</button></div><div class="training-summary-lines"><div>週'+(prof.weeklyRunDays||2)+'回（'+escapeHtml(availableLabel||'曜日は後から変更できます')+'）　・　最長ロング走 '+formatKm(longest.km)+'</div><div><strong>自己ベスト</strong><br>'+escapeHtml(pbLabel)+'</div></div></div>'
+        +'<form id="gen-form"><input type="hidden" name="purpose" value="'+purpose+'"><div class="form-grid">'+goals+minutes+fld('startDate','プラン開始日','date','value="'+toISO(nextMonday(todayLocal()))+'" required')+'<div class="form-actions"><button type="submit" class="btn-primary">プランを作成</button><span class="form-note">内容はあとから変更・削除できます</span></div></div></form></div>';
     }
     const raceCategory=state.raceCatalogCategory||'recommended';
     const initialRaceResults=raceCatalogSearch('',raceCategory==='recommended'?null:raceCategory).map(raceResultHTML).join('');
@@ -4959,15 +5137,15 @@
       .map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.meta.name)+'('+p.meta.raceDate+')</option>'; }).join('');
     return '<div class="form-card">'
       + '<h2>新しいプランを作る</h2>'
-      + '<div class="lede">今回のレース条件を入力すると、マイページのランニングプロフィールをもとに週別プランを自動生成します。</div>'
-      + '<div class="info-card" style="margin:14px 0;"><div class="runner-profile-head"><h3>トレーニング設定</h3><button type="button" class="li-remove" data-action="tab" data-tab="profile">プロフィールを変更 ＞</button></div><div class="li-sub">週'+prof.weeklyRunDays+'回（'+escapeHtml(availableLabel)+'） ・ 最長ロング走 '+formatKm(longest.km)+'（'+longest.source+'）</div><div class="li-sub" style="margin-top:4px;">自己ベスト: '+escapeHtml(pbLabel)+'</div></div>'
+      + '<div class="lede">目標レースに向けて、マイページのランニングプロフィールをもとに週別プランを自動生成します。</div>'+purposeCards
+      + '<div class="info-card training-summary-card" style="margin:14px 0;"><div class="runner-profile-head"><h3>トレーニング設定</h3><button type="button" class="li-remove" data-action="tab" data-tab="profile">プロフィールを変更 ＞</button></div><div class="training-summary-lines"><div>週'+prof.weeklyRunDays+'回（'+escapeHtml(availableLabel)+'）　・　最長ロング走 '+formatKm(longest.km)+'（'+longest.source+'）</div><div><strong>自己ベスト</strong><br>'+escapeHtml(pbLabel)+'</div></div></div>'
       + '<div class="plan-review-card"><h3>このプランで使う実績</h3><p>'+ (evidence.count ? '直近4週 '+evidence.count+'回・平均 '+formatKm(evidence.weeklyKm)+'/週・最長 '+formatKm(evidence.longest) : 'RUNQ.の実績はまだ少ないため、プロフィールの最長距離と走れる曜日を基に保守的に作成します。') +'</p>'+(evidence.pain?'<p>痛み・違和感の記録があるため、距離や強度を急に増やさない構成にします。</p>':'')+'</div>'
       + '<form id="gen-form"><div class="form-grid">'
       + '<div class="race-picker"><div class="race-picker-head"><label for="f_race_search">マラソン大会を探す</label><span>公式情報をもとにした候補</span></div>'
       + '<input id="f_race_search" type="search" placeholder="大会名・よみ・都道府県で検索" autocomplete="off" aria-controls="race-search-results">'
       + '<div class="race-filter-row" aria-label="距離で絞り込む">'+[['recommended','おすすめ'],['nearby','近く'],['full','フル'],['half','ハーフ'],['short','10km以下']].map(function(item){return '<button type="button" class="race-filter '+(raceCategory===item[0]?'active':'')+'" data-action="race-catalog-filter" data-filter="'+item[0]+'">'+item[1]+'</button>';}).join('')+'</div>'
       + '<div id="race-search-results" class="race-results">'+(initialRaceResults||'<div class="li-sub">候補がありません。</div>')+'</div>'
-      + (selectedRace?'<div class="li-sub" style="margin-top:8px;">選択中：'+escapeHtml(selectedRace.name)+'</div>':'')
+      + (selectedRace?'<div class="race-selected-summary">選択中：'+escapeHtml(selectedRace.name)+'</div>':'')
       + '<button type="button" class="race-manual-toggle" data-action="toggle-race-manual">候補にない大会を入力する</button>'
       + (state.raceManualOpen ? '<div class="race-manual-fields"><div><label for="f_name">大会名</label><input id="f_name" name="name" type="text" required placeholder="例: ○○マラソン"></div><div><label for="f_race_prefecture">都道府県</label><input id="f_race_prefecture" name="racePrefecture" type="text" placeholder="任意"></div><div><label for="f_race_city">開催地</label><input id="f_race_city" name="raceCity" type="text" placeholder="任意"></div><div><label for="f_race_url">公式サイトURL</label><input id="f_race_url" name="raceUrl" type="url" placeholder="任意"></div></div>' : '<input id="f_name" name="name" type="hidden" value="'+escapeHtml(selectedRace?selectedRace.name:'')+'">')
       + '<div class="hint">開催日未発表の大会は、公式発表後に日付を入力してください。手入力した大会はあなたの候補だけに保存されます。</div></div>'
@@ -5005,8 +5183,27 @@
     const btn = e.target.closest('[data-action]');
     if(!btn) return;
     const action = btn.dataset.action;
-    if(action==='race-catalog-filter'){
+    if(action==='open-share'){
+      state.share={open:true,workoutId:btn.dataset.workoutId,template:'photo',photoDataUrl:null,busy:false,error:null};
+      render();
+    } else if(action==='close-share'){
+      state.share={open:false,workoutId:null,template:'photo',photoDataUrl:null,busy:false,error:null};
+      render();
+    } else if(action==='select-share-template'){
+      state.share.template=btn.dataset.template||'photo'; state.share.error=null; render();
+    } else if(action==='share-card'){
+      shareCurrentCard();
+    } else if(action==='race-catalog-filter'){
       state.raceCatalogCategory=btn.dataset.filter||'recommended';
+      render();
+    } else if(action==='select-create-purpose'){
+      state.createPurpose=btn.dataset.purpose||'race';
+      state.raceSelection=null;
+      state.raceManualOpen=false;
+      state.formError={};
+      render();
+    } else if(action==='select-create-goal'){
+      state.createBeginnerGoal=btn.dataset.goal||'first_5k';
       render();
     } else if(action==='toggle-race-manual'){
       state.raceManualOpen=!state.raceManualOpen;
@@ -5031,6 +5228,7 @@
     } else if(action==='tab'){
       state.mode = btn.dataset.tab;
       state.formError = {};
+      if(state.mode==='coach') state.adjust.context=null;
       if(state.mode==='profile'){
         // マイページを開くたびに「まず自分のランナー情報を見る」状態に戻す(編集フォームを開いたままにしない)
         state.mypageView = 'main';
@@ -5083,6 +5281,9 @@
       const plan=currentPlan(), ref=plan&&findItemByDate(plan,btn.dataset.date);
       if(ref){ state.adjust.context=fmtMD(parseISO(ref.it.date))+'の'+ref.it.title; state.adjust.draft=state.adjust.context+'について相談したいです。'; }
       state.mode='coach'; render(); if(plan) loadCoachThread(plan.id);
+    } else if(action==='clear-coach-context'){
+      state.adjust.context=null;
+      render();
     } else if(action==='coach-prompt'){
       state.adjust.context=null;
       state.adjust.draft=btn.dataset.prompt||'';
@@ -5351,10 +5552,16 @@
   // ウォークスルーはボタンに加えて横スワイプでも進める。縦スクロールとの誤操作を
   // 避けるため、十分な横移動だけを受け付ける。
   let onboardingTouchStart=null;
+  let shareTouchStart=null;
   document.getElementById('app').addEventListener('touchstart', function(e){
     if(state.mode==='onboarding' && state.onboarding.screen==='walkthrough' && e.touches[0]) onboardingTouchStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    if(state.share&&state.share.open&&e.touches[0]&&e.target.closest('.share-canvas-wrap')) shareTouchStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
   }, {passive:true});
   document.getElementById('app').addEventListener('touchend', function(e){
+    if(shareTouchStart&&e.changedTouches[0]){
+      const dx=e.changedTouches[0].clientX-shareTouchStart.x, dy=e.changedTouches[0].clientY-shareTouchStart.y; shareTouchStart=null;
+      if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)){ const order=['photo','coach','road'], current=order.indexOf(state.share.template); state.share.template=order[(current+(dx<0?1:order.length-1))%order.length]; render(); return; }
+    }
     if(!onboardingTouchStart || state.mode!=='onboarding' || state.onboarding.screen!=='walkthrough' || !e.changedTouches[0]){ onboardingTouchStart=null; return; }
     const dx=e.changedTouches[0].clientX-onboardingTouchStart.x, dy=e.changedTouches[0].clientY-onboardingTouchStart.y; onboardingTouchStart=null;
     if(Math.abs(dx)<48 || Math.abs(dx)<=Math.abs(dy)) return;
@@ -5364,6 +5571,12 @@
   }, {passive:true});
 
   document.getElementById('app').addEventListener('change', function(e){
+    if(e.target.id==='share-photo-input'){
+      const file=e.target.files&&e.target.files[0]; if(!file) return;
+      if(!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>12*1024*1024){ state.share.error='JPEG、PNG、WebP形式で12MB以下の写真を選んでください。'; render(); return; }
+      readFileAsDataUrl(file).then(function(data){ state.share.photoDataUrl=data; state.share.error=null; render(); }).catch(function(){ state.share.error='写真を読み込めませんでした。'; render(); });
+      return;
+    }
     if(e.target.id==='profile-photo-input'){
       const file=e.target.files&&e.target.files[0]; if(!file) return;
       state.profilePhotoState={busy:true,error:null,draft:null}; render();
@@ -5576,6 +5789,30 @@
     if(e.target.id!=='gen-form') return;
     e.preventDefault();
     const f = e.target;
+    const purpose=f.purpose ? f.purpose.value : 'race';
+    if(purpose!=='race'){
+      const startDate=f.startDate && f.startDate.value;
+      if(!startDate){ state.formError={startDate:'開始日を入力してください'}; render(); return; }
+      const profile=state.profile||{};
+      const questType=purpose==='fitness'?'fitness_weight':(f.beginnerGoal ? f.beginnerGoal.value : 'first_5k');
+      const plan=generateBeginnerPlan({
+        questType:questType,
+        startDate:startDate,
+        weeks:purpose==='fitness'?8:(questType==='first_10k'?10:8),
+        sessionMinutes:f.fitnessMinutes ? Number(f.fitnessMinutes.value) : null,
+        availableWeekdays:(profile.availableWeekdays&&profile.availableWeekdays.length?profile.availableWeekdays:['1','3','6'])
+      });
+      plan.meta.plan_goal_type=purpose==='fitness'?'fitness_weight':'beginner';
+      plan.meta.goal_type=plan.meta.plan_goal_type;
+      plan.meta.fitnessMinutes=f.fitnessMinutes ? Number(f.fitnessMinutes.value) : null;
+      Store.savePlan(plan).then(function(){
+        state.plans.push(plan); state.currentId=plan.id; state.profile.activePlanId=plan.id;
+        Store.setProfile(state.profile);
+        state.completed={}; state.logs={}; state.mode='view'; state.formError={};
+        render();
+      });
+      return;
+    }
     const data = {
       name: f.name.value.trim() || '新しいレース',
       distanceKm: parseFloat(f.distance.value),
@@ -5629,6 +5866,8 @@
       forceRecoveryWeeks: forceRecoveryWeeks,
       raceCatalog: state.raceSelection ? {provider:'LocalRaceCatalogProvider',race_series_id:state.raceSelection,race_edition_id:null,source_status:'master_verified'} : {provider:'user_submitted',source_status:'user_submitted',name:data.name,prefecture:data.racePrefecture||null,city:data.raceCity||null,official_url:data.raceUrl||null}
     });
+    plan.meta.plan_goal_type='race';
+    plan.meta.goal_type='race';
 
     if(!state.raceSelection){
       const submitted=(profile.raceCatalogSubmissions||[]);
@@ -5652,6 +5891,7 @@
       state.formError = {};
       state.raceSelection = null;
       state.raceManualOpen = false;
+      state.createPurpose = 'race';
       render();
       recomputeAndSaveForecast(plan).then(function(){ render(); });
     });
