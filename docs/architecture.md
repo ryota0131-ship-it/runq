@@ -226,9 +226,11 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 - レースなしプランは`generateBeginnerPlan()`で決定論的に生成する。開始日以前のメニューは作らず、週表示は月曜から日曜までとする。AI CoachやRace Forecastに基礎数値の生成を委ねない。
 - 旧デモプランは`id: aqualine-2026`かつ`meta.source: seed`に一致するものだけを起動時に削除する。ユーザー作成のプランや練習記録を一括削除しない。
 
-### 5.2 ネイティブ起動画面
+### 5.2 ネイティブ起動画面・Androidプロジェクト
 
 iOSは`LaunchScreen.storyboard`でRUNQ.名とタグラインを表示する。起動画面はOSが表示する静的な画面であり、HealthKitや保存済みプロフィールにはアクセスしない。起動後の初回判定・ウォークスルーはWebView側で共通に処理するため、iOS/Android/Webでデータの扱いは共通である。
+
+Androidは`android/`のCapacitorプロジェクトで、Application IDは`com.astome.runq`。`npm run build && npx cap sync android && npx cap open android`でAndroid Studioへ同期・起動する。Health Connect SDKの下限に合わせ、`minSdkVersion`は26（Android 8）とするが、Health Connect連携はAndroid 9以降を対象とする。Android 9〜13では端末側にHealth Connectアプリが必要なため、利用可否をプラグインの`isAvailable()`で確認してから権限画面を開く。`app/privacypolicy.html`はビルド時に`dist/`へコピーされ、Capacitor同期後はHealth Connectの権限説明画面からも同じ内容を表示する。
 
 ### 5.3 Activity Import(HealthKit / Health Connect / Garmin / Strava)の基盤
 
@@ -240,10 +242,10 @@ iOSは`LaunchScreen.storyboard`でRUNQ.名とタグラインを表示する。�
 - 利用者が候補を統合したときは、取得元参照、メモ、画像由来情報、フィードバック、予定への紐付けを残す。既存記録は起動時に候補だけを付与し、自動削除・表示だけの非表示は行わない。
 - `matchWorkoutToPlan(workout)`が同日予定を単純に探し、`plan_id`・`scheduled_item_ref`・`completion_status:'matched'`を保存する。高度なAI判定は行わない。
 - 認証未導入のため`user_id`はプロフィール内の端末ローカルID(`workoutUserId`)を使う。将来認証を導入する際は、既存の共通Workoutを保持したままAuthのIDへ移行する。
-- マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。
+- マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。接続済み、権限不足、利用不可、同期中、成功・失敗を`profile.healthConnections`の接続状態として表示し、失敗時は設定画面への再試行導線を出す。
 - マイページの振り返り表示・月別履歴・ワークアウト詳細は、追加の保存先を作らず`workouts/main.entries[]`を読み取り専用で集計する。予定との関係は、共通Workoutの`plan_id`と`scheduled_item_date`から既存プランのメニューを参照する。距離差は予定説明文に明示された距離がある場合だけ表示し、推測で評価しない。
-- `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、Running Workoutのみを過去90日分ページング取得する。iOSではHealthKit、AndroidではHealth Connectを同じAdapterで扱う。
-- 初回連携・手動同期では、ワークアウト・心拍・距離・消費カロリーの読み取り権限を要求する。心拍は各Workoutの時間範囲でサンプルを読み、平均・最大を決定論的に算出する。GPSルート・ケイデンス・標高・心拍ゾーンは未取得。
+- `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、ランニング・ウォーキングのWorkoutを同じAdapterで取り込む。初回だけ最大90日をページング取得し、成功後は前回成功時刻から10分を重ねた増分同期に切り替える。重なった取得分は外部IDとfingerprintの`upsertWorkout()`で照合するため、連打・遅延書き込み・アプリ起動時の再同期でも増殖しない。iOSではHealthKit、AndroidではHealth Connectを同じ正規化モデルで扱う。
+- 初回連携・手動同期では、ワークアウト・心拍・距離・消費カロリーの読み取り権限だけを要求する。Android Manifestでも不要な健康種別と全書き込み権限を除外する。心拍は各Workoutの時間範囲でサンプルを読み、平均・最大を決定論的に算出する。GPSルート・ケイデンス・標高・心拍ゾーンは未取得。
 - 自動登録ON時、同日の予定メニューに一致したWorkoutだけを既存の予定日別ログと完了状態にも反映する。ユーザーが手動／スクショで保存済みのログは端末連携で上書きしない。予定の完了チェックだけではCommon Workoutを作らず、実際のWorkoutへの紐付けだけを行う。
 - 記録入力では画像解析は入力欄への反映まで、Health同期はCommon Workoutへの保存までを担う。同期済みWorkoutを選んで保存すると、既存Workoutへメモ・RPE・痛みを追記し、新しい走行記録は作らない。記録後のAIフィードバックは`metadata.feedback`にも保存する。
 - Web/VercelではネイティブAPIを呼べないため、連携操作は説明メッセージを表示して他の機能を継続できる。

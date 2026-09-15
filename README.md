@@ -61,6 +61,28 @@ npm run build
 
 `app/runq.html`(Claude Artifactへ公開する形式そのままの断片)を、標準的なHTMLドキュメント(`<!doctype>`/`<html>`/`<head>`/`<body>`)でラップして`dist/index.html`を生成するだけの処理です(`scripts/build.js`、依存パッケージなし)。アプリのロジック・スタイル・マークアップ自体は一切変更しません。
 
+## Androidアプリ（Health Connect対応）
+
+Android版はCapacitorでiOS版と同じWebコードを使います。Application IDはiOSのBundle IDとそろえた`com.astome.runq`です。
+
+友人のAndroid端末で試す最短手順は次のとおりです。
+
+```bash
+npm install
+npm run build
+npx cap sync android
+npx cap open android
+```
+
+Android Studioで開いたら、端末を接続して実行するか、**Build > Build APK(s)** でデバッグAPKを作成します。APKは通常`android/app/build/outputs/apk/debug/app-debug.apk`に生成されます。端末への配布・インストールは、テスト端末の所有者が許可した方法で行ってください。
+
+- 必要環境: Android Studio、Android SDK、JDK 21、Android 8（API 26）以降の実機またはエミュレーター。Health Connect連携自体はAndroid 9以降で利用できます。
+- Health ConnectはAndroid 14以降ではOSに含まれます。Android 9〜13では、対応するHealth Connectアプリを端末に入れて更新してください。
+- RUNQ.では「マイページ > ヘルスデータ連携 > Health Connect」から連携します。初回は最大90日を確認し、以後は前回成功時刻以降を短く重ねて照合します。同じ外部記録は外部IDと指紋照合により増えません。
+- 読み取るのはランニング・ウォーキングの運動セッション、距離、活動カロリー、心拍だけです。Health Connectへ書き込みは行いません。権限はいつでも端末設定またはHealth Connectから変更できます。
+
+Android Studioでビルドできない場合は、まずJDK 21が選択されているか（Settings > Build Tools > Gradle）、Android SDKが導入済みかを確認してください。Webブラウザ版ではHealth Connect連携は使えません。
+
 ## テスト
 
 ```bash
@@ -76,7 +98,8 @@ npm run build && npm run test:e2e   # ブラウザ(Playwright)でのE2Eテスト
 ```
 runq/
 ├─ app/
-│  └─ runq.html        # アプリ本体(Claude Artifact公開用の断片形式のまま管理。ここが正本)
+│  ├─ runq.html        # アプリ本体(Claude Artifact公開用の断片形式のまま管理。ここが正本)
+│  └─ privacypolicy.html # Health Connectの権限説明にも使うプライバシー表示
 ├─ api/
 │  └─ coach.js          # AI Coach用サーバーエンドポイント(Vercel Serverless Function。OpenAI API呼び出し)
 │  └─ run-extract.js    # スクリーンショット解析用エンドポイント(画像は保存しない)
@@ -92,6 +115,8 @@ runq/
 ├─ AGENTS.md            # AI開発エージェント(Claude Code / Codex 共通)向けルール
 ├─ CLAUDE.md            # → AGENTS.mdを参照する薄いポインタ
 ├─ package.json
+├─ android/             # Capacitor Androidプロジェクト（Android Studioで開く）
+├─ ios/                 # Capacitor iOSプロジェクト（Xcodeで開く）
 ├─ .env.example
 ├─ .gitignore
 └─ README.md

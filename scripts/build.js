@@ -26,6 +26,8 @@ const ASSET_SRC = path.join(ROOT, 'app', 'assets');
 const ASSET_OUT = path.join(OUT_DIR, 'assets');
 const RACE_CATALOG_SRC = path.join(ROOT, 'app', 'race-catalog.generated.js');
 const RACE_CATALOG_OUT = path.join(OUT_DIR, 'race-catalog.generated.js');
+const PRIVACY_POLICY_SRC = path.join(ROOT, 'app', 'privacypolicy.html');
+const PRIVACY_POLICY_OUT = path.join(OUT_DIR, 'privacypolicy.html');
 
 const fragment = fs.readFileSync(SRC, 'utf8');
 
@@ -64,5 +66,8 @@ if (fs.existsSync(ASSET_SRC)) {
   fs.cpSync(ASSET_SRC, ASSET_OUT, { recursive: true });
 }
 if (fs.existsSync(RACE_CATALOG_SRC)) fs.copyFileSync(RACE_CATALOG_SRC, RACE_CATALOG_OUT);
+// Health Connect の権限説明画面からも開けるプライバシー説明。Capacitor sync 時に
+// Android の assets/public へコピーされるため、Web とネイティブで同じ内容を使える。
+if (fs.existsSync(PRIVACY_POLICY_SRC)) fs.copyFileSync(PRIVACY_POLICY_SRC, PRIVACY_POLICY_OUT);
 
 console.log(`built ${path.relative(ROOT, OUT_FILE)} (${wrapped.length} bytes) from ${path.relative(ROOT, SRC)}`);
