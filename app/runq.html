@@ -31,31 +31,28 @@
   /* Capacitor実機だけはステータスバー領域まで描画されるため、その分をヘッダーに含める。
      アプリ内ブラウザは既に親アプリが安全領域を確保するため、二重に足さない。 */
   :root[data-runq-native="true"]{ --runq-safe-top:env(safe-area-inset-top, 0px); }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg:#0b1220;
-      --surface:#111a2e;
-      --surface-2:#182544;
-      --border:#28365a;
-      --text:#eaf1ff;
-      --text-muted:#9fb0cc;
-      --text-faint:#93a4c0;
-      --accent:#4d8dff;
-      --accent-soft:#16233f;
-      --accent-strong:#8fbbff;
-      --mp:#f87171;
-      --mp-soft:#3b1518;
-      --easy:#4ade80;
-      --easy-soft:#123321;
-      --rest:#6b7c99;
-      --warn:#fbbf24;
-      --warn-soft:#3a2a0c;
-      --shadow:rgba(0,0,0,0.45);
-      --focus:#4d8dff;
-      --logo-chip:#ffffff;
-    }
+  /* 背景テーマは端末設定ではなく、RUNQ.内で保存した選択だけを使う。 */
+  :root[data-theme="snow"]{
+    --bg:#f8fafc; --surface:#ffffff; --surface-2:#f1f5f9; --border:#e5eaf0;
+    --text:#202938; --text-muted:#6d7888; --text-faint:#778396; --accent-soft:#eef5ff; --accent-strong:#0b1f3b; --shadow:rgba(11,31,59,.05);
   }
-  :root[data-theme="dark"]{
+  :root[data-theme="ice"]{
+    --bg:#eef7fb; --surface:#ffffff; --surface-2:#e2f2fb; --border:#d5e6ef;
+    --text:#173246; --text-muted:#638092; --text-faint:#6f8a9b; --accent-soft:#e0f0ff; --accent-strong:#0b3451; --shadow:rgba(15,65,91,.06);
+  }
+  :root[data-theme="mint"]{
+    --bg:#f0f8f5; --surface:#ffffff; --surface-2:#e4f3ec; --border:#d8e9e0;
+    --text:#19332b; --text-muted:#627c72; --text-faint:#70887f; --accent-soft:#e4f1ff; --accent-strong:#12372b; --shadow:rgba(20,75,54,.06);
+  }
+  :root[data-theme="sand"]{
+    --bg:#faf6ef; --surface:#fffdf9; --surface-2:#f5eddf; --border:#e9dfd0;
+    --text:#382f25; --text-muted:#7f7366; --text-faint:#8c8073; --accent-soft:#edf4ff; --accent-strong:#2a2118; --shadow:rgba(83,60,34,.06);
+  }
+  :root[data-theme="lavender"]{
+    --bg:#f7f3fb; --surface:#ffffff; --surface-2:#eee8f6; --border:#e3daf0;
+    --text:#302641; --text-muted:#786d8a; --text-faint:#867a98; --accent-soft:#ebf2ff; --accent-strong:#2b1f45; --shadow:rgba(65,45,95,.06);
+  }
+  :root[data-theme="night"]{
     --bg:#0b1220;
     --surface:#111a2e;
     --surface-2:#182544;
@@ -483,6 +480,9 @@
 
   /* ---------- my page ---------- */
   .mypage-grid{ display:flex; flex-direction:column; gap:18px; }
+  .mypage-main{ width:100%; }
+  .mypage-main > .mypage-grid{ gap:20px; }
+  .mypage-main .settings-section-title{ margin-top:4px; }
   .list-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-top:1px solid var(--border); }
   .list-row:first-of-type{ border-top:none; }
   .list-row .li-main{ font-size:13.5px; color:var(--text); }
@@ -527,6 +527,21 @@
   .mypage-menu-row:hover{ border-color:var(--accent); }
   .mypage-menu-row .li-main{ font-size:14px; font-weight:600; }
   .settings-section-title{ margin:4px 2px -8px; color:var(--text-faint); font-size:11px; font-weight:700; letter-spacing:.09em; }
+  .theme-choice-list{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }
+  .theme-choice{ min-width:0; display:flex; align-items:center; gap:9px; border:1px solid var(--border); border-radius:12px; padding:10px; background:var(--surface); color:var(--text); text-align:left; cursor:pointer; font:inherit; }
+  .theme-choice.selected{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); background:var(--accent-soft); }
+  .theme-preview{ display:flex; gap:3px; flex:0 0 auto; padding:4px; border-radius:999px; background:var(--theme-preview-bg); }
+  .theme-preview i{ width:12px; height:12px; border-radius:50%; background:var(--theme-preview-surface); border:1px solid var(--theme-preview-border); }
+  .theme-preview i:last-child{ background:var(--theme-preview-accent); border-color:var(--theme-preview-accent); }
+  .theme-choice-copy{ min-width:0; flex:1; font-size:13px; font-weight:700; }
+  .theme-choice-check{ color:var(--accent); font-weight:900; font-size:14px; }
+  .theme-choice[data-theme-choice="runq"]{ --theme-preview-bg:#f5f7fa; --theme-preview-surface:#fff; --theme-preview-border:#e2e8f0; --theme-preview-accent:#0066ff; }
+  .theme-choice[data-theme-choice="snow"]{ --theme-preview-bg:#f8fafc; --theme-preview-surface:#fff; --theme-preview-border:#e5eaf0; --theme-preview-accent:#0066ff; }
+  .theme-choice[data-theme-choice="ice"]{ --theme-preview-bg:#eef7fb; --theme-preview-surface:#fff; --theme-preview-border:#d5e6ef; --theme-preview-accent:#0066ff; }
+  .theme-choice[data-theme-choice="mint"]{ --theme-preview-bg:#f0f8f5; --theme-preview-surface:#fff; --theme-preview-border:#d8e9e0; --theme-preview-accent:#0066ff; }
+  .theme-choice[data-theme-choice="sand"]{ --theme-preview-bg:#faf6ef; --theme-preview-surface:#fffdf9; --theme-preview-border:#e9dfd0; --theme-preview-accent:#0066ff; }
+  .theme-choice[data-theme-choice="lavender"]{ --theme-preview-bg:#f7f3fb; --theme-preview-surface:#fff; --theme-preview-border:#e3daf0; --theme-preview-accent:#0066ff; }
+  .theme-choice[data-theme-choice="night"]{ --theme-preview-bg:#0b1220; --theme-preview-surface:#111a2e; --theme-preview-border:#28365a; --theme-preview-accent:#4d8dff; }
   .mypage-menu-leading{ display:flex; align-items:center; min-width:0; gap:12px; }
   .mypage-menu-copy{ min-width:0; }
   .mypage-menu-icon{ width:34px; height:34px; display:grid; place-items:center; flex:0 0 auto; color:var(--accent-strong); background:var(--accent-soft); border-radius:11px; }
@@ -620,6 +635,7 @@
     .monthly-stat{ padding:0 7px; }
     .monthly-stat .num{ font-size:18px; }
     .workout-row-values strong{ font-size:18px; }
+    .theme-choice-list{ grid-template-columns:1fr; }
   }
 
   .foot-note{ text-align:center; font-size:11.5px; color:var(--text-faint); padding-top:6px; }
@@ -1779,6 +1795,10 @@
   ============================================================ */
   let db = null;
   let sampleFn = null;
+  // 端末のライト／ダーク設定を参照せず、プロフィールに保存した背景テーマだけを適用する。
+  const BACKGROUND_THEMES = {
+    runq:'RUNQ.', snow:'Snow', ice:'Ice', mint:'Mint', sand:'Sand', lavender:'Lavender', night:'Night'
+  };
   const Store = {
     async listPlans(){
       if(db){
@@ -1887,7 +1907,7 @@
       try{ localStorage.setItem('paceplan.workouts', JSON.stringify(entries)); }catch(e){}
     },
     async getProfile(){
-      const empty = { name:null, profilePhoto:null, coachPersona:'companion', activePlanId:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, onboarding:{version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
+      const empty = { name:null, profilePhoto:null, coachPersona:'companion', backgroundTheme:'runq', activePlanId:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, onboarding:{version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
       const withDefaults = function(raw){
         const profile = Object.assign({}, empty, raw||{});
         const connections = (raw&&raw.healthConnections)||{};
@@ -1898,6 +1918,7 @@
         };
         profile.onboarding = Object.assign({version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, (raw&&raw.onboarding)||{});
         profile.displayPreferences = Object.assign({largeText:false,highContrast:false,simple:false}, (raw&&raw.displayPreferences)||{});
+        profile.backgroundTheme = BACKGROUND_THEMES[profile.backgroundTheme] ? profile.backgroundTheme : 'runq';
         return profile;
       };
       if(db){
@@ -1942,7 +1963,7 @@
     logProposal: null,
     deleteModal: null,
     workoutMergeModal: null,
-    profile: { name:null, profilePhoto:null, coachPersona:'companion', injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} },
+    profile: { name:null, profilePhoto:null, coachPersona:'companion', backgroundTheme:'runq', injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} },
     shoeMileage: {},
     runnerStats: { longestRunKm: null },
     profileFormError: {},
@@ -2132,6 +2153,8 @@
   function render(){
     const app = document.getElementById('app');
     const prefs=(state.profile&&state.profile.displayPreferences)||{};
+    const theme=BACKGROUND_THEMES[(state.profile&&state.profile.backgroundTheme)||'runq'] ? state.profile.backgroundTheme : 'runq';
+    document.documentElement.dataset.theme=theme;
     document.documentElement.dataset.runqLarge=String(!!prefs.largeText);
     document.documentElement.dataset.runqContrast=String(!!prefs.highContrast);
     document.documentElement.dataset.runqSimple=String(!!prefs.simple);
@@ -2914,7 +2937,7 @@
   }
   function mypageMainHTML(){
     const workouts=allWorkouts();
-    let html = '<div class="form-card">';
+    let html = '<div class="mypage-main">';
     html += mypageToastHTML();
     html += '<div class="mypage-grid">';
     html += currentGoalCardHTML();
@@ -3247,9 +3270,14 @@
   // SETTINGS 画面(最小プレースホルダ。新機能は追加せず、マイページ構成上の項目としてのみ設置)
   function settingsScreenHTML(){
     const p=(state.profile&&state.profile.displayPreferences)||{};
+    const selected=BACKGROUND_THEMES[(state.profile&&state.profile.backgroundTheme)||'runq'] ? state.profile.backgroundTheme : 'runq';
+    const themes=Object.keys(BACKGROUND_THEMES).map(function(key){
+      const isSelected=key===selected;
+      return '<button type="button" class="theme-choice'+(isSelected?' selected':'')+'" data-action="select-background-theme" data-theme-choice="'+key+'" aria-pressed="'+(isSelected?'true':'false')+'"><span class="theme-preview" aria-hidden="true"><i></i><i></i><i></i></span><span class="theme-choice-copy">'+BACKGROUND_THEMES[key]+'</span><span class="theme-choice-check">'+(isSelected?'✓':'')+'</span></button>';
+    }).join('');
     let html = '<div class="form-card">';
     html += mypageBackHeaderHTML('見やすさ・その他の設定');
-    html += '<div class="mypage-grid"><div class="info-card"><h3>見やすさ設定</h3><p class="li-sub">端末の文字サイズ・動きを減らす設定には、通常の画面でも対応します。</p><div class="preference-options"><label><input type="checkbox" data-action="display-preference" data-key="largeText" '+(p.largeText?'checked':'')+'> 大きな文字とボタン</label><label><input type="checkbox" data-action="display-preference" data-key="highContrast" '+(p.highContrast?'checked':'')+'> コントラストを強くする</label><label><input type="checkbox" data-action="display-preference" data-key="simple" '+(p.simple?'checked':'')+'> 情報をシンプルに表示</label></div></div></div>';
+    html += '<div class="mypage-grid"><div class="info-card"><h3>背景テーマ</h3><p class="li-sub">背景の雰囲気を選べます。端末の表示モードには連動しません。</p><div class="theme-choice-list">'+themes+'</div></div><div class="info-card"><h3>見やすさ設定</h3><p class="li-sub">端末の文字サイズ・動きを減らす設定には、通常の画面でも対応します。</p><div class="preference-options"><label><input type="checkbox" data-action="display-preference" data-key="largeText" '+(p.largeText?'checked':'')+'> 大きな文字とボタン</label><label><input type="checkbox" data-action="display-preference" data-key="highContrast" '+(p.highContrast?'checked':'')+'> コントラストを強くする</label><label><input type="checkbox" data-action="display-preference" data-key="simple" '+(p.simple?'checked':'')+'> 情報をシンプルに表示</label></div></div></div>';
     html += '</div>';
     return html;
   }
@@ -5265,6 +5293,14 @@
       state.profile.displayPreferences=Object.assign({largeText:false,highContrast:false,simple:false},state.profile.displayPreferences||{});
       state.profile.displayPreferences[btn.dataset.key]=btn.checked;
       Store.setProfile(state.profile); render();
+    } else if(action==='select-background-theme'){
+      const theme=btn.dataset.themeChoice;
+      if(!BACKGROUND_THEMES[theme]) return;
+      state.profile.backgroundTheme=theme;
+      // 保存完了を待たずに画面へ反映するため、選択中の色を見ながら決められる。
+      document.documentElement.dataset.theme=theme;
+      Store.setProfile(state.profile);
+      render();
     } else if(action==='tab'){
       state.mode = btn.dataset.tab;
       state.formError = {};

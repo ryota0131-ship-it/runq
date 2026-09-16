@@ -65,6 +65,7 @@ Runner Profile (profile/main)
  ├─ pbs[]                 … 自己ベスト(種目別、複数)
  ├─ shoes[]                … シューズ(id, name, brand, startDate, active, note)
  ├─ weeklyRunDays / availableWeekdays
+ ├─ backgroundTheme          … runq | snow | ice | mint | sand | lavender | night。端末設定とは連動しない
  ├─ longestRunManualKm          … 実績が無い場合の手動最長ロング走
  ├─ injuryNote / courseNote / constitutionNote / scheduleNote
  └─ 新規Quest作成時のプロフィール正本。既存のlongRunWeekday/courseNoteは
