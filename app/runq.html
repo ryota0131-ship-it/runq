@@ -107,11 +107,12 @@
   input, select{ font-family:inherit; }
 
   /* ---------- top bar ---------- */
-  .topbar{ position:fixed; top:0; left:0; right:0; z-index:40; display:flex; align-items:center; justify-content:space-between; gap:16px; height:calc(var(--app-header-height) + var(--runq-safe-top)); padding:calc(var(--runq-safe-top) + 10px) 16px 10px; background:var(--bg); border-bottom:1px solid color-mix(in srgb, var(--border) 65%, transparent); }
-  .brand{ display:flex; flex-direction:column; gap:2px; }
-  .brand-logo{ display:inline-flex; align-items:center; padding:6px 12px; border-radius:12px; background:var(--logo-chip); }
-  .brand-logo img{ display:block; height:26px; width:auto; }
-  .page-context{ margin:0; color:var(--text-muted); font-size:13px; font-weight:700; letter-spacing:.02em; }
+  .topbar{ position:fixed; top:0; left:0; right:0; z-index:40; display:flex; align-items:center; height:calc(var(--app-header-height) + var(--runq-safe-top)); padding:calc(var(--runq-safe-top) + 8px) 16px 8px; background:color-mix(in srgb,var(--bg) 94%,transparent); border-bottom:1px solid color-mix(in srgb, var(--border) 65%, transparent); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+  .topbar-main{ display:flex; align-items:center; gap:10px; min-width:0; width:100%; max-width:980px; margin:0 auto; }
+  .topbar-copy{ display:flex; flex-direction:column; justify-content:center; min-width:0; }
+  .topbar-kicker{ color:var(--accent); font-size:10px; font-weight:800; letter-spacing:.1em; line-height:1.2; }
+  .topbar-title{ margin:2px 0 0; color:var(--text); font-family:"Zen Kaku Gothic New",sans-serif; font-size:17px; font-weight:800; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .topbar .coach-mascot-small{ width:27px; height:31px; }
   .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .action-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.action-row .log-btn{margin:0}.detail-link{border:0;background:transparent;color:var(--accent);font:inherit;font-weight:700;padding:10px 4px;cursor:pointer;min-height:44px}
   .status-copy{font-size:14px;color:var(--text-muted);line-height:1.65}.week-card.collapsed .item-row{display:none}.week-card-toggle{border:0;background:transparent;padding:11px;min-width:44px;min-height:44px;color:var(--text-muted);cursor:pointer;font-size:14px}
@@ -281,7 +282,7 @@
      他のタブ(ホーム/プラン/マイページ)のレイアウトには一切影響しない。 */
   body.mode-coach{ padding:0; height:100dvh; overflow:hidden; }
   body.mode-coach .wrap{ height:100%; max-width:100%; margin:0; gap:0; }
-  body.mode-coach .topbar{ position:static; height:auto; flex:0 0 auto; padding:calc(16px + var(--runq-safe-top)) 16px 10px; }
+  body.mode-coach .topbar{ position:static; height:calc(var(--app-header-height) + var(--runq-safe-top)); flex:0 0 auto; padding:calc(var(--runq-safe-top) + 8px) 16px 8px; }
   body.mode-coach .bottom-nav{ position:static; flex:0 0 auto; box-shadow:none; }
   body.mode-coach .wrap > .info-card{ flex:1 1 auto; min-height:0; margin:0 16px; overflow:hidden; }
   body.mode-coach .coach-chat-card{
@@ -2167,7 +2168,8 @@
     else if(state.mode==='coach') body = coachTabHTML();
     else if(state.mode==='home') body = homeHTML();
     else body = planViewHTML(plan);
-    // 全タブに共通ヘッダーを置き、現在地を短い日本語ラベルで示す。
+    // アプリ内ではロゴを繰り返さず、画面ごとの現在地と次の行動につながる文脈を示す。
+    // ロゴは起動・オンボーディング・共有カード等のブランド接点に限定する。
     // 下部ナビゲーションは既存のまま維持するため、画面遷移や情報構造は変えない。
     app.innerHTML = (state.mode==='onboarding' ? '' : topbarHTML()) + body + (state.mode==='onboarding' ? '' : bottomNavHTML()) + modalHTML();
     if(state.share && state.share.open) requestAnimationFrame(renderShareCardPreview);
@@ -2182,11 +2184,32 @@
   }
 
   function topbarHTML(){
-    const titles = { home:'ホーム', view:'プラン', coach:'コーチ', profile:'マイページ', create:'新しい目標' };
-    return '<div class="topbar">'
-      + '<div class="brand"><span class="brand-logo"><img src="'+RUNQ_LOGO_SRC+'" alt="RUNQ. Run your quest."></span></div>'
-      + '<p class="sr-only">'+(titles[state.mode]||'RUNQ.')+'</p>'
-      + '</div>';
+    const plan=currentPlan(), profile=state.profile||{};
+    let kicker='', title='RUNQ.', leading='';
+    if(state.mode==='home'){
+      const hour=new Date().getHours();
+      const greeting=hour<11?'おはよう':hour<18?'こんにちは':'こんばんは';
+      kicker='TODAY';
+      title=profile.name ? greeting+'、'+profile.name+(String(profile.name).endsWith('さん')?'':'さん') : '今日も、次の一歩へ';
+    } else if(state.mode==='view'){
+      kicker='TRAINING PLAN';
+      title=plan&&plan.meta&&plan.meta.name ? plan.meta.name : 'トレーニングプラン';
+    } else if(state.mode==='coach'){
+      const persona=coachPersona();
+      kicker='一緒に考えます';
+      title=persona.label+' コーチ';
+      leading=coachMascotHTML(profile.coachPersona,'normal','small');
+    } else if(state.mode==='profile'){
+      kicker='MY RUNNING';
+      title='マイページ';
+    } else if(state.mode==='create'){
+      kicker='NEW QUEST';
+      title='新しい目標';
+    }
+    return '<header class="topbar"><div class="topbar-main">'+leading
+      + '<div class="topbar-copy">'+(kicker?'<span class="topbar-kicker">'+escapeHtml(kicker)+'</span>':'')
+      + '<h1 class="topbar-title">'+escapeHtml(title)+'</h1></div>'
+      + '<span class="sr-only">RUNQ. Run your quest.</span></div></header>';
   }
 
   function navIconHTML(name){
@@ -4012,9 +4035,7 @@
   ============================================================ */
   function coachChatHTML(){
     const a = state.adjust, c = state.coach;
-    const persona=coachPersona();
     let html = '<div class="info-card adjust-card coach-chat-card">';
-    html += '<div class="coach-chat-heading">'+coachMascotHTML((state.profile||{}).coachPersona,'normal','small')+'<div><div class="li-sub">'+escapeHtml(persona.label)+' コーチが一緒に考えます</div><div class="lede">プラン、実績、体調について相談できます。</div></div></div>';
     if(a.context) html += '<div class="todays-point"><span class="tp-label">相談中のメニュー <button type="button" class="workout-text-link" data-action="clear-coach-context">相談を終了</button></span><span class="tp-text">'+escapeHtml(a.context)+'</span></div>';
 
     html += '<div class="chat-thread" id="coach-thread">';
