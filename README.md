@@ -83,6 +83,18 @@ Android Studioで開いたら、端末を接続して実行するか、**Build >
 
 Android Studioでビルドできない場合は、まずJDK 21が選択されているか（Settings > Build Tools > Gradle）、Android SDKが導入済みかを確認してください。Webブラウザ版ではHealth Connect連携は使えません。
 
+## iOSアプリ（TestFlight / Xcode Cloud）
+
+iOS版はTestFlightへ切り替えると、MacとiPhoneをケーブル接続せずに更新できます。Xcode Cloudを設定すれば、`main`へのマージ後にWebビルドとCapacitor同期を行い、TestFlightへ自動配布できます。
+
+```bash
+npm run ios:sync          # WebをビルドしてiOSへ同期
+npm run ios:open          # 同期後にXcodeを開く
+npm run ios:release       # 手動配布用にビルド番号を増やして同期
+```
+
+初回のSigning、App Store Connect、TestFlight、Xcode Cloudの設定は[配布手順](./docs/testflight-xcode-cloud.md)を参照してください。
+
 ## テスト
 
 ```bash
