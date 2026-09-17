@@ -416,7 +416,10 @@ async function main() {
         const health = {
           isAvailable: async () => ({ available: true, platform: 'ios' }),
           requestAuthorization: async () => ({ readAuthorized: ['workouts', 'heartRate', 'distance', 'calories'], readDenied: [], writeAuthorized: [], writeDenied: [] }),
-          queryWorkouts: async () => ({ workouts: [{ workoutType: 'running', duration: 3000, totalDistance: 8240, totalEnergyBurned: 510, startDate: start, endDate: end, sourceName: 'Apple Watch', platformId: 'healthkit-e2e-1' }] }),
+          queryWorkouts: async () => ({ workouts: [
+            { workoutType: 'running', duration: 3000, totalDistance: 8240, totalEnergyBurned: 510, startDate: start, endDate: end, sourceName: 'Apple Watch', platformId: 'healthkit-e2e-1' },
+            { workoutType: 'walking', duration: 2400, totalDistance: 3000, totalEnergyBurned: 180, startDate: start, endDate: end, sourceName: 'Apple Watch', platformId: 'healthkit-e2e-walk-1' },
+          ] }),
           readSamples: async () => ({ samples: [{ value: 145 }, { value: 155 }, { value: 150 }] }),
         };
         window.Capacitor = { isNativePlatform: () => true, registerPlugin: () => health, Plugins: { Health: health } };
@@ -433,6 +436,7 @@ async function main() {
         profile: JSON.parse(localStorage.getItem('paceplan.profile') || '{}'),
       }));
       check('[HealthKit] Running Workoutを共通Workoutとして保存する', healthData.workouts.length === 1 && healthData.workouts[0].source === 'apple_health' && healthData.workouts[0].distance_meters === 8240 && healthData.workouts[0].average_heart_rate === 150 && healthData.workouts[0].max_heart_rate === 155);
+      check('[HealthKit] Walking Workoutは取り込まない', !healthData.workouts.some((workout) => workout.source_workout_id === 'healthkit-e2e-walk-1'));
       check('[HealthKit] 同日の予定メニューへ自動反映する', healthData.logs[today] && healthData.logs[today].source === 'apple_health' && healthData.progress['w0-0'] === true);
       check('[HealthKit] 連携状態と最終同期日時を保存する', healthData.profile.healthConnections.appleHealth.enabled === true && !!healthData.profile.healthConnections.appleHealth.lastSyncedAt);
       await page.locator('[data-action="health-sync"][data-platform="appleHealth"]').click();
@@ -453,6 +457,24 @@ async function main() {
       check('[マイページ] すべての記録画面へ遷移できる', (await page.locator('.form-card').innerText()).includes('これまでの記録'));
       await page.locator('[data-action="open-workout-detail"]').first().click();
       check('[マイページ] ワークアウト詳細に実績と予定の関係を表示する', (await page.locator('.form-card').innerText()).includes('ワークアウト詳細') && (await page.locator('.form-card').innerText()).includes('予定：イージー'));
+      await page.locator('[data-action="request-workout-delete"]').click();
+      check('[削除] 確認ダイアログを表示する', (await page.locator('.modal-card').innerText()).includes('このワークアウトを削除しますか？'));
+      await page.locator('[data-action="confirm-workout-delete"]').click();
+      await page.waitForTimeout(300);
+      let deletedHealthData = await page.evaluate(() => ({
+        workouts: JSON.parse(localStorage.getItem('paceplan.workouts') || '[]'),
+        logs: JSON.parse(localStorage.getItem('paceplan.logs.aqualine-2026') || '{}'),
+        progress: JSON.parse(localStorage.getItem('paceplan.progress.aqualine-2026') || '{}'),
+        profile: JSON.parse(localStorage.getItem('paceplan.profile') || '{}'),
+      }));
+      check('[削除] Workout・予定日別ログ・完了状態を集計から除外する', deletedHealthData.workouts.length === 0 && !deletedHealthData.logs[today] && !deletedHealthData.progress['w0-0']);
+      check('[削除] 外部IDを削除済みとして保存する', (deletedHealthData.profile.deletedWorkoutRefs || []).some((ref) => ref.source === 'apple_health' && ref.source_workout_id === 'healthkit-e2e-1'));
+      await page.locator('[data-action="mypage-nav"][data-view="main"]').click();
+      await page.locator('[data-action="mypage-nav"][data-view="data-connections"]').click();
+      await page.locator('[data-action="health-sync"][data-platform="appleHealth"]').click();
+      await page.waitForTimeout(300);
+      deletedHealthData = await page.evaluate(() => ({ workouts: JSON.parse(localStorage.getItem('paceplan.workouts') || '[]') }));
+      check('[削除] 同じHealthKit記録は再同期しても復活しない', deletedHealthData.workouts.length === 0);
       await context.close();
     }
 

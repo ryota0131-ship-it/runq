@@ -102,6 +102,8 @@ Common Workout (workouts/main.entries[])
  └─ metadata { note, rpe, pain, feedback, image_import }
     … 取り込み元横断の正規化・重複防止・将来の同期用として保存する。
 
+Runner Profileの`deletedWorkoutRefs[]`には、利用者がRUNQ.上で削除した同期由来Workoutの`source`・`source_workout_id`・`deleted_at`を最大2,000件保持する。Health側の元データは変更せず、再同期時はこの外部IDを`upsertWorkout()`の前段で除外する。
+
 Race Forecast (forecast/{planId})
  └─ history: [{ predictedSec, predictedMinSec, predictedMaxSec,
                recommendedGoalSec, challengeGoalSec, safeGoalSec,
@@ -245,7 +247,7 @@ Androidは`android/`のCapacitorプロジェクトで、Application IDは`com.as
 - 認証未導入のため`user_id`はプロフィール内の端末ローカルID(`workoutUserId`)を使う。将来認証を導入する際は、既存の共通Workoutを保持したままAuthのIDへ移行する。
 - マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。接続済み、権限不足、利用不可、同期中、成功・失敗を`profile.healthConnections`の接続状態として表示し、失敗時は設定画面への再試行導線を出す。
 - マイページの振り返り表示・月別履歴・ワークアウト詳細は、追加の保存先を作らず`workouts/main.entries[]`を読み取り専用で集計する。予定との関係は、共通Workoutの`plan_id`と`scheduled_item_date`から既存プランのメニューを参照する。距離差は予定説明文に明示された距離がある場合だけ表示し、推測で評価しない。
-- `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、ランニング・ウォーキングのWorkoutを同じAdapterで取り込む。初回だけ最大90日をページング取得し、成功後は前回成功時刻から10分を重ねた増分同期に切り替える。重なった取得分は外部IDとfingerprintの`upsertWorkout()`で照合するため、連打・遅延書き込み・アプリ起動時の再同期でも増殖しない。iOSではHealthKit、AndroidではHealth Connectを同じ正規化モデルで扱う。
+- `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、ランニングWorkoutだけを取り込む。ウォーキング・ハイキング等はRUNQ.の実績・集計へ含めない。初回だけ最大90日をページング取得し、成功後は前回成功時刻から10分を重ねた増分同期に切り替える。重なった取得分は外部IDとfingerprintの`upsertWorkout()`で照合するため、連打・遅延書き込み・アプリ起動時の再同期でも増殖しない。利用者が削除した同期記録は`profile.deletedWorkoutRefs[]`で外部IDを保持し、再同期でも復活させない。iOSではHealthKit、AndroidではHealth Connectを同じ正規化モデルで扱う。
 - 初回連携・手動同期では、ワークアウト・心拍・距離・消費カロリーの読み取り権限だけを要求する。Android Manifestでも不要な健康種別と全書き込み権限を除外する。心拍は各Workoutの時間範囲でサンプルを読み、平均・最大を決定論的に算出する。GPSルート・ケイデンス・標高・心拍ゾーンは未取得。
 - 自動登録ON時、同日の予定メニューに一致したWorkoutだけを既存の予定日別ログと完了状態にも反映する。ユーザーが手動／スクショで保存済みのログは端末連携で上書きしない。予定の完了チェックだけではCommon Workoutを作らず、実際のWorkoutへの紐付けだけを行う。
 - 記録入力では画像解析は入力欄への反映まで、Health同期はCommon Workoutへの保存までを担う。同期済みWorkoutを選んで保存すると、既存Workoutへメモ・RPE・痛みを追記し、新しい走行記録は作らない。記録後のAIフィードバックは`metadata.feedback`にも保存する。
