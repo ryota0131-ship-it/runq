@@ -18,8 +18,11 @@ assert.ok(fs.existsSync(path.join(root, 'app', 'privacypolicy.html')), 'privacy 
 assert.ok(build.includes('PRIVACY_POLICY_SRC'), 'privacy explanation is copied into the Capacitor web bundle');
 assert.ok(app.includes('HEALTH_INITIAL_LOOKBACK_DAYS=90'), 'initial sync window is limited to 90 days');
 assert.ok(app.includes('HEALTH_INCREMENTAL_OVERLAP_MS'), 'later syncs use a bounded overlap window');
-assert.ok(app.includes("for(const workoutType of ['running','walking'])"), 'running and walking are imported through the common path');
+assert.ok(app.includes("for(const workoutType of ['running'])"), 'only running workouts are queried');
+assert.ok(!app.includes("for(const workoutType of ['running','walking'])"), 'walking workouts are not imported');
 assert.ok(app.includes('source_workout_id'), 'external workout identity is preserved for upsert');
+assert.ok(app.includes('deletedWorkoutRefs'), 'deleted synced workout identities are preserved to prevent re-import');
+assert.ok(app.includes('request-workout-delete'), 'workout detail offers a confirmed delete action');
 assert.ok(app.includes('rememberHealthConnectionError'), 'connection errors are persisted for a retry UI');
 assert.ok(app.includes('health-open-settings'), 'Health Connect settings can be opened after an error');
 

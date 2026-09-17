@@ -1986,7 +1986,7 @@
       try{ localStorage.setItem('paceplan.workouts', JSON.stringify(entries)); }catch(e){}
     },
     async getProfile(){
-      const empty = { name:null, profilePhoto:null, coachPersona:'companion', backgroundTheme:'runq', activePlanId:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, onboarding:{version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
+      const empty = { name:null, profilePhoto:null, coachPersona:'companion', backgroundTheme:'runq', activePlanId:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, deletedWorkoutRefs:[], onboarding:{version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
       const withDefaults = function(raw){
         const profile = Object.assign({}, empty, raw||{});
         const connections = (raw&&raw.healthConnections)||{};
@@ -1996,6 +1996,7 @@
           healthConnect: Object.assign({enabled:false,lastSyncedAt:null}, connections.healthConnect||{})
         };
         profile.onboarding = Object.assign({version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, (raw&&raw.onboarding)||{});
+        profile.deletedWorkoutRefs = Array.isArray(raw&&raw.deletedWorkoutRefs) ? raw.deletedWorkoutRefs : [];
         profile.displayPreferences = Object.assign({largeText:false,highContrast:false,simple:false}, (raw&&raw.displayPreferences)||{});
         profile.backgroundTheme = BACKGROUND_THEMES[profile.backgroundTheme] ? profile.backgroundTheme : 'runq';
         return profile;
@@ -2042,7 +2043,8 @@
     logProposal: null,
     deleteModal: null,
     workoutMergeModal: null,
-    profile: { name:null, profilePhoto:null, coachPersona:'companion', backgroundTheme:'runq', injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} },
+    workoutDeleteModal: null,
+    profile: { name:null, profilePhoto:null, coachPersona:'companion', backgroundTheme:'runq', injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, deletedWorkoutRefs:[], healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} },
     shoeMileage: {},
     runnerStats: { longestRunKm: null },
     profileFormError: {},
@@ -2334,6 +2336,12 @@
       if(!primary||!duplicate) return '';
       return '<div class="modal-backdrop" data-action="cancel-workout-merge"><div class="modal-card" data-action="noop"><h3>同じランニングとして統合しますか？</h3><p>'+escapeHtml(workoutDateLabel(primary))+'の '+formatKm(Number(primary.distance_meters||0)/1000)+' / '+workoutDurationLabel(primary.duration_seconds)+' と、'+workoutSourceLabel(duplicate.source)+'の記録は、時間・距離・所要時間が近いため同じ可能性があります。</p><p>メモ、画像情報、コーチのフィードバック、プランとの紐づけは統合後の1件へ残します。元の2件には戻せません。</p><div class="modal-actions"><button type="button" class="btn-secondary" data-action="cancel-workout-merge">キャンセル</button><button type="button" class="btn-danger" data-action="confirm-workout-merge">統合する</button></div></div></div>';
     }
+    if(state.workoutDeleteModal){
+      const workout=(state.workouts||[]).find(function(w){return w.id===state.workoutDeleteModal;});
+      if(!workout) return '';
+      const synced=['apple_health','health_connect','strava','garmin'].indexOf(workout.source)>=0 || (workout.source_refs||[]).some(function(ref){return ['apple_health','health_connect','strava','garmin'].indexOf(ref.source)>=0;});
+      return '<div class="modal-backdrop" data-action="cancel-workout-delete"><div class="modal-card" data-action="noop"><h3>このワークアウトを削除しますか？</h3><p>'+escapeHtml(workoutDateLabel(workout))+'の '+formatKm(Number(workout.distance_meters||0)/1000)+' をRUNQ.から削除します。集計や予定メニューへの反映からも除外されます。'+(synced?'Appleヘルスケア／Health Connect側の元データは削除せず、次回同期でもRUNQ.へ再登録しません。':'この操作は元に戻せません。')+'</p><div class="modal-actions"><button type="button" class="btn-secondary" data-action="cancel-workout-delete">キャンセル</button><button type="button" class="btn-danger" data-action="confirm-workout-delete" data-id="'+escapeHtml(workout.id)+'">削除する</button></div></div></div>';
+    }
     if(!state.deleteModal) return '';
     const p = state.plans.find(pl=>pl.id===state.deleteModal);
     const name = p ? p.meta.name : 'このプラン';
@@ -2494,6 +2502,19 @@
     const refs=(workout.source_refs||[]).concat(workout.source_workout_id?[{source:workout.source,source_workout_id:workout.source_workout_id}]:[]);
     return refs.map(function(ref){ return workoutRefKey(ref.source,ref.source_workout_id); }).filter(Boolean);
   }
+  const SYNCED_WORKOUT_SOURCES = ['apple_health','health_connect','strava','garmin'];
+  function deletedWorkoutRefKeys(){
+    return new Set(((state.profile&&state.profile.deletedWorkoutRefs)||[]).map(function(ref){ return workoutRefKey(ref.source,ref.source_workout_id); }).filter(Boolean));
+  }
+  function syncedWorkoutRefs(workout){
+    const refs=(workout.source_refs||[]).concat(workout.source_workout_id?[{source:workout.source,source_workout_id:workout.source_workout_id}]:[]), seen={};
+    return refs.filter(function(ref){
+      const key=workoutRefKey(ref.source,ref.source_workout_id);
+      if(!key || seen[key] || SYNCED_WORKOUT_SOURCES.indexOf(ref.source)<0) return false;
+      seen[key]=true;
+      return true;
+    });
+  }
   function hasSharedExternalRef(a,b){
     const keys=new Set(workoutRefKeys(a));
     return workoutRefKeys(b).some(function(key){ return keys.has(key); });
@@ -2560,6 +2581,11 @@
     const resultPromise=new Promise(function(resolve){ resolveResult=resolve; });
     workoutWriteQueue=workoutWriteQueue.catch(function(){}).then(async function(){
       const next=matchWorkoutToPlan(normalizeWorkout(raw));
+      const deletedRefs=deletedWorkoutRefKeys();
+      if(workoutRefKeys(next).some(function(key){return deletedRefs.has(key);})){
+        resolveResult(Object.assign({},next,{_upsert:{created:false,merged:false,possible:[],skippedDeleted:true}}));
+        return;
+      }
       const entries=Array.isArray(state.workouts)?state.workouts.slice():[];
       let confidentIndex=-1, possible=[];
       entries.forEach(function(entry,index){ const kind=workoutMatchKind(entry,next); if((kind==='exact'||kind==='confident')&&confidentIndex<0) confidentIndex=index; else if(kind==='possible') possible.push(entry.id); });
@@ -2590,6 +2616,46 @@
     Object.keys(logEntries).forEach(function(date){ if(logEntries[date]&&logEntries[date].workoutId===duplicateId){ logEntries[date]=Object.assign({},logEntries[date],{workoutId:merged.id}); logChanged=true; } });
     if(logChanged && state.currentId){ state.logs=logEntries; await Store.setLogs(state.currentId,logEntries); }
     return true;
+  }
+  async function deleteWorkout(workoutId){
+    let resolveResult;
+    const resultPromise=new Promise(function(resolve){resolveResult=resolve;});
+    workoutWriteQueue=workoutWriteQueue.catch(function(){}).then(async function(){
+      const workout=(state.workouts||[]).find(function(w){return w.id===workoutId;});
+      if(!workout){ resolveResult(false); return; }
+      const entries=(state.workouts||[]).filter(function(w){return w.id!==workoutId;}).map(function(w){
+        return Object.assign({},w,{duplicate_candidate_ids:(w.duplicate_candidate_ids||[]).filter(function(id){return id!==workoutId;})});
+      });
+      const refs=syncedWorkoutRefs(workout);
+      if(refs.length){
+        const previous=(state.profile.deletedWorkoutRefs||[]).slice(), known=new Set(previous.map(function(ref){return workoutRefKey(ref.source,ref.source_workout_id);}).filter(Boolean));
+        refs.forEach(function(ref){ const key=workoutRefKey(ref.source,ref.source_workout_id); if(!known.has(key)){previous.push({source:ref.source,source_workout_id:ref.source_workout_id,deleted_at:new Date().toISOString()});known.add(key);} });
+        state.profile.deletedWorkoutRefs=previous.slice(-2000);
+        // 再同期より先に削除済み外部IDを永続化し、削除直後の同期でも復活させない。
+        await Store.setProfile(state.profile);
+      }
+      state.workouts=entries;
+      await Store.setWorkouts(entries);
+      for(const plan of (state.plans||[])){
+        const logs=await Store.getLogs(plan.id), nextLogs=Object.assign({},logs), removedDates=[];
+        Object.keys(nextLogs).forEach(function(date){ if(nextLogs[date]&&nextLogs[date].workoutId===workoutId){delete nextLogs[date];removedDates.push(date);} });
+        if(removedDates.length){
+          await Store.setLogs(plan.id,nextLogs);
+          if(plan.id===state.currentId) state.logs=nextLogs;
+          const progress=await Store.getProgress(plan.id), nextProgress=Object.assign({},progress); let changed=false;
+          removedDates.forEach(function(date){
+            const found=findItemByDate(plan,date), hasReplacement=entries.some(function(w){return w.plan_id===plan.id&&w.scheduled_item_date===date;});
+            if(found&&!hasReplacement){ const key='w'+found.wi+'-'+found.ii; if(nextProgress[key]){delete nextProgress[key];changed=true;} }
+          });
+          if(changed){ await Store.setProgress(plan.id,nextProgress); if(plan.id===state.currentId) state.completed=nextProgress; }
+        }
+      }
+      resolveResult(true);
+    });
+    await workoutWriteQueue;
+    const deleted=await resultPromise;
+    if(deleted){ const activePlan=currentPlan(); if(activePlan) await recomputeAndSaveForecast(activePlan); }
+    return deleted;
   }
   function annotateExistingDuplicateCandidates(entries){
     const next=(entries||[]).map(function(w){return Object.assign({},w,{duplicate_candidate_ids:[]});});
@@ -2723,15 +2789,16 @@
     const previousSync=previous.lastSyncedAt ? new Date(previous.lastSyncedAt).getTime() : NaN;
     const startDate=new Date(Number.isFinite(previousSync) ? Math.max(0,previousSync-HEALTH_INCREMENTAL_OVERLAP_MS) : Date.now()-HEALTH_INITIAL_LOOKBACK_DAYS*86400000).toISOString();
     let imported = 0, matched = 0, merged = 0, possible = 0, pages = 0;
-    // AndroidのHealth Connectではランニングだけでなくウォーキングとして保存される記録もあるため、
-    // 同じ正規化・重複防止経路で取り込む。
-    for(const workoutType of ['running','walking']){
+    // RUNQ.の実績・集計・コーチ判断にはランニングだけを取り込む。
+    for(const workoutType of ['running']){
       let anchor=null;
       do {
         const result = await plugin.queryWorkouts({ workoutType:workoutType, startDate:startDate, endDate:endDate, limit:100, ascending:false, anchor:anchor||undefined });
         const workouts = result.workouts || [];
         for(const nativeWorkout of workouts){
+          if(nativeWorkout.workoutType && String(nativeWorkout.workoutType).toLowerCase()!=='running') continue;
           const saved = await upsertWorkout(await healthWorkoutToRunq(plugin, nativeWorkout, platform));
+          if(saved._upsert && saved._upsert.skippedDeleted) continue;
           if(saved._upsert && saved._upsert.created) imported++;
           if(saved._upsert && saved._upsert.merged) merged++;
           if(saved._upsert && saved._upsert.possible && saved._upsert.possible.length) possible++;
@@ -3078,7 +3145,7 @@
     const groups=Object.keys(grouped).sort().reverse();
     const buttons=[['month','今月'],['three-months','3か月'],['year','今年'],['all','全期間']].map(function(entry){ return '<button type="button" class="'+(state.workoutHistoryRange===entry[0]?'active':'')+'" data-action="workout-history-range" data-range="'+entry[0]+'">'+entry[1]+'</button>'; }).join('');
     let content=groups.length ? groups.map(function(key){ const rows=grouped[key], parts=key.split('-'); const stat={entries:rows,distanceMeters:rows.reduce(function(sum,w){return sum+Number(w.distance_meters||0);},0),durationSeconds:rows.reduce(function(sum,w){return sum+Number(w.duration_seconds||0);},0)}; return '<section class="history-month"><div class="history-month-head"><h3>'+Number(parts[0])+'年'+Number(parts[1])+'月</h3><span>'+monthStatsLabel(stat)+'</span></div>'+rows.map(workoutRowHTML).join('')+'</section>'; }).join('') : '<div class="workout-empty">この期間には走った記録がありません。</div>';
-    return '<div class="form-card">'+mypageBackHeaderHTML('これまでの記録')+'<div class="history-range">'+buttons+'</div>'+content+'</div>';
+    return '<div class="form-card">'+mypageBackHeaderHTML('これまでの記録')+mypageToastHTML()+'<div class="history-range">'+buttons+'</div>'+content+'</div>';
   }
   function workoutDetailHTML(){
     const workout=allWorkouts().find(function(w){ return w.id===state.workoutDetailId; });
@@ -3099,8 +3166,8 @@
     const reflectionHTML=reflectionRows.length?'<div class="workout-detail-plan"><div class="li-main">今回の振り返り</div><div class="workout-reflection-list">'+reflectionRows.map(function(row){ return '<div class="workout-reflection-row"><span class="label">'+escapeHtml(row[0])+'</span><span>'+escapeHtml(row[1])+'</span></div>'; }).join('')+'</div></div>':'';
     const updated=workout.updated_at||workout.created_at;
     const updatedHTML=updated?'<div class="workout-detail-updated">最終更新: '+escapeHtml(new Date(updated).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div>':'';
-    const shareButton='<div class="log-saved-actions"><button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェアする</button></div>';
-    return '<div class="form-card"><div class="mypage-subhead"><button type="button" class="mypage-back-btn" data-action="mypage-nav" data-view="workout-history">＜ これまでの記録</button><h2>ワークアウト詳細</h2></div><div class="workout-detail-hero"><div><div class="workout-detail-date">'+workoutDateLabel(workout)+'</div><div class="workout-detail-title">'+escapeHtml(info&&info.item?info.item.title:'ランニング')+'</div></div><div><div class="workout-detail-distance mono">'+formatKm(distance)+'</div><div class="workout-detail-source">'+escapeHtml(workoutSourceLabel(workout.source))+'</div></div></div><div class="workout-detail-grid">'+metrics.map(function(m){return '<div class="workout-detail-metric"><div class="label">'+m[0]+'</div><div class="value mono">'+m[1]+'</div></div>';}).join('')+'</div>'+planHTML+reflectionHTML+feedbackHTML+candidateHTML+shareButton+updatedHTML+'</div>';
+    const actions='<div class="log-saved-actions"><button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェアする</button><button type="button" class="btn-danger" data-action="request-workout-delete" data-id="'+escapeHtml(workout.id)+'">削除する</button></div>';
+    return '<div class="form-card"><div class="mypage-subhead"><button type="button" class="mypage-back-btn" data-action="mypage-nav" data-view="workout-history">＜ これまでの記録</button><h2>ワークアウト詳細</h2></div><div class="workout-detail-hero"><div><div class="workout-detail-date">'+workoutDateLabel(workout)+'</div><div class="workout-detail-title">'+escapeHtml(info&&info.item?info.item.title:'ランニング')+'</div></div><div><div class="workout-detail-distance mono">'+formatKm(distance)+'</div><div class="workout-detail-source">'+escapeHtml(workoutSourceLabel(workout.source))+'</div></div></div><div class="workout-detail-grid">'+metrics.map(function(m){return '<div class="workout-detail-metric"><div class="label">'+m[0]+'</div><div class="value mono">'+m[1]+'</div></div>';}).join('')+'</div>'+planHTML+reflectionHTML+feedbackHTML+candidateHTML+actions+updatedHTML+'</div>';
   }
 
   function dataConnectionsHTML(){
@@ -5658,6 +5725,22 @@
       const merge=state.workoutMergeModal;
       if(!merge) return;
       mergeExistingWorkouts(merge.primary,merge.duplicate).then(function(ok){ state.workoutMergeModal=null; if(ok) showMypageToast('2件の記録を1件に統合しました'); render(); });
+    } else if(action==='request-workout-delete'){
+      state.workoutDeleteModal=btn.dataset.id||null;
+      render();
+    } else if(action==='cancel-workout-delete'){
+      state.workoutDeleteModal=null;
+      render();
+    } else if(action==='confirm-workout-delete'){
+      const id=btn.dataset.id;
+      state.workoutDeleteModal=null;
+      deleteWorkout(id).then(function(deleted){
+        if(deleted){ state.workoutDetailId=null; state.mypageView='workout-history'; showMypageToast('ワークアウトを削除しました'); }
+        render();
+      }).catch(function(){
+        showMypageToast('ワークアウトを削除できませんでした。もう一度お試しください');
+        render();
+      });
     } else if(action==='confirm-delete-plan'){
       const id = btn.dataset.id;
       Store.deletePlan(id).then(()=>{
