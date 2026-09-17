@@ -7,7 +7,11 @@
     "build": "node scripts/build.js",
     "dev": "npm run build && node scripts/dev-server.js",
     "start": "npm run dev",
-    "test": "node test/coach.api.test.js && node test/run-extract.api.test.js && node test/race-catalog.test.js && node test/share-card.test.js && node test/android-health.test.js && node test/background-theme.test.js && node test/quest-experience.test.js",
+    "ios:sync": "npm run build && npx cap sync ios",
+    "ios:open": "npm run ios:sync && npx cap open ios",
+    "ios:build-number": "node scripts/bump-ios-build.js",
+    "ios:release": "node scripts/bump-ios-build.js && npm run ios:sync",
+    "test": "node test/coach.api.test.js && node test/run-extract.api.test.js && node test/race-catalog.test.js && node test/share-card.test.js && node test/android-health.test.js && node test/background-theme.test.js && node test/quest-experience.test.js && node test/ios-release.test.js",
     "test:coach-safety": "node test/coach-safety-conversation.test.js",
     "test:coach-thread": "node test/coach-user-thread.test.js",
     "test:e2e": "node test/e2e/run.js"
