@@ -317,24 +317,45 @@
   .week-card{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:18px 22px 8px; }
   .week-card.current{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
   .week-card.past{ opacity:0.68; }
-  .quest-journey{ padding:18px 20px; border:1px solid var(--border); border-radius:18px; background:var(--surface); overflow:hidden; }
-  .journey-heading{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:15px; }
-  .journey-heading h3{ margin-top:2px; font-size:18px; }
-  .journey-week{ color:var(--accent); font-size:12px; font-weight:800; white-space:nowrap; }
-  .journey-track{ display:flex; align-items:flex-start; min-width:560px; }
-  .journey-stage{ position:relative; flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--text-faint); text-align:center; }
-  .journey-stage:not(:last-child)::after{ content:""; position:absolute; top:10px; left:calc(50% + 12px); width:calc(100% - 24px); height:3px; border-radius:3px; background:var(--border); }
-  .journey-stage.done:not(:last-child)::after{ background:var(--easy); }
-  .journey-dot{ position:relative; z-index:1; width:22px; height:22px; border:4px solid var(--surface); border-radius:50%; background:var(--border); box-shadow:0 0 0 1px var(--border); }
-  .journey-stage.done .journey-dot{ background:var(--easy); box-shadow:0 0 0 1px var(--easy); }
-  .journey-stage.current .journey-dot{ background:var(--accent); box-shadow:0 0 0 4px var(--accent-soft); }
-  .journey-stage.current{ color:var(--accent-strong); }
-  .journey-stage-name{ max-width:96px; font-size:11px; font-weight:800; line-height:1.35; }
-  .journey-scroll{ overflow-x:auto; padding:4px 2px 3px; scrollbar-width:none; }
-  .journey-scroll::-webkit-scrollbar{ display:none; }
-  .journey-next{ display:flex; align-items:center; gap:10px; margin-top:15px; padding:11px 12px; border-radius:12px; background:var(--warn-soft); color:var(--text); }
-  .journey-next strong{ color:var(--warn); font-size:11px; white-space:nowrap; }
-  .journey-next span{ font-size:13px; font-weight:700; }
+  /* ---------- ROAD TO GOAL: 週単位の蛇行パス表示(planPathHTML) ----------
+     週タイムラインを、練習を消化するほど道を進んでいくパス表示にする改善(2026-09-18)。
+     以前の5段階抽象ステージ表示(journeyStageIndex/旧planJourneyHTML)は廃止した。
+     JSでの座標計算は行わず(render()が毎回innerHTMLを丸ごと再構築する既存アーキテクチャに
+     新しい描画後フックを増やさないため)、ノードの左右配置は純CSSのnth-childパターンのみで
+     実現し、中央の点線を背骨として奥行きを出す簡易ジグザグ版(v1)。 */
+  .quest-path{ padding:18px 14px 14px; border:1px solid var(--border); border-radius:18px; background:var(--surface); overflow:hidden; }
+  .quest-path-heading{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:4px; padding:0 6px; }
+  .quest-path-heading h3{ margin-top:2px; font-size:18px; }
+  .quest-path-week{ color:var(--accent); font-size:12px; font-weight:800; white-space:nowrap; }
+  .quest-path-track{ position:relative; padding:16px 4px 6px; }
+  .quest-path-track::before{ content:""; position:absolute; top:8px; bottom:8px; left:50%; width:2px; margin-left:-1px;
+    background:repeating-linear-gradient(to bottom, var(--border) 0 7px, transparent 7px 14px); }
+  .path-banner{ position:relative; z-index:1; margin:8px auto 14px; width:max-content; max-width:82%; text-align:center;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:6px 16px; }
+  .path-banner.done{ opacity:.6; }
+  .path-banner-eyebrow{ display:block; font-size:9px; letter-spacing:.1em; color:var(--text-faint); font-weight:700; }
+  .path-banner-name{ font-family:"Zen Kaku Gothic New",sans-serif; font-size:12.5px; font-weight:700; color:var(--accent-strong); }
+  .path-row{ position:relative; z-index:1; display:flex; padding:6px 0; }
+  .path-row:nth-child(4n+2){ justify-content:flex-end; padding-right:12%; }
+  .path-row:nth-child(4n+4){ justify-content:flex-start; padding-left:12%; }
+  .path-row:nth-child(4n+1),.path-row:nth-child(4n+3){ justify-content:center; }
+  .path-node{ display:flex; flex-direction:column; align-items:center; gap:4px; border:0; background:none; padding:2px; margin:0;
+    font:inherit; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .path-node:disabled{ cursor:default; }
+  .path-puck{ width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:16px; font-weight:800; font-family:"Zen Kaku Gothic New",sans-serif; color:#fff;
+    background:var(--border); box-shadow:0 3px 0 rgba(0,0,0,.14); position:relative; }
+  .path-node.locked .path-puck{ background:var(--border); color:var(--text-faint); box-shadow:none; }
+  .path-node.done .path-puck{ background:var(--easy); }
+  .path-node.current .path-puck{ width:58px; height:58px; background:var(--accent); box-shadow:0 4px 0 rgba(0,0,0,.2); }
+  .path-node.current .path-puck::after{ content:""; position:absolute; inset:-6px; border-radius:50%; border:2.5px solid var(--accent);
+    opacity:.5; animation:pathPulse 2.2s ease-out infinite; }
+  @keyframes pathPulse{ 0%{ transform:scale(.85); opacity:.6; } 75%{ transform:scale(1.3); opacity:0; } 100%{ opacity:0; } }
+  @media (prefers-reduced-motion: reduce){ .path-node.current .path-puck::after{ animation:none; } }
+  .path-node.race .path-puck{ background:var(--accent-strong); box-shadow:0 4px 0 rgba(0,0,0,.3); }
+  .path-label{ font-size:10.5px; font-weight:700; color:var(--text-muted); white-space:nowrap; max-width:76px; overflow:hidden; text-overflow:ellipsis; }
+  .path-node.current .path-label{ color:var(--accent); }
+  .path-node.locked .path-label{ color:var(--text-faint); }
   .journey-weeks{ gap:10px; }
   .journey-weeks .week-card{ padding:14px 16px 5px; border-radius:14px; }
   .journey-weeks .week-card.collapsed{ padding-bottom:14px; }
@@ -3676,28 +3697,70 @@
     return (sentence>Math.floor(limit*0.55)?cut.slice(0,sentence+1):cut.trim())+'…';
   }
 
-  function journeyStageIndex(plan, weekIndex){
-    if(weekIndex<0) return 0;
-    const weeks=plan.weeks||[], wk=weeks[weekIndex]||{}, phase=String(wk.phase||'');
-    if(plan.meta&&plan.meta.questType&&plan.meta.questType!=='race') return Math.min(4,Math.floor(weekIndex/Math.max(1,weeks.length)*5));
-    if(/レース/.test(phase)) return 4;
-    if(/テーパー/.test(phase)) return 3;
-    if(/ピーク/.test(phase)) return 2;
-    if(/ベース|基礎|復帰/.test(phase)){
-      const baseIndexes=weeks.map(function(w,i){return /ベース|基礎|復帰/.test(String(w.phase||''))?i:-1;}).filter(function(i){return i>=0;});
-      return baseIndexes.indexOf(weekIndex)>=Math.ceil(baseIndexes.length/2)?1:0;
+  // 大会の連結(meta.linkedFromPlanId)を親→子の順に辿り、チェーン全体のweeksを
+  // 1本のパス用ノード列に結合する(orderedPlansForDisplayと同じ辿り方)。
+  // 連結の無い単独プランなら、そのプラン単体のweeksがそのまま1本のノード列になる。
+  function planChainNodes(plan){
+    const byId={}; (state.plans||[]).forEach(function(p){ byId[p.id]=p; });
+    let root=plan;
+    while(root.meta && root.meta.linkedFromPlanId && byId[root.meta.linkedFromPlanId]){ root=byId[root.meta.linkedFromPlanId]; }
+    const chain=[root];
+    let cursor=root;
+    while(true){
+      const next=(state.plans||[]).find(function(p){ return p.meta && p.meta.linkedFromPlanId===cursor.id; });
+      if(!next) break;
+      chain.push(next); cursor=next;
     }
-    return weekIndex<Math.ceil(weeks.length*.4)?0:1;
+    const today=todayLocal();
+    const nodes=[];
+    chain.forEach(function(p){
+      (p.weeks||[]).forEach(function(w,wi){
+        const dates=w.items.map(function(it){ return it.date; }).filter(Boolean).map(parseISO);
+        const wkStart=dates.length?new Date(Math.min.apply(null,dates.map(function(d){return d.getTime();}))):null;
+        const wkEnd=dates.length?new Date(Math.max.apply(null,dates.map(function(d){return d.getTime();}))):null;
+        nodes.push({
+          planId:p.id, wi:wi, week:w,
+          isCurrent:!!(wkStart && today>=wkStart && today<=wkEnd),
+          isPast:!!(wkEnd && today>wkEnd)
+        });
+      });
+    });
+    return nodes;
   }
 
-  function planJourneyHTML(plan,currentWeekIdx){
-    const beginner=plan.meta&&plan.meta.questType&&plan.meta.questType!=='race';
-    const labels=beginner?['はじめる','習慣にする','少し伸ばす','仕上げ','達成']:['ベースづくり','距離を伸ばす','ピーク','テーパー','レース'];
-    const currentStage=journeyStageIndex(plan,currentWeekIdx), cur=currentWeekIdx>=0&&plan.weeks[currentWeekIdx];
-    let milestone=null;
-    (plan.weeks||[]).forEach(function(wk,wi){ wk.items.forEach(function(it){ if(milestone||wi<Math.max(0,currentWeekIdx)||!isLoggable(it)||it.type==='rest') return; const km=plannedDistanceKm(it); if((it.type==='long'||it.type==='race')&&km) milestone=it.title+' '+formatKm(km); }); });
-    if(!milestone){ const next=findNextRun(plan,todayLocal()); milestone=next?next.it.title+(plannedDistanceKm(next.it)?' '+formatKm(plannedDistanceKm(next.it)):''):'今週のメニューを完了する'; }
-    return '<section class="quest-journey"><div class="journey-heading"><div><span class="quest-kicker">ROAD TO GOAL</span><h3>ゴールまでの旅</h3></div><span class="journey-week">'+(cur?'現在 '+escapeHtml(cur.label):'スタート前')+'</span></div><div class="journey-scroll"><div class="journey-track">'+labels.map(function(label,index){ const status=index<currentStage?' done':index===currentStage?' current':''; return '<div class="journey-stage'+status+'"><span class="journey-dot"></span><span class="journey-stage-name">'+escapeHtml(label)+'</span></div>'; }).join('')+'</div></div><div class="journey-next"><strong>NEXT</strong><span>'+escapeHtml(milestone)+'</span></div></section>';
+  // ROAD TO GOAL: 週単位のノードを蛇行パスでつなぐ表示(旧5段階抽象ステージ表示を置き換え)。
+  // ノードの状態判定(完了/現在/未来)は週カード一覧(planViewHTML内)の既存ロジックと同じ
+  // isPast/isCurrentの考え方を流用している。タップ時の挙動はclick-handler側のaction==='path-node'を参照。
+  function planPathHTML(plan){
+    const nodes=planChainNodes(plan);
+    if(!nodes.length) return '';
+    const cur=nodes.find(function(n){ return n.isCurrent; });
+    const curLabel=cur?(cur.week.label||('WEEK '+(cur.wi+1))):null;
+    let prevPhase=null;
+    const rows=nodes.map(function(n,idx){
+      let banner='';
+      const phase=String(n.week.phase||'');
+      if(phase!==prevPhase){
+        banner='<div class="path-banner'+(n.isPast?' done':'')+'"><span class="path-banner-eyebrow">PHASE</span><span class="path-banner-name">'+escapeHtml(phase||'—')+'</span></div>';
+        prevPhase=phase;
+      }
+      const isFinish = idx===nodes.length-1 && !!(byIdRaceDate(n.planId));
+      const cls = isFinish?'race':(n.isPast?'done':(n.isCurrent?'current':'locked'));
+      const puckContent = isFinish?'🏁':(n.isPast?'✓':String(n.wi+1));
+      const label = n.week.label || ('WEEK '+(n.wi+1));
+      const disabled = ''; // ロック中(未来)の週も、既存の週カード一覧では常に閲覧可能なためタップは常に許可する
+      return banner+'<div class="path-row"><button type="button" class="path-node '+cls+'" data-action="path-node" data-plan="'+escapeHtml(n.planId)+'" data-week="'+n.wi+'" '+disabled+'>'
+        + '<span class="path-puck">'+puckContent+'</span><span class="path-label">'+escapeHtml(label)+'</span>'
+        + '</button></div>';
+    }).join('');
+    return '<section class="quest-path"><div class="quest-path-heading"><div><span class="quest-kicker">ROAD TO GOAL</span><h3>ゴールまでの旅</h3></div><span class="quest-path-week">'+(curLabel?'現在 '+escapeHtml(curLabel):'スタート前')+'</span></div><div class="quest-path-track">'+rows+'</div></section>';
+  }
+
+  // planChainNodesのノードがどのプランに属するかから、そのプランがレース(大会)プランで
+  // ゴール(レース日)を持つかどうかを調べる(パス最終ノードをゴールの旗として描くための判定)。
+  function byIdRaceDate(planId){
+    const p=(state.plans||[]).find(function(x){ return x.id===planId; });
+    return p && p.meta && p.meta.raceDate;
   }
 
   function planViewHTML(plan){
@@ -3705,7 +3768,7 @@
     if(plan.meta && plan.meta.questType && plan.meta.questType!=='race'){
       const beginnerToday=todayLocal(), beginnerCur=findCurrentWeek(plan,beginnerToday);
       let total=0,done=0; plan.weeks.forEach(function(w){w.items.forEach(function(it){if(isLoggable(it)){total++;if(isItemCompleted(plan,it))done++;}});});
-      return '<main class="wrap">'+planPillsHTML()+'<div class="hero"><div class="hero-meta"><div class="quest-kicker">CURRENT QUEST</div><div class="hero-race">'+escapeHtml(plan.meta.name)+'</div><div class="hero-sub">'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</div></div><div class="phase-side"><div class="phase-badge">'+done+' / '+total+' メニュー完了</div></div></div>'+planJourneyHTML(plan,beginnerCur?beginnerCur.wi:-1)+'<div class="weeks journey-weeks">'+plan.weeks.map(function(w,wi){const current=beginnerCur&&beginnerCur.wi===wi;return '<section class="week-card'+(current?' current':'')+'"><div class="week-head"><div class="week-head-left"><span class="week-num">'+escapeHtml(w.label)+'</span><span class="week-phase">'+escapeHtml(w.phase)+'</span><span class="week-range mono">'+escapeHtml(w.dateRange||'')+'</span></div></div>'+w.items.map(function(it,ii){return itemRowHTML(plan,wi,ii,it,beginnerToday);}).join('')+'</section>';}).join('')+'</div></main>';
+      return '<main class="wrap">'+planPillsHTML()+'<div class="hero"><div class="hero-meta"><div class="quest-kicker">CURRENT QUEST</div><div class="hero-race">'+escapeHtml(plan.meta.name)+'</div><div class="hero-sub">'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</div></div><div class="phase-side"><div class="phase-badge">'+done+' / '+total+' メニュー完了</div></div></div>'+planPathHTML(plan)+'<div class="weeks journey-weeks">'+plan.weeks.map(function(w,wi){const current=beginnerCur&&beginnerCur.wi===wi;return '<section class="week-card'+(current?' current':'')+'" id="week-card-'+escapeHtml(plan.id)+'-'+wi+'"><div class="week-head"><div class="week-head-left"><span class="week-num">'+escapeHtml(w.label)+'</span><span class="week-phase">'+escapeHtml(w.phase)+'</span><span class="week-range mono">'+escapeHtml(w.dateRange||'')+'</span></div></div>'+w.items.map(function(it,ii){return itemRowHTML(plan,wi,ii,it,beginnerToday);}).join('')+'</section>';}).join('')+'</div></main>';
     }
     const today = todayLocal();
     const raceDate = parseISO(plan.meta.raceDate);
@@ -3770,7 +3833,7 @@
       + '</div>'
       + '</div>';
 
-    html += planJourneyHTML(plan,currentWeekIdx);
+    html += planPathHTML(plan);
 
     const contextLines = [];
     if(plan.meta.courseNote) contextLines.push('コース特性・気候: '+plan.meta.courseNote);
@@ -3808,14 +3871,18 @@
       const wkEnd = dates.length? new Date(Math.max(...dates.map(d=>d.getTime()))): null;
       const isCurrent = wkStart && today>=wkStart && today<=wkEnd;
       const isPast = wkEnd && today>wkEnd;
-      const expanded = isCurrent || !!state.expandedWeeks[wi];
+      // expandedWeeksは週番号(wi)だけでなくプランIDでも区切る。プラン単体で使っている分には
+      // 影響しないが、パス表示から別プラン(連結先など)の週へジャンプする際、たまたま同じ週番号の
+      // 開閉状態を誤って引き継いでしまうのを防ぐため(2026-09-18、ROAD TO GOALパス表示の追加に伴う修正)。
+      const expandKey = plan.id+':'+wi;
+      const expanded = isCurrent || !!state.expandedWeeks[expandKey];
       let wTotal=0, wDone=0;
       wk.items.forEach((it,ii)=>{
         if(isLoggable(it)){ wTotal++; if(isItemCompleted(plan,it)) wDone++; }
       });
-      html += '<div class="week-card'+(isCurrent?' current':'')+(isPast?' past':'')+(expanded?'':' collapsed')+'">';
+      html += '<div class="week-card'+(isCurrent?' current':'')+(isPast?' past':'')+(expanded?'':' collapsed')+'" id="week-card-'+escapeHtml(plan.id)+'-'+wi+'">';
       html += '<div class="week-head"><div class="week-head-left"><span class="week-num">'+wk.label.toUpperCase()+'</span><span class="week-phase">'+escapeHtml(wk.phase)+'</span><span class="week-range mono">'+wk.dateRange+'</span>'+(isCurrent?'<span class="today-chip">今週</span>':'')+'</div>'
-        + '<div class="week-progress"><div class="bar"><div class="fill" style="width:'+(wTotal?Math.round(wDone/wTotal*100):0)+'%"></div></div><span class="txt">'+wDone+'/'+wTotal+'</span><button type="button" class="week-card-toggle" data-action="toggle-week" data-week="'+wi+'" aria-expanded="'+(expanded?'true':'false')+'">'+(expanded?'閉じる':'見る')+'</button></div>'
+        + '<div class="week-progress"><div class="bar"><div class="fill" style="width:'+(wTotal?Math.round(wDone/wTotal*100):0)+'%"></div></div><span class="txt">'+wDone+'/'+wTotal+'</span><button type="button" class="week-card-toggle" data-action="toggle-week" data-plan="'+escapeHtml(plan.id)+'" data-week="'+wi+'" aria-expanded="'+(expanded?'true':'false')+'">'+(expanded?'閉じる':'見る')+'</button></div>'
         + '</div>';
       wk.items.forEach((it, ii)=>{
         html += itemRowHTML(plan, wi, ii, it, today);
@@ -5626,7 +5693,25 @@
       plan.meta=Object.assign({},plan.meta,{status:btn.dataset.status});
       Store.savePlan(plan).then(function(){ showMypageToast(btn.dataset.status==='paused'?'プランを休止しました':'プランをアーカイブしました'); render(); });
     } else if(action==='toggle-week'){
-      const key=btn.dataset.week; state.expandedWeeks[key]=!state.expandedWeeks[key]; render();
+      const key=(btn.dataset.plan||'')+':'+btn.dataset.week; state.expandedWeeks[key]=!state.expandedWeeks[key]; render();
+    } else if(action==='path-node'){
+      // ROAD TO GOALのパス上のノードをタップした時の挙動: その週を展開して該当の週カードまでスクロールする。
+      // タップしたノードが「今表示中のプランとは別のプラン」(連結プランをまたいだパスの場合)に
+      // 属する時は、先にプランタブを切り替えてから展開・スクロールする。
+      const planId=btn.dataset.plan, wi=btn.dataset.week;
+      const jumpToWeek=function(){
+        state.expandedWeeks[planId+':'+wi]=true;
+        render();
+        requestAnimationFrame(function(){
+          const el=document.getElementById('week-card-'+planId+'-'+wi);
+          if(el) el.scrollIntoView({block:'start',behavior:'smooth'});
+        });
+      };
+      if(planId && state.currentId!==planId){
+        setActivePlan(planId,false).then(jumpToWeek);
+      } else {
+        jumpToWeek();
+      }
     } else if(action==='toggle-policy'){
       state.policyOpen = !state.policyOpen;
       render();

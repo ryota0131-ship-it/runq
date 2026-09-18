@@ -10,10 +10,13 @@ assert.ok(!app.includes('今日は予定を入れていません'), 'home no lon
 assert.ok(app.includes('class="home-workout-details"'), 'long workout instructions are expandable');
 assert.ok(app.includes('NEXT MILESTONE'), 'home shows the next achievable milestone');
 assert.ok(app.includes('RECENT WIN'), 'home shows a recent achievement');
-assert.ok(app.includes('class="quest-journey"'), 'plan view renders the journey to the goal');
-['ベースづくり','距離を伸ばす','ピーク','テーパー','レース'].forEach((stage) => {
-  assert.ok(app.includes(stage), 'race journey includes ' + stage);
-});
+// ROAD TO GOAL: 5段階の抽象ステージ表示(quest-journey)は廃止し、週単位のノードを
+// 蛇行パスでつなぐ表示(quest-path / planPathHTML)に置き換えた(2026-09-18)。
+assert.ok(app.includes('class="quest-path"'), 'plan view renders the road-to-goal path');
+assert.ok(app.includes('function planPathHTML(plan)'), 'planPathHTML renders the week-by-week path');
+assert.ok(app.includes('function planChainNodes(plan)'), 'the path walks the linkedFromPlanId chain into one node list');
+assert.ok(app.includes('data-action="path-node"'), 'path nodes are tappable');
+assert.ok(!app.includes('class="quest-journey"'), 'the old 5-stage abstract journey markup is removed');
 assert.ok(app.includes('class="coach-proposal"'), 'plan changes use a dedicated proposal card');
 assert.ok(app.includes('if(m.resolved) return \'\';'), 'resolved proposal cards collapse from the conversation');
 assert.ok(app.includes('<strong>プランを変更しました</strong>'), 'confirmed changes use a short completion message');
