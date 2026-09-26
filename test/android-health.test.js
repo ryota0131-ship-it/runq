@@ -25,6 +25,7 @@ assert.ok(app.includes("metadata: { workout_type:'running' }"), 'saved Health wo
 assert.ok(app.includes('source_workout_id'), 'external workout identity is preserved for upsert');
 assert.ok(app.includes('deletedWorkoutRefs'), 'deleted synced workout identities are preserved to prevent re-import');
 assert.ok(app.includes('request-workout-delete'), 'workout detail offers a confirmed delete action');
+assert.ok(app.includes('この記録を削除'), 'workout detail makes the delete action visible independently from sharing');
 assert.ok(app.includes('rememberHealthConnectionError'), 'connection errors are persisted for a retry UI');
 assert.ok(app.includes('health-open-settings'), 'Health Connect settings can be opened after an error');
 

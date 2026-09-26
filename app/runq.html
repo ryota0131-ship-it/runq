@@ -683,6 +683,10 @@
   .workout-reflection-row{ display:grid; grid-template-columns:78px minmax(0,1fr); gap:10px; align-items:start; font-size:13px; line-height:1.6; }
   .workout-reflection-row .label{ color:var(--text-muted); font-size:12px; font-weight:700; }
   .workout-detail-updated{ margin-top:10px; color:var(--text-faint); font-size:11px; }
+  .workout-detail-actions{ display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+  .workout-detail-delete{ margin-top:18px; padding-top:15px; border-top:1px solid var(--border); }
+  .workout-detail-delete p{ margin:0 0 10px; color:var(--text-muted); font-size:12px; line-height:1.55; }
+  .workout-detail-delete .btn-danger{ min-height:44px; }
   .profile-photo{ width:54px; height:54px; flex:0 0 54px; border-radius:50%; overflow:hidden; background:var(--accent-soft); color:var(--accent-strong); display:grid; place-items:center; font-size:22px; font-weight:800; }
   .profile-photo img{ width:100%; height:100%; object-fit:cover; }
   .profile-photo-row{ display:flex; align-items:center; gap:12px; padding:10px 0; }
@@ -3205,7 +3209,8 @@
     const reflectionHTML=reflectionRows.length?'<div class="workout-detail-plan"><div class="li-main">今回の振り返り</div><div class="workout-reflection-list">'+reflectionRows.map(function(row){ return '<div class="workout-reflection-row"><span class="label">'+escapeHtml(row[0])+'</span><span>'+escapeHtml(row[1])+'</span></div>'; }).join('')+'</div></div>':'';
     const updated=workout.updated_at||workout.created_at;
     const updatedHTML=updated?'<div class="workout-detail-updated">最終更新: '+escapeHtml(new Date(updated).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div>':'';
-    const actions='<div class="log-saved-actions"><button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェアする</button><button type="button" class="btn-danger" data-action="request-workout-delete" data-id="'+escapeHtml(workout.id)+'">削除する</button></div>';
+    const actions='<div class="workout-detail-actions"><button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェアする</button></div>'
+      + '<div class="workout-detail-delete"><p>この記録が不要な場合は、RUNQ.の集計と予定実績から削除できます。'+(['apple_health','health_connect'].indexOf(workout.source)>=0?'Appleヘルスケア／Health Connectの元データは削除しません。':'')+'</p><button type="button" class="btn-danger" data-action="request-workout-delete" data-id="'+escapeHtml(workout.id)+'">この記録を削除</button></div>';
     return '<div class="form-card"><div class="mypage-subhead"><button type="button" class="mypage-back-btn" data-action="mypage-nav" data-view="workout-history">＜ これまでの記録</button><h2>ワークアウト詳細</h2></div><div class="workout-detail-hero"><div><div class="workout-detail-date">'+workoutDateLabel(workout)+'</div><div class="workout-detail-title">'+escapeHtml(info&&info.item?info.item.title:'ランニング')+'</div></div><div><div class="workout-detail-distance mono">'+formatKm(distance)+'</div><div class="workout-detail-source">'+escapeHtml(workoutSourceLabel(workout.source))+'</div></div></div><div class="workout-detail-grid">'+metrics.map(function(m){return '<div class="workout-detail-metric"><div class="label">'+m[0]+'</div><div class="value mono">'+m[1]+'</div></div>';}).join('')+'</div>'+planHTML+reflectionHTML+feedbackHTML+candidateHTML+actions+updatedHTML+'</div>';
   }
 
