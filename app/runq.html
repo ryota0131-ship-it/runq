@@ -767,7 +767,7 @@
   .today-card .rest-banner{ background:var(--surface); border:1px solid var(--border); }
   .today-card .next-run{ margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
   .today-card .next-run-label{ color:var(--accent); }
-  .home-workout{ display:grid; gap:11px; padding:15px; border:1px solid var(--border); border-radius:15px; background:var(--surface); }
+  .home-workout{ position:relative; isolation:isolate; display:grid; gap:11px; padding:15px; border:1px solid var(--border); border-radius:15px; background:var(--surface); }
   .home-workout-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
   .home-workout-title{ font:800 19px/1.35 "Zen Kaku Gothic New",sans-serif; }
   .home-workout-date{ color:var(--text-muted); font-size:11px; white-space:nowrap; }
@@ -780,8 +780,10 @@
   .home-workout-details summary::after{ content:" ＋"; }
   .home-workout-details[open] summary::after{ content:" −"; }
   .home-workout-details p{ margin:8px 0 0; color:var(--text-muted); font-size:12.5px; line-height:1.65; }
-  .home-workout-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .home-workout-actions .btn-primary{ padding:9px 15px; }
+  /* 今日の記録操作は、カード内の装飾や展開領域より必ず前面で受ける。
+     iOS/WKWebViewでも44px以上の独立したタップ領域として扱う。 */
+  .home-workout-actions{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-height:44px; pointer-events:auto; }
+  .home-workout-actions .btn-primary{ position:relative; z-index:1; min-height:44px; padding:9px 15px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
   .home-workout-actions .detail-link{ padding:7px 2px; min-height:36px; font-size:12px; }
   .todays-point{ background:var(--surface); border:1px solid var(--border); padding:11px 13px; }
   .todays-point .tp-label{ color:var(--accent-strong); }
@@ -2744,6 +2746,21 @@
       return { average:Math.round(values.reduce(function(total, value){ return total+value; },0)/values.length), max:Math.round(Math.max.apply(null,values)) };
     }catch(e){ return { average:null, max:null }; }
   }
+  // queryWorkouts({workoutType:'running'}) はHealthKit / Health Connect側でも絞り込む。
+  // ただし将来のプラグイン差分やモックで別形式の種目名が返った場合にも、保存直前で
+  // ランニング以外を拒否する。種目名が返らない旧ペイロードだけは、実行したqueryの
+  // runningフィルタを根拠に許可する。
+  function normalizedHealthWorkoutType(workout){
+    const raw=workout&&(workout.workoutType||workout.workout_type||workout.activityType||workout.activity_type||workout.type);
+    if(!raw) return null;
+    const value=String(raw).trim().toLowerCase().replace(/[ _-]/g,'');
+    if(value==='running'||value==='runningtreadmill'||value==='hkworkoutactivitytyperunning') return 'running';
+    return value;
+  }
+  function isRunningHealthWorkout(workout, requestedType){
+    const type=normalizedHealthWorkoutType(workout);
+    return type ? type==='running' : requestedType==='running';
+  }
   async function healthWorkoutToRunq(plugin, workout, platform){
     const heartRate = await heartRateForWorkout(plugin, workout);
     return {
@@ -2756,7 +2773,8 @@
       calories: workout.totalEnergyBurned,
       source: platform==='ios' ? 'apple_health' : 'health_connect',
       source_workout_id: workout.platformId || [workout.sourceId||'native', workout.startDate, workout.endDate].join(':'),
-      source_device: workout.sourceName || workout.sourceId || null
+      source_device: workout.sourceName || workout.sourceId || null,
+      metadata: { workout_type:'running' }
     };
   }
   async function reflectImportedWorkout(workout){
@@ -2817,7 +2835,7 @@
         const result = await plugin.queryWorkouts({ workoutType:workoutType, startDate:startDate, endDate:endDate, limit:100, ascending:false, anchor:anchor||undefined });
         const workouts = result.workouts || [];
         for(const nativeWorkout of workouts){
-          if(nativeWorkout.workoutType && String(nativeWorkout.workoutType).toLowerCase()!=='running') continue;
+          if(!isRunningHealthWorkout(nativeWorkout,workoutType)) continue;
           const saved = await upsertWorkout(await healthWorkoutToRunq(plugin, nativeWorkout, platform));
           if(saved._upsert && saved._upsert.skippedDeleted) continue;
           if(saved._upsert && saved._upsert.created) imported++;
@@ -4057,6 +4075,17 @@
         + '<button type="button" class="detail-link" data-action="consult-item" data-date="'+it.date+'">コーチに相談</button></div>';
     }
     return html+'</div>';
+  }
+
+  // ホーム、プラン、完了表示から同じ記録フォームを開く。入口ごとに状態を持たせず、
+  // iOSのイベント委譲でも常に同じ遷移を使う。
+  function openWorkoutLog(date){
+    const plan=currentPlan();
+    if(!plan || !date) return false;
+    const existing=state.logs[date]||null;
+    state.logForm={ openDate:date, values:existing?Object.assign({},existing):{}, busy:false, error:null, imageBusy:false, imageError:null, imageImport:existing&&existing.imageImport||null, selectedWorkoutId:existing&&existing.workoutId||null, feedbackBusy:null, feedbackError:null, status:null, syncMessage:null, syncError:false };
+    render();
+    return true;
   }
 
   function coachDailyBriefHTML(plan,today){
@@ -5886,11 +5915,7 @@
       state.calendarSelected = (state.calendarSelected===d) ? null : d;
       render();
     } else if(action==='open-log'){
-      const date = btn.dataset.date;
-      const plan = currentPlan();
-      const existing = plan ? state.logs[date] : null;
-      state.logForm = { openDate: date, values: existing ? Object.assign({}, existing) : {}, busy:false, error:null, imageBusy:false, imageError:null, imageImport: existing && existing.imageImport || null, selectedWorkoutId:existing&&existing.workoutId||null, feedbackBusy:null, feedbackError:null, status:null, syncMessage:null, syncError:false };
-      render();
+      openWorkoutLog(btn.dataset.date);
     } else if(action==='close-log'){
       state.logForm.openDate = null;
       state.logForm.values = null;

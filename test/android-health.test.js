@@ -20,6 +20,8 @@ assert.ok(app.includes('HEALTH_INITIAL_LOOKBACK_DAYS=90'), 'initial sync window 
 assert.ok(app.includes('HEALTH_INCREMENTAL_OVERLAP_MS'), 'later syncs use a bounded overlap window');
 assert.ok(app.includes("for(const workoutType of ['running'])"), 'only running workouts are queried');
 assert.ok(!app.includes("for(const workoutType of ['running','walking'])"), 'walking workouts are not imported');
+assert.ok(app.includes('isRunningHealthWorkout(nativeWorkout,workoutType)'), 'returned workout types are also checked before saving');
+assert.ok(app.includes("metadata: { workout_type:'running' }"), 'saved Health workouts retain their running type');
 assert.ok(app.includes('source_workout_id'), 'external workout identity is preserved for upsert');
 assert.ok(app.includes('deletedWorkoutRefs'), 'deleted synced workout identities are preserved to prevent re-import');
 assert.ok(app.includes('request-workout-delete'), 'workout detail offers a confirmed delete action');

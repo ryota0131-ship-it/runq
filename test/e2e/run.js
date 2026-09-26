@@ -425,6 +425,15 @@ async function main() {
         window.Capacitor = { isNativePlatform: () => true, registerPlugin: () => health, Plugins: { Health: health } };
       }, { plan, profile, today });
       await page.goto(baseUrl + '/', { waitUntil: 'load' });
+      // iPhone/Capacitor相当のコンテキストでも、ホームの記録ボタンがカード内の他の操作を
+      // 阻害せず、記録フォームを開けることを先に確認する。
+      const recordButton = page.locator('.today-card [data-action="open-log"][data-date="' + today + '"]');
+      check('[ホーム] 結果を記録するは有効なタップ領域として表示される', await recordButton.count() === 1 && await recordButton.isEnabled());
+      await recordButton.click();
+      check('[ホーム] 結果を記録するから該当日の記録フォームを開く', await page.locator('.log-form[data-date="' + today + '"]').count() === 1);
+      await page.locator('[data-action="close-log"]').click();
+      await page.locator('.today-card [data-action="consult-item"][data-date="' + today + '"]').click();
+      check('[ホーム] コーチに相談するは記録操作と独立して開く', (await page.locator('#coach-thread').count()) === 1);
       await page.locator('.bottom-nav *').filter({ hasText: 'マイページ' }).first().click({ force: true });
       await page.locator('[data-action="mypage-nav"][data-view="data-connections"]').click();
       await page.locator('[data-action="health-connect"][data-platform="appleHealth"]').click();
