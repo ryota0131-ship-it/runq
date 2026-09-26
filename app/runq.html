@@ -365,6 +365,26 @@
   .path-label{ font-size:10.5px; font-weight:700; color:var(--text-muted); white-space:nowrap; max-width:76px; overflow:hidden; text-overflow:ellipsis; }
   .path-node.current .path-label{ color:var(--accent); }
   .path-node.locked .path-label{ color:var(--text-faint); }
+  /* 現在地の前後だけを見せる、小さな旅の盤面。全週の工程表は必要な場合だけ展開する。 */
+  .journey-board{ position:relative; display:flex; flex-direction:column; gap:8px; padding:14px 10px 12px; border-radius:14px; background:linear-gradient(145deg,var(--accent-soft),var(--surface)); overflow:hidden; }
+  .journey-board::before{ content:""; position:absolute; top:36px; bottom:36px; left:50%; width:2px; transform:translateX(-50%); background:repeating-linear-gradient(to bottom,var(--accent) 0 7px,transparent 7px 13px); opacity:.38; }
+  .journey-board-head{ position:relative; z-index:1; display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:0 4px 4px; }
+  .journey-board-head h3{ margin:0; font-size:16px; }
+  .journey-board-head span{ color:var(--text-faint); font-size:11px; white-space:nowrap; }
+  .journey-step{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; width:fit-content; max-width:91%; border:0; background:transparent; color:var(--text); padding:3px 0; text-align:left; cursor:pointer; font:inherit; }
+  .journey-step:nth-of-type(2n){ align-self:flex-end; flex-direction:row-reverse; text-align:right; }
+  .journey-step.is-static{ cursor:default; }
+  .journey-dot{ width:38px; height:38px; flex:0 0 38px; display:grid; place-items:center; border-radius:50%; background:var(--surface); border:2px solid var(--border); color:var(--text-faint); box-shadow:0 2px 0 var(--shadow); font:800 14px/1 "Zen Kaku Gothic New",sans-serif; }
+  .journey-step.done .journey-dot{ background:var(--easy); border-color:var(--easy); color:#fff; }
+  .journey-step.current .journey-dot{ width:48px; height:48px; flex-basis:48px; background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 17%,transparent),0 3px 0 rgba(0,0,0,.16); }
+  .journey-step.goal .journey-dot{ background:var(--accent-strong); border-color:var(--accent-strong); color:#fff; }
+  .journey-step-copy{ min-width:0; padding:5px 9px; border-radius:10px; background:color-mix(in srgb,var(--surface) 88%,transparent); }
+  .journey-step.current .journey-step-copy{ background:var(--surface); }
+  .journey-step-kicker{ display:block; color:var(--text-faint); font-size:9px; font-weight:800; letter-spacing:.09em; }
+  .journey-step-title{ display:block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; font-size:13px; font-weight:800; }
+  .journey-step-sub{ display:block; margin-top:2px; color:var(--text-muted); font-size:10.5px; }
+  .journey-step.current .journey-step-title{ color:var(--accent-strong); }
+  .journey-all-toggle{ display:block; width:fit-content; margin:10px auto 0; border:0; background:transparent; color:var(--accent); padding:8px 4px; font:700 12px/1.2 inherit; cursor:pointer; }
   .journey-weeks{ gap:10px; }
   .journey-weeks .week-card{ padding:14px 16px 5px; border-radius:14px; }
   .journey-weeks .week-card.collapsed{ padding-bottom:14px; }
@@ -3819,9 +3839,36 @@
     return p && p.meta && p.meta.raceDate;
   }
 
+  function planJourneyBoardHTML(plan){
+    const today=todayLocal(), items=[];
+    (plan.weeks||[]).forEach(function(week,wi){ (week.items||[]).forEach(function(it,ii){
+      if(isLoggable(it)&&it.date) items.push({it:it,wi:wi,ii:ii,completion:itemCompletionState(plan,it)});
+    }); });
+    items.sort(function(a,b){ return a.it.date.localeCompare(b.it.date); });
+    const completed=items.filter(function(entry){ return entry.it.date<=toISO(today)&&entry.completion.status==='completed'; });
+    const upcoming=items.filter(function(entry){ return entry.it.date>=toISO(today)&&entry.completion.status!=='completed'&&entry.completion.status!=='skipped'; });
+    const recent=completed.length?completed[completed.length-1]:null;
+    const next=upcoming[0]||null;
+    const checkpoint=upcoming.slice(1).find(function(entry){ return entry.it.type==='long'&&plannedDistanceKm(entry.it); })||upcoming[1]||null;
+    const step=function(kind,kicker,title,sub,entry,icon){
+      const action=entry?' data-action="path-node" data-plan="'+escapeHtml(plan.id)+'" data-week="'+entry.wi+'"':'';
+      return '<button type="button" class="journey-step '+kind+(entry?'':' is-static')+'"'+action+' '+(!entry?'disabled':'')+'><span class="journey-dot">'+icon+'</span><span class="journey-step-copy"><span class="journey-step-kicker">'+escapeHtml(kicker)+'</span><span class="journey-step-title">'+escapeHtml(title)+'</span><span class="journey-step-sub">'+escapeHtml(sub)+'</span></span></button>';
+    };
+    const steps=[];
+    if(recent) steps.push(step('done','PREVIOUS',''+recent.it.title,fmtMD(parseISO(recent.it.date))+'に積み上げました',recent,'✓'));
+    else steps.push(step('done','START','ここから始めよう','最初の記録が次の提案につながります',null,'•'));
+    if(next) steps.push(step('current','NEXT STEP',next.it.title,fmtMD(parseISO(next.it.date))+'のメニュー',next,'›'));
+    else steps.push(step('current','NOW','今週のメニューを振り返る','次の一歩をコーチと決めましょう',null,'•'));
+    if(checkpoint) steps.push(step('checkpoint','NEXT MILESTONE',checkpoint.it.title,fmtMD(parseISO(checkpoint.it.date))+'の節目',checkpoint,'○'));
+    const raceDate=plan.meta&&plan.meta.raceDate?parseISO(plan.meta.raceDate):null;
+    const goalSub=raceDate?fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）':'今の目標を達成する日';
+    steps.push(step('goal','GOAL',plan.meta&&plan.meta.name||'ゴール',goalSub,null,'🏁'));
+    return '<section class="journey-board" aria-label="ゴールまでの進み方"><div class="journey-board-head"><div><span class="quest-kicker">YOUR JOURNEY</span><h3>次の一歩へ</h3></div><span>'+completed.length+'/'+items.length+'完了</span></div>'+steps.join('')+'</section>';
+  }
+
   function planJourneyDisclosureHTML(plan){
     const open=!!state.planJourneyOpen;
-    return '<section class="info-card disclosure-card plan-disclosure"><button type="button" data-action="toggle-plan-journey" aria-expanded="'+(open?'true':'false')+'"><span>ゴールまでの流れ<small>期ごとの進め方を見る</small></span><span class="disclosure-arrow" aria-hidden="true">'+(open?'⌃':'›')+'</span></button>'+(open?'<div class="disclosure-body">'+planPathHTML(plan)+'</div>':'')+'</section>';
+    return '<section class="info-card plan-disclosure">'+planJourneyBoardHTML(plan)+'<button type="button" class="journey-all-toggle" data-action="toggle-plan-journey" aria-expanded="'+(open?'true':'false')+'">'+(open?'全体の旅程を閉じる':'全体の旅程を見る')+'</button>'+(open?'<div class="disclosure-body">'+planPathHTML(plan)+'</div>':'')+'</section>';
   }
 
   function planGoalDisclosureHTML(plan, body){
