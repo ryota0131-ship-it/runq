@@ -1508,8 +1508,10 @@
     }
 
     // 4) 痛みは走力タイムの減点ではなく、安全な負荷調整の注意として扱う。
-    if(evidence.maxPainLevel>=3) mainFactors.push({ label:'直近の痛み・不調', value:'強めの記録あり。負荷を増やさず、コーチに相談してください', impact:'slower' });
-    else if(evidence.maxPainLevel>0) mainFactors.push({ label:'直近の痛み・不調', value:'軽度の記録あり。距離・強度は急に増やさない', impact:'neutral' });
+    // 過去の入力だけで現在も痛いとは扱わない。状態が未確認なら、次の提案前に確認する。
+    const painCondition=evidence.painCondition||currentPainCondition();
+    if(painCondition.status==='active') mainFactors.push({ label:'現在の痛み・不調', value:'現在も症状があるとの申告。負荷を増やさず、コーチに相談してください', impact:'slower' });
+    else if(painCondition.status==='needs_checkin') mainFactors.push({ label:'直近の痛み・不調', value:'記録はありますが、現在の状態は未確認。次の提案前に確認します', impact:'neutral' });
 
     // 7) 残り日数による確信度 — 遠いほど補正を弱め、直前(2週間以内)はほぼそのまま適用
     let confidenceWeight = 1.0;
@@ -1536,8 +1538,8 @@
     const confidence = evidence.recent.length>=10&&evidence.runDays>=7&&!!pb&&maxLongRun>=raceDistanceKm*0.45&&mpLogCount>=2 ? 'high' : evidence.recent.length>=4&&!!pb ? 'medium' : 'low';
     let readinessLevel='starting', readinessLabel='準備開始', readinessSummary='まずは週の運動を無理なく続け、走った記録を2〜3件積み上げましょう。';
     const nextLong=Math.min(raceDistanceKm*longTarget.min, Math.max(maxLongRun+2, raceDistanceKm*.4));
-    if(evidence.maxPainLevel>=3){
-      readinessLevel='caution'; readinessLabel='回復を優先'; readinessSummary='強めの痛み・不調の記録があります。距離や強度を上げず、症状が続く場合は医療機関へ相談してください。';
+    if(painCondition.status==='active'){
+      readinessLevel='caution'; readinessLabel='回復を優先'; readinessSummary='現在の痛み・不調の申告があります。距離や強度を上げず、症状が続く場合は医療機関へ相談してください。';
     } else if(evidence.recent.length>=2){
       readinessLevel='base'; readinessLabel='基礎づくり'; readinessSummary='現在の最長 '+formatKm(maxLongRun)+'。まずは無理なく '+formatKm(nextLong)+' 前後のロング走を目指しましょう。';
       if(maxLongRun>=raceDistanceKm*.35 && evidence.weeklyAvgKm>=raceDistanceKm*.22){
@@ -1562,7 +1564,7 @@
       mainFactors: mainFactors,
       confidence: confidence,
       readiness: readiness,
-      evidence: { workoutCount:evidence.recent.length, runDays:evidence.runDays, totalKm:evidence.totalKm, weeklyAvgKm:evidence.weeklyAvgKm, maxRunKm:maxLongRun, mpLogCount:mpLogCount, maxPainLevel:evidence.maxPainLevel },
+      evidence: { workoutCount:evidence.recent.length, runDays:evidence.runDays, totalKm:evidence.totalKm, weeklyAvgKm:evidence.weeklyAvgKm, maxRunKm:maxLongRun, mpLogCount:mpLogCount, maxPainLevel:evidence.maxPainLevel, painStatus:painCondition.status },
       algorithmVersion: FORECAST_ALGO_VERSION,
       generatedAt: new Date().toISOString()
     };
@@ -2986,11 +2988,59 @@
     const manual = profile && Number(profile.longestRunManualKm);
     return manual>0 ? { km:manual, source:'手動で設定' } : { km:null, source:'未設定' };
   }
+  // 痛みの「傾向」と「いま症状があるか」は別の情報として扱う。過去の記録だけで
+  // 現在も痛いと決めつけず、最近の未確認記録はコーチが一度だけ確認するために使う。
+  function painPartsInMessage(text){
+    const value=String(text||'');
+    return ['踵','かかと','足首','足','ひざ','膝','すね','ふくらはぎ','もも','股関節','腰'].filter(function(part){ return value.indexOf(part)>=0; });
+  }
+  function activeConditionEvents(messages){
+    const events={};
+    (messages||[]).forEach(function(message){
+      const event=message&&message.conditionEvent;
+      if(!event || !event.id) return;
+      if(event.action==='detected') events[event.id]=Object.assign({},event);
+      else events[event.id]=Object.assign({},events[event.id]||{},event);
+    });
+    return Object.keys(events).map(function(id){ return events[id]; });
+  }
+  function currentPainCondition(){
+    const now=todayLocal(), since=addDays(now,-28), entries=[];
+    allWorkouts().forEach(function(workout){
+      const date=workoutDate(workout), pain=workout.metadata&&workout.metadata.pain;
+      if(date&&date>=since&&pain&&Number(pain.level)>0) entries.push({date:date,level:Number(pain.level)||1,parts:pain.parts||[],source:'workout'});
+    });
+    Object.keys(state.logs||{}).forEach(function(date){
+      const log=state.logs[date]||{}, pain=log.pain;
+      if(parseISO(date)&&parseISO(date)>=since&&pain&&Number(pain.level)>0) entries.push({date:parseISO(date),level:Number(pain.level)||1,parts:pain.parts||[],source:'log'});
+    });
+    entries.sort(function(a,b){ return b.date-a.date; });
+    const chatEvents=activeConditionEvents(state.coach&&state.coach.messages);
+    const active=chatEvents.filter(function(event){ return event.status==='active'; }).slice(-1)[0];
+    const resolved=chatEvents.filter(function(event){ return event.status==='resolved'; }).slice(-1)[0];
+    if(active) return {status:'active',parts:active.parts||[],updatedAt:active.updatedAt||active.detectedAt,source:'chat'};
+    const latest=entries[0]||null;
+    const resolvedAt=resolved&&new Date(resolved.resolvedAt||0);
+    if(resolvedAt && !isNaN(resolvedAt) && (!latest || resolvedAt>=latest.date)) return {status:'resolved',parts:resolved.parts||latest&&latest.parts||[],updatedAt:resolvedAt.toISOString(),source:'chat'};
+    if(!latest) return {status:'none',parts:[],updatedAt:null,source:null};
+    const age=Math.max(0,Math.floor((now-latest.date)/86400000));
+    if(age<=7) return {status:'needs_checkin',parts:latest.parts||[],updatedAt:latest.date.toISOString(),ageDays:age,source:latest.source};
+    return {status:'historical',parts:latest.parts||[],updatedAt:latest.date.toISOString(),ageDays:age,source:latest.source};
+  }
+  function evaluatePainConditionMessage(text,messages){
+    const parts=painPartsInMessage(text), value=String(text||'');
+    if(!parts.length) return null;
+    const resolved=/大丈夫|治(?:った|まった)|おさま(?:った|りました)|問題ない|気にならない|痛くない/.test(value);
+    const active=activeConditionEvents(messages).filter(function(event){ return event.status==='active'; }).slice(-1)[0];
+    if(resolved) return {id:active&&active.id||'condition_'+Date.now().toString(36),action:'resolved',status:'resolved',parts:parts,resolvedAt:new Date().toISOString()};
+    if(/痛|違和感|張り|重い|つらい|しびれ/.test(value)) return {id:'condition_'+Date.now().toString(36),action:'detected',status:'active',parts:parts,detectedAt:new Date().toISOString()};
+    return null;
+  }
   function trainingEvidenceSummary(){
     const now=todayLocal(), since=addDays(now,-28), workouts=allWorkouts().filter(function(w){return workoutDate(w)>=since;});
     const km=workouts.reduce(function(sum,w){return sum+Number(w.distance_meters||0)/1000;},0);
-    const pain=workouts.some(function(w){return w.metadata&&w.metadata.pain&&Number(w.metadata.pain.level)>0;}) || Object.keys(state.logs||{}).some(function(d){return state.logs[d]&&state.logs[d].pain&&Number(state.logs[d].pain.level)>0;});
-    return {count:workouts.length, weeklyKm:km/4, longest:workouts.reduce(function(m,w){return Math.max(m,Number(w.distance_meters||0)/1000);},0), pain:pain};
+    const painCondition=currentPainCondition();
+    return {count:workouts.length, weeklyKm:km/4, longest:workouts.reduce(function(m,w){return Math.max(m,Number(w.distance_meters||0)/1000);},0), pain:painCondition.status==='active', painCondition:painCondition};
   }
   function profileTrainingReady(profile){
     const count = Number(profile && profile.weeklyRunDays);
@@ -4168,7 +4218,7 @@
       message=complete?'今日の'+found.it.title+'、おつかれさま。しっかり休んで次につなげよう。':'今日は'+found.it.title+'。余裕を残して、気持ちよく終えよう。';
     } else if(next){
       const distance=plannedDistanceKm(next.it);
-      message='今日は休んで強くなる日。次は'+fmtMD(parseISO(next.it.date))+'の'+next.it.title+(distance?' '+formatKm(distance):'')+'に備えよう。';
+      message='今日は休んで強くなる日だよ。次の練習につなげていこう！次は'+fmtMD(parseISO(next.it.date))+'の'+next.it.title+(distance?' '+formatKm(distance):'')+'だね。';
     } else {
       message='今日は回復を優先しよう。休む日も、ゴールまでの大切な一日だよ。';
     }
@@ -4195,7 +4245,7 @@
     if(found && found.it.type!=='rest'){
       html += homeWorkoutHTML(plan,found,today,'today');
     } else {
-      html += '<div class="rest-banner"><strong>今日は休んで強くなる日。</strong><br>疲れを整えて、次の練習につなげましょう。</div>';
+      html += coachDailyBriefHTML(plan,today);
       const next = findNextRun(plan, today);
       if(next){
         html += '<div class="next-run"><div class="next-run-label">NEXT MISSION</div>'+homeWorkoutHTML(plan,next,today,'next')+'</div>';
@@ -4314,11 +4364,15 @@
   };
   function coachDecisionBasis(plan, runningContext){
     const evidence=trainingEvidenceSummary();
+    const condition=evidence.painCondition||{status:'none'};
     const reasons=['RUNQ.に保存された実走、予定、プロフィール設定を確認しました。'];
     const sourceIds=['who-physical-activity-2020'];
-    if(evidence.pain || /痛み|不調|疲労/.test(String(runningContext||''))){
-      reasons.push('痛み・不調・疲労の入力があるため、負荷を上げず休養または軽い内容を優先します。');
+    if(condition.status==='active' || /痛み|不調|疲労/.test(String(runningContext||''))){
+      reasons.push('現在の痛み・不調の申告があるため、負荷を上げず休養または軽い内容を優先します。');
       sourceIds.push('mhlw-physical-activity-guide-2023','running-injury-training-parameters-2022');
+    } else if(condition.status==='needs_checkin'){
+      reasons.push('直近の痛み・違和感の記録はありますが、現在の状態は未確認です。プランを変える前に今の状態を確認します。');
+      sourceIds.push('mhlw-physical-activity-guide-2023');
     } else if(evidence.count<3){
       reasons.push('実走の件数がまだ少ないため、走力を断定せず保守的に提案します。');
       sourceIds.push('mhlw-physical-activity-guide-2023');
@@ -4352,14 +4406,17 @@
     const today=todayLocal(), from=addDays(today,-14), items=flattenPlanItems(plan).filter(function(x){return x.date&&parseISO(x.date)>=from&&parseISO(x.date)<=today&&['easy','long','mp'].indexOf(x.type)>=0;});
     const done=items.filter(function(x){ return isItemCompleted(plan,(plan.weeks[x.wi]||{items:[]}).items[x.ii]); }).length;
     const evidence=trainingEvidenceSummary();
-    if(evidence.pain) return {kind:'reduce',reason:'直近の記録に痛み・違和感があります。負荷を増やさず、未実施分を詰め込まない調整を提案します。'};
+    if(evidence.painCondition&&evidence.painCondition.status==='active') return {kind:'reduce',reason:'現在も痛み・違和感があると聞いています。負荷を増やさず、未実施分を詰め込まない調整を提案します。'};
+    if(evidence.painCondition&&evidence.painCondition.status==='needs_checkin') return {kind:'checkin',reason:'直近に'+(evidence.painCondition.parts&&evidence.painCondition.parts.length?evidence.painCondition.parts.join('・')+'の':'')+'痛み・違和感の記録があります。今はどんな感じか、カイに教えてください。'};
     if(items.length>=3&&done/items.length<0.5) return {kind:'reduce',reason:'直近2週間は予定の実施が少なめです。理由は断定せず、次週を少し軽くする案を用意しました。'};
     if(items.length>=3&&done/items.length>=0.8) return {kind:'steady',reason:'直近2週間は無理なく継続できています。今のプランを続けるのが基本です。'};
     return null;
   }
   function planReviewCardHTML(plan){
     if(state.profile.planReviewDismissedFor===plan.id+':'+todayISO()) return '';
-    const review=planReviewAssessment(plan); if(!review || review.kind!=='reduce') return '';
+    const review=planReviewAssessment(plan); if(!review) return '';
+    if(review.kind==='checkin') return '<section class="plan-review-card"><div class="plan-review-head">'+coachMascotHTML((state.profile||{}).coachPersona,'normal','small')+'<div><h3>カイから確認</h3><p>'+escapeHtml(review.reason)+'</p></div></div><div class="form-actions"><button type="button" class="btn-primary" data-action="review-condition-checkin">今の状態を伝える</button><button type="button" class="btn-secondary" data-action="dismiss-plan-review">今回は表示しない</button></div></section>';
+    if(review.kind!=='reduce') return '';
     return '<section class="plan-review-card"><div class="plan-review-head">'+coachMascotHTML((state.profile||{}).coachPersona,'thinking','small')+'<div><h3>今週のプランを整えますか？</h3><p>'+escapeHtml(review.reason)+'</p></div></div><div class="plan-review-recommend"><strong>おすすめ</strong>未実施のイージー／ロング走を約10%軽くし、目標タイムはそのまま維持します。</div><div class="form-actions"><button type="button" class="btn-primary" data-action="apply-plan-review">この変更で進める</button><button type="button" class="btn-secondary" data-action="review-consult">別の案を相談</button><button type="button" class="btn-secondary" data-action="dismiss-plan-review">今回は変えない</button></div>'+(state.planReviewUndo?'<button type="button" class="workout-text-link" style="margin-top:10px" data-action="undo-plan-review">直前の見直しを取り消す</button>':'')+'</section>';
   }
 
@@ -4653,7 +4710,7 @@
       if(legacyLog && legacyLog.completionType!=='skipped' && legacyLog.completionType!=='partial') return true;
       return planActivities.some(function(a){ return a.date===p.date; });
     }).length;
-    return { activities:activities, recent:recent, totalKm:totalKm, weeklyAvgKm:totalKm/4, runDays:runDays.size, maxRunKm:maxRunKm, mpActivities:mpActivities, maxPainLevel:maxPainLevel, plannedCount:windowItems.length, completedCount:completedCount, adherence:windowItems.length?completedCount/windowItems.length:null };
+    return { activities:activities, recent:recent, totalKm:totalKm, weeklyAvgKm:totalKm/4, runDays:runDays.size, maxRunKm:maxRunKm, mpActivities:mpActivities, maxPainLevel:maxPainLevel, painCondition:currentPainCondition(), plannedCount:windowItems.length, completedCount:completedCount, adherence:windowItems.length?completedCount/windowItems.length:null };
   }
   function coachRunningContextLines(plan, allPlanLogs){
     const lines=[], today=todayISO(), todayDate=todayLocal();
@@ -4826,7 +4883,7 @@
     const lines = [];
     const profile = state.profile || {};
     // 個人プロフィールは最新の内容を、レース固有のコース情報はプラン作成時の内容を参照する。
-    if(profile.injuryNote || plan.meta.injuryNote) lines.push('既往症・怪我パターン: '+(profile.injuryNote || plan.meta.injuryNote));
+    if(profile.injuryNote || plan.meta.injuryNote) lines.push('痛み・違和感の傾向（現在の症状とは限らない）: '+(profile.injuryNote || plan.meta.injuryNote));
     if(plan.meta.courseNote) lines.push('コース特性・気候: '+plan.meta.courseNote);
     if(profile.constitutionNote || plan.meta.constitutionNote) lines.push('体質的特徴: '+(profile.constitutionNote || plan.meta.constitutionNote));
     if(profile.scheduleNote || plan.meta.scheduleNote) lines.push('生活制約・走れる曜日: '+(profile.scheduleNote || plan.meta.scheduleNote));
@@ -4845,6 +4902,10 @@
       lines.push('直近のRACE FORECAST: 走力の目安 '+forecastEstimateLabel(forecast)+'、フルへの準備度 '+(readiness.label||'更新中')+'、データの確かさ '+(FORECAST_CONFIDENCE_LABEL[forecast.confidence]||forecast.confidence));
     }
     lines.push.apply(lines, recentLogSummaryLines());
+    const condition=currentPainCondition();
+    if(condition.status==='active') lines.push('現在の体調: '+(condition.parts.length?condition.parts.join('・')+'に':'')+'痛み・違和感があると本人が申告中。負荷増加は提案しない。');
+    else if(condition.status==='needs_checkin') lines.push('現在の体調: 直近の痛み・違和感の記録あり（'+condition.ageDays+'日前、現在の状態は未確認）。過去の記録だけで症状継続と断定せず、変更前に一度だけ確認する。');
+    else if(condition.status==='resolved') lines.push('現在の体調: 以前の痛み・違和感は本人から改善済みと確認。再発の申告がない限り、現在の痛みとしては扱わない。');
     return lines;
   }
 
@@ -4880,6 +4941,7 @@
   function buildAdjustPrompt(plan, instruction, todayStr, historyLines, personaKey, runningContext, allPlanSummaries, namedPlanDetails){
     const payload = {meta:plan.meta, weeks:plan.weeks, extras:plan.extras};
     const context = planContextLines(plan);
+    const condition=currentPainCondition();
     return [
       'あなたは経験豊富なランニングコーチです。以下はランナーの走り込みプラン(JSON)です。ランナーからの相談に対して、判断ロジック(下記「# 判断ルール」)に基づいて対応してください。',
       coachPersona(personaKey).prompt,
@@ -4899,6 +4961,8 @@
       '# 判断ルール(必ず考慮すること)',
       '0. 安全: '+COACHING_RULES.safety,
       '0-1. 参照情報: '+COACHING_RULES.reviewInputs.join('／')+'。'+COACHING_RULES.loadPolicy,
+      condition.status==='needs_checkin' ? '0-2. 体調確認: 過去の痛み・違和感が現在も続くとは断定しない。今回の依頼がプラン変更・負荷増加に関わる場合は、まず「前に記録した痛み・違和感は今どんな感じ？」と短く確認し、回答後に変更案を出す。' : '',
+      condition.status==='resolved' ? '0-2. 体調確認: 過去の痛みは改善済みと確認されている。再発の申告がなければ、過去の記録だけを理由に負荷を一律に下げない。' : '',
       '1. 期分け: 復帰期→ベース構築期→ピーク期→テーパー期の順に負荷が上がり、最後に下がる。phaseの文言はこの考え方に沿わせる。',
       '2. 週間パターン: 曜日構成(どの曜日にMP走/イージー/ロング走/完全休養を置くか)は現在のプランの構成を尊重しつつ、ランナーの生活制約があればそれを優先する。',
       '3. 負荷の調整: 一律の増加率は使わず、直近の実走、最長距離、実施状況、疲労・痛み、生活制約を合わせて判断する。痛みや強い疲労がある場合は、増量より休養・維持・軽減を優先する。',
@@ -5757,7 +5821,8 @@
       state.onboarding.screen='quest-form'; render();
     } else if(action==='onboarding-create'){
       const o=state.onboarding, d=o.draft; if(o.busy) return; o.busy=true; render();
-      const plan=o.questType==='race' ? generatePlan({name:d.name,distanceLabel:d.distanceKm===42.195?'フルマラソン':d.distanceKm===21.0975?'ハーフマラソン':d.distanceKm+'km',distanceKm:d.distanceKm,raceDate:parseISO(d.raceDate),startDate:parseISO(d.startDate),targetSec:4*3600,targetLabel:'4:00:00',longRunStart:Math.max(3,Number(state.profile.longestRunManualKm)||3),pbLabel:null,heelCaution:!!state.profile.injuryNote,injuryNote:state.profile.injuryNote,courseNote:null,constitutionNote:state.profile.constitutionNote,scheduleNote:state.profile.scheduleNote,mpWeekday:1,easyWeekdays:[3],longWeekday:6}) : generateBeginnerPlan(Object.assign({},d,{questType:o.questType,availableWeekdays:d.availableWeekdays||state.profile.availableWeekdays}));
+      const currentCondition=currentPainCondition();
+      const plan=o.questType==='race' ? generatePlan({name:d.name,distanceLabel:d.distanceKm===42.195?'フルマラソン':d.distanceKm===21.0975?'ハーフマラソン':d.distanceKm+'km',distanceKm:d.distanceKm,raceDate:parseISO(d.raceDate),startDate:parseISO(d.startDate),targetSec:4*3600,targetLabel:'4:00:00',longRunStart:Math.max(3,Number(state.profile.longestRunManualKm)||3),pbLabel:null,heelCaution:currentCondition.status==='active',injuryNote:currentCondition.status==='active'?state.profile.injuryNote:null,courseNote:null,constitutionNote:state.profile.constitutionNote,scheduleNote:state.profile.scheduleNote,mpWeekday:1,easyWeekdays:[3],longWeekday:6}) : generateBeginnerPlan(Object.assign({},d,{questType:o.questType,availableWeekdays:d.availableWeekdays||state.profile.availableWeekdays}));
       if(!plan){ o.busy=false; o.screen='quest-form'; render(); return; }
       Store.savePlan(plan).then(function(){ state.plans.push(plan); state.currentId=plan.id; state.completed={}; state.logs={}; d.firstMenu=(plan.weeks[0].items[0]||{}).title||''; return onboardingSave({walkthroughCompleted:true,profileCompleted:true,draft:null}); }).then(function(){ o.busy=false;o.screen='done';render(); });
     } else if(action==='onboarding-finish'){
@@ -6038,6 +6103,13 @@
       const plan=currentPlan(); if(plan){ state.profile.planReviewDismissedFor=plan.id+':'+todayISO(); Store.setProfile(state.profile); showMypageToast('今のプランを続けます'); render(); }
     } else if(action==='review-consult'){
       const plan=currentPlan(); if(plan) state.adjust.draft='プランの見直し提案について相談したいです。'; state.mode='coach'; render(); if(plan) loadCoachThread(plan.id);
+    } else if(action==='review-condition-checkin'){
+      const plan=currentPlan();
+      const condition=currentPainCondition();
+      const partLabel=condition.parts&&condition.parts.length ? condition.parts.join('・') : '痛み・違和感';
+      state.adjust.context=null;
+      state.adjust.draft='前に記録した'+partLabel+'は、今はどんな感じか相談したいです。';
+      state.mode='coach'; render(); if(plan) loadCoachThread(plan.id);
     } else if(action==='apply-plan-review'){
       const plan=currentPlan(); if(!plan) return;
       const previous=JSON.parse(JSON.stringify(plan)), completed=JSON.parse(JSON.stringify(state.completed));
@@ -6215,7 +6287,8 @@
       state.adjust.startedAt = Date.now();
       state.adjust.streamPreview = null;
       const safety=evaluateSafetyMessage(instruction,state.coach.messages);
-      addCoachMessage({ role:'user', text: instruction, safetyEvent:safety.event||null });
+      const conditionEvent=evaluatePainConditionMessage(instruction,state.coach.messages);
+      addCoachMessage({ role:'user', text: instruction, safetyEvent:safety.event||null, conditionEvent:conditionEvent||null });
       if(safety.localReply){
         state.adjust.busy=false;
         addCoachMessage({ role:'coach', kind:'advice', text:safety.localReply, coachPersona:coachPersonaKey((state.profile||{}).coachPersona), basis:{version:COACHING_RULES.version,reasons:['今回の発言と、症状ごとに保存した継続状態を確認しました。'],sourceIds:['mhlw-physical-activity-guide-2023']}, safetyEvent:safety.event||null });
@@ -6389,6 +6462,7 @@
     const longest = effectiveLongestRunKm(profile);
     const pattern = trainingWeekPattern(profile.availableWeekdays, Number(profile.weeklyRunDays));
     const bestPb = bestPbForDistance(data.distanceKm, profile.pbs);
+    const currentCondition = currentPainCondition();
     const distLabels = {'42.195':'フルマラソン','21.0975':'ハーフマラソン','16':'16km','10':'10km','5':'5km'};
     const linkedPlan = data.linkedFrom ? state.plans.find(p=>p.id===data.linkedFrom) : null;
     const forceRecoveryWeeks = linkedPlan ? recoveryPlanFor(linkedPlan).forceRecoveryWeeks : null;
@@ -6402,8 +6476,8 @@
       targetLabel: secToHMSLabel(targetSec),
       longRunStart: longest.km,
       pbLabel: bestPb ? bestPb.timeLabel : null,
-      heelCaution: !!profile.injuryNote,
-      injuryNote: profile.injuryNote || null,
+      heelCaution: currentCondition.status==='active',
+      injuryNote: currentCondition.status==='active' ? profile.injuryNote || null : null,
       courseNote: data.courseNote || null,
       constitutionNote: profile.constitutionNote || null,
       scheduleNote: profile.scheduleNote || null,

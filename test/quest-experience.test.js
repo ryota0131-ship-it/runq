@@ -5,7 +5,9 @@ const path = require('path');
 const app = fs.readFileSync(path.join(__dirname, '..', 'app', 'runq.html'), 'utf8');
 
 assert.ok(app.includes('coachDailyBriefHTML(plan,today)'), 'home starts with a short coach brief');
-assert.ok(app.includes('今日は休んで強くなる日。'), 'rest days are framed positively');
+assert.ok(app.includes('今日は休んで強くなる日'), 'rest days are framed positively');
+assert.ok(app.includes("html += coachDailyBriefHTML(plan,today)"), 'rest guidance is presented as the coach message');
+assert.ok(app.includes("coachMascotHTML((state.profile||{}).coachPersona,'normal','small')"), 'daily coach brief includes the selected coach mascot');
 assert.ok(!app.includes('今日は予定を入れていません'), 'home no longer leads with an empty-schedule message');
 assert.ok(app.includes('class="home-workout-details"'), 'long workout instructions are expandable');
 assert.ok(app.includes('NEXT MILESTONE'), 'home shows the next achievable milestone');
@@ -20,5 +22,9 @@ assert.ok(!app.includes('class="quest-journey"'), 'the old 5-stage abstract jour
 assert.ok(app.includes('class="coach-proposal"'), 'plan changes use a dedicated proposal card');
 assert.ok(app.includes('if(m.resolved) return \'\';'), 'resolved proposal cards collapse from the conversation');
 assert.ok(app.includes('<strong>プランを変更しました</strong>'), 'confirmed changes use a short completion message');
+assert.ok(app.includes('function currentPainCondition()'), 'pain history and current condition are evaluated separately');
+assert.ok(app.includes("condition.status==='needs_checkin'"), 'recent unconfirmed pain triggers a check-in rather than an automatic load reduction');
+assert.ok(app.includes('function evaluatePainConditionMessage'), 'a user can resolve a named pain condition in chat');
+assert.ok(app.includes('過去の痛み・違和感が現在も続くとは断定しない'), 'coach prompt does not treat historical pain as current');
 
 console.log('quest experience checks: passed');
