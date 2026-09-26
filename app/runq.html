@@ -194,6 +194,15 @@
   .plan-focus-bar small{ display:block; color:var(--text-faint); margin-top:2px; font-size:11.5px; }
   .plan-focus-actions{ display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; }
   .plan-focus-actions .btn-secondary{ padding:7px 10px; font-size:12px; }
+  .plan-overview{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:2px 2px 0; }
+  .plan-overview-copy{ min-width:0; }
+  .plan-overview-copy strong{ display:block; margin-top:3px; font-size:18px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .plan-overview-copy small{ display:block; margin-top:4px; color:var(--text-muted); font-size:12px; }
+  .plan-overview-status{ flex:0 0 auto; text-align:right; }
+  .plan-overview-status strong{ display:block; color:var(--accent-strong); font-family:"Zen Kaku Gothic New",sans-serif; font-size:18px; }
+  .plan-overview-status span{ display:block; color:var(--text-faint); font-size:10px; margin-top:3px; }
+  .plan-disclosure{ margin:0; }
+  .plan-disclosure .quest-path{ margin:0; border:0; border-radius:0; padding:14px 0 0; background:transparent; }
   .plan-management-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
   .plan-management-actions .btn-secondary,.plan-management-actions .btn-danger{ padding:7px 10px; font-size:12px; }
   .risk-callout{ display:flex; align-items:flex-start; gap:8px; background:var(--warn-soft); color:var(--warn); border-radius:10px; padding:10px 14px; font-size:13px; line-height:1.55; margin-bottom:12px; }
@@ -717,6 +726,20 @@
 
   /* ---------- home dashboard ---------- */
   .home-dashboard{ display:flex; flex-direction:column; gap:18px; padding-bottom:4px; }
+  .home-goal-summary{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:2px 2px; }
+  .home-goal-summary-copy{ min-width:0; }
+  .home-goal-summary-kicker{ display:block; color:var(--text-faint); font-size:10px; font-weight:800; letter-spacing:.1em; }
+  .home-goal-summary strong{ display:block; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; }
+  .home-goal-summary small{ display:block; margin-top:2px; color:var(--text-muted); font-size:11.5px; }
+  .home-goal-count{ flex:0 0 auto; text-align:right; }
+  .home-goal-count strong{ color:var(--accent-strong); font-family:"Zen Kaku Gothic New",sans-serif; font-size:20px; }
+  .home-goal-count span{ display:block; color:var(--text-faint); font-size:10px; margin-top:1px; }
+  .disclosure-card{ padding:0; overflow:hidden; }
+  .disclosure-card > button{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 16px; border:0; background:transparent; color:var(--text); text-align:left; font:700 14px/1.35 "Zen Kaku Gothic New",sans-serif; cursor:pointer; }
+  .disclosure-card > button small{ display:block; margin-top:3px; color:var(--text-muted); font:400 11.5px/1.45 inherit; }
+  .disclosure-card > button .disclosure-arrow{ color:var(--text-faint); font-size:15px; }
+  .disclosure-card .disclosure-body{ padding:0 16px 16px; border-top:1px solid var(--border); }
+  .disclosure-card .forecast-card{ border:0; border-radius:0; padding:14px 0 0; background:transparent; }
   .home-dashboard .hero{ margin:0; }
   .coach-daily-brief{ display:flex; align-items:center; gap:12px; padding:14px 16px; border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border)); border-radius:18px; background:linear-gradient(130deg,var(--surface) 0%,var(--accent-soft) 100%); box-shadow:0 8px 22px var(--shadow); }
   .coach-daily-brief .coach-mascot{ flex:0 0 auto; }
@@ -2013,7 +2036,7 @@
       try{ localStorage.setItem('paceplan.workouts', JSON.stringify(entries)); }catch(e){}
     },
     async getProfile(){
-      const empty = { name:null, profilePhoto:null, coachPersona:'companion', backgroundTheme:'runq', activePlanId:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, deletedWorkoutRefs:[], onboarding:{version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
+      const empty = { name:null, profilePhoto:null, coachPersona:'cheer', coachName:'カイ', backgroundTheme:'runq', activePlanId:null, injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, deletedWorkoutRefs:[], onboarding:{version:1,walkthroughCompleted:false,profileCompleted:false,draft:null}, healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} };
       const withDefaults = function(raw){
         const profile = Object.assign({}, empty, raw||{});
         const connections = (raw&&raw.healthConnections)||{};
@@ -2026,6 +2049,8 @@
         profile.deletedWorkoutRefs = Array.isArray(raw&&raw.deletedWorkoutRefs) ? raw.deletedWorkoutRefs : [];
         profile.displayPreferences = Object.assign({largeText:false,highContrast:false,simple:false}, (raw&&raw.displayPreferences)||{});
         profile.backgroundTheme = BACKGROUND_THEMES[profile.backgroundTheme] ? profile.backgroundTheme : 'runq';
+        profile.coachPersona = 'cheer';
+        profile.coachName = String(profile.coachName||'カイ').trim().slice(0,20)||'カイ';
         return profile;
       };
       if(db){
@@ -2071,13 +2096,17 @@
     deleteModal: null,
     workoutMergeModal: null,
     workoutDeleteModal: null,
-    profile: { name:null, profilePhoto:null, coachPersona:'companion', backgroundTheme:'runq', injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, deletedWorkoutRefs:[], healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} },
+    profile: { name:null, profilePhoto:null, coachPersona:'cheer', coachName:'カイ', backgroundTheme:'runq', injuryNote:null, courseNote:null, constitutionNote:null, scheduleNote:null, pbs:[], shoes:[], weeklyRunDays:null, availableWeekdays:[], longRunWeekday:null, longestRunManualKm:null, workoutUserId:null, deletedWorkoutRefs:[], healthConnections:{autoImport:true, appleHealth:{enabled:false,lastSyncedAt:null}, healthConnect:{enabled:false,lastSyncedAt:null}} },
     shoeMileage: {},
     runnerStats: { longestRunKm: null },
     profileFormError: {},
     trainingFormError: {},
     policyOpen: false,
     planHistoryOpen: false,
+    planJourneyOpen: false,
+    planGoalOpen: false,
+    planExtrasOpen: false,
+    homeProgressOpen: false,
     forecastDetailsOpen: false,
     infoModal: null,
     forecast: {},
@@ -2125,6 +2154,10 @@
     state.currentId=id;
     state.profile.activePlanId=id;
     state.planHistoryOpen=false;
+    state.planJourneyOpen=false;
+    state.planGoalOpen=false;
+    state.planExtrasOpen=false;
+    state.homeProgressOpen=false;
     state.forecastDetailsOpen=false;
     state.adjust.draft=''; state.adjust.error=null; state.adjust.context=null;
     state.logForm={ openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy:null };
@@ -3786,12 +3819,28 @@
     return p && p.meta && p.meta.raceDate;
   }
 
+  function planJourneyDisclosureHTML(plan){
+    const open=!!state.planJourneyOpen;
+    return '<section class="info-card disclosure-card plan-disclosure"><button type="button" data-action="toggle-plan-journey" aria-expanded="'+(open?'true':'false')+'"><span>ゴールまでの流れ<small>期ごとの進め方を見る</small></span><span class="disclosure-arrow" aria-hidden="true">'+(open?'⌃':'›')+'</span></button>'+(open?'<div class="disclosure-body">'+planPathHTML(plan)+'</div>':'')+'</section>';
+  }
+
+  function planGoalDisclosureHTML(plan, body){
+    const open=!!state.planGoalOpen;
+    return '<section class="info-card disclosure-card"><button type="button" data-action="toggle-plan-goal" aria-expanded="'+(open?'true':'false')+'"><span>目標の詳細<small>大会日・目標ペースなどを確認</small></span><span class="disclosure-arrow" aria-hidden="true">'+(open?'⌃':'›')+'</span></button>'+(open?'<div class="disclosure-body">'+body+'</div>':'')+'</section>';
+  }
+
+  function planExtrasDisclosureHTML(plan){
+    const open=!!state.planExtrasOpen;
+    const body='<div class="extras-grid"><div><h3>補給計画（本番想定）</h3><ul>'+((plan.extras&&plan.extras.fueling)||[]).map(function(f){return '<li>'+escapeHtml(f)+'</li>';}).join('')+'</ul></div><div><h3>注意事項</h3><ul>'+((plan.extras&&plan.extras.cautions)||[]).map(function(f){return '<li>'+escapeHtml(f)+'</li>';}).join('')+'</ul></div></div>';
+    return '<section class="info-card disclosure-card"><button type="button" data-action="toggle-plan-extras" aria-expanded="'+(open?'true':'false')+'"><span>本番に向けた補足<small>補給と注意事項を確認</small></span><span class="disclosure-arrow" aria-hidden="true">'+(open?'⌃':'›')+'</span></button>'+(open?'<div class="disclosure-body">'+body+'</div>':'')+'</section>';
+  }
+
   function planViewHTML(plan){
     if(!plan) return planPillsHTML()+'<div class="info-card">プランがありません。「プラン作成」から作成してください。</div>';
     if(plan.meta && plan.meta.questType && plan.meta.questType!=='race'){
       const beginnerToday=todayLocal(), beginnerCur=findCurrentWeek(plan,beginnerToday);
       let total=0,done=0; plan.weeks.forEach(function(w){w.items.forEach(function(it){if(isLoggable(it)){total++;if(isItemCompleted(plan,it))done++;}});});
-      return '<main class="wrap">'+planPillsHTML()+'<div class="hero"><div class="hero-meta"><div class="quest-kicker">CURRENT QUEST</div><div class="hero-race">'+escapeHtml(plan.meta.name)+'</div><div class="hero-sub">'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</div></div><div class="phase-side"><div class="phase-badge">'+done+' / '+total+' メニュー完了</div></div></div>'+planPathHTML(plan)+'<div class="weeks journey-weeks">'+plan.weeks.map(function(w,wi){const current=beginnerCur&&beginnerCur.wi===wi;return '<section class="week-card'+(current?' current':'')+'" id="week-card-'+escapeHtml(plan.id)+'-'+wi+'"><div class="week-head"><div class="week-head-left"><span class="week-num">'+escapeHtml(w.label)+'</span><span class="week-phase">'+escapeHtml(w.phase)+'</span><span class="week-range mono">'+escapeHtml(w.dateRange||'')+'</span></div></div>'+w.items.map(function(it,ii){return itemRowHTML(plan,wi,ii,it,beginnerToday);}).join('')+'</section>';}).join('')+'</div></main>';
+      return '<main class="wrap">'+planPillsHTML()+'<section class="plan-overview"><div class="plan-overview-copy"><span class="quest-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name)+'</strong><small>'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</small></div><div class="plan-overview-status"><strong>'+done+'/'+total+'</strong><span>メニュー完了</span></div></section>'+planJourneyDisclosureHTML(plan)+'<div class="weeks journey-weeks">'+plan.weeks.map(function(w,wi){const current=beginnerCur&&beginnerCur.wi===wi;return '<section class="week-card'+(current?' current':'')+'" id="week-card-'+escapeHtml(plan.id)+'-'+wi+'"><div class="week-head"><div class="week-head-left"><span class="week-num">'+escapeHtml(w.label)+'</span><span class="week-phase">'+escapeHtml(w.phase)+'</span><span class="week-range mono">'+escapeHtml(w.dateRange||'')+'</span></div></div>'+w.items.map(function(it,ii){return itemRowHTML(plan,wi,ii,it,beginnerToday);}).join('')+'</section>';}).join('')+'</div></main>';
     }
     const today = todayLocal();
     const raceDate = parseISO(plan.meta.raceDate);
@@ -3823,53 +3872,25 @@
         }
       });
     });
-    const pct = total? Math.round(done/total*100):0;
-
-    let countdownNum, countdownLbl;
-    if(daysLeft>0){ countdownNum=daysLeft; countdownLbl='DAYS TO RACE'; }
-    else if(daysLeft===0){ countdownNum='0'; countdownLbl='RACE DAY'; }
-    else { countdownNum='+'+(-daysLeft); countdownLbl='DAYS SINCE RACE'; }
-
     let html = planPillsHTML();
-
-    html += '<div class="hero">'
-      + '<div class="countdown"><div class="num mono">'+countdownNum+'</div><div class="lbl">'+countdownLbl+'</div></div>'
-      + '<div class="hero-meta">'
-      + '<div class="quest-kicker">CURRENT QUEST</div>'
-      + '<div class="hero-race">'+escapeHtml(plan.meta.name)+'</div>'
-      + '<div class="hero-sub">'+plan.meta.distanceLabel+' ・ '+fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）・ 開始 '+fmtMD(startDate)+'</div>'
-      + (function(){
-          if(!plan.meta.linkedFromPlanId) return '';
-          const src = state.plans.find(p=>p.id===plan.meta.linkedFromPlanId);
-          if(!src) return '';
-          return '<div class="hero-link-note">'+escapeHtml(src.meta.name)+'（'+fmtMD(parseISO(src.meta.raceDate))+'）からの継続プラン</div>';
-        })()
-      + '<div class="hero-stats">'
-      + '<div class="stat"><span class="k">目標タイム</span><span class="v">'+plan.meta.targetLabel+'</span></div>'
-      + '<div class="stat"><span class="k">MPペース</span><span class="v">'+plan.meta.mpLabel+'</span></div>'
-      + '<div class="stat"><span class="k">イージー</span><span class="v">'+plan.meta.easyLabel+'</span></div>'
-      + (plan.meta.pbLabel?'<div class="stat"><span class="k">現在PB</span><span class="v">'+plan.meta.pbLabel+'</span></div>':'')
-      + '</div></div>'
-      + '<div class="phase-side">'
-      + '<div class="phase-badge">'+escapeHtml(phaseLabel)+'</div>'
-      + '<div class="ring-wrap"><div class="week-progress"><div class="bar"><div class="fill" style="width:'+pct+'%"></div></div></div><div class="ring-label"><span class="rl-kicker">PROGRESS</span>全体 '+done+'/'+total+'</div></div>'
-      + '</div>'
-      + '</div>';
-
-    html += planPathHTML(plan);
+    const raceStatus=daysLeft>0?'あと '+daysLeft+'日':daysLeft===0?'レース当日':'レース後';
+    const goalDetails='<div class="hero-stats"><div class="stat"><span class="k">大会日</span><span class="v">'+fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）</span></div><div class="stat"><span class="k">目標タイム</span><span class="v mono">'+escapeHtml(plan.meta.targetLabel||'—')+'</span></div><div class="stat"><span class="k">MPペース</span><span class="v">'+escapeHtml(plan.meta.mpLabel||'—')+'</span></div><div class="stat"><span class="k">イージー</span><span class="v">'+escapeHtml(plan.meta.easyLabel||'—')+'</span></div>'+(plan.meta.pbLabel?'<div class="stat"><span class="k">現在PB</span><span class="v">'+escapeHtml(plan.meta.pbLabel)+'</span></div>':'')+'</div>'+(plan.meta.linkedFromPlanId?(function(){const src=state.plans.find(function(p){return p.id===plan.meta.linkedFromPlanId;});return src?'<div class="hero-link-note">'+escapeHtml(src.meta.name)+'からの継続プラン</div>':'';})():'');
+    html += '<section class="plan-overview"><div class="plan-overview-copy"><span class="quest-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name)+'</strong><small>'+escapeHtml(plan.meta.distanceLabel)+' ・ '+escapeHtml(phaseLabel)+'</small></div><div class="plan-overview-status"><strong>'+done+'/'+total+'</strong><span>'+escapeHtml(raceStatus)+' ・ 完了</span></div></section>';
+    html += planGoalDisclosureHTML(plan,goalDetails);
+    html += planJourneyDisclosureHTML(plan);
 
     const contextLines = [];
     if(plan.meta.courseNote) contextLines.push('コース特性・気候: '+plan.meta.courseNote);
     if(plan.meta.constitutionNote) contextLines.push('体質的特徴: '+plan.meta.constitutionNote);
     if(plan.meta.scheduleNote) contextLines.push('生活制約: '+plan.meta.scheduleNote);
-    html += '<div class="info-card policy-card'+(state.policyOpen?' open':'')+'">'
+    let secondaryHTML = '<div class="info-card policy-card'+(state.policyOpen?' open':'')+'">'
       + '<button type="button" class="policy-toggle" data-action="toggle-policy" aria-expanded="'+(state.policyOpen?'true':'false')+'">基本方針<span class="policy-chevron">▾</span></button>'
       + (state.policyOpen ? '<ul>'+plan.meta.policy.concat(contextLines).map(p=>'<li>'+escapeHtml(p)+'</li>').join('')+'</ul>' : '')
       + '</div>';
 
     if(plan.history && plan.history.length){
       const recent = plan.history.slice(-3).reverse();
-      html += '<div class="info-card"><button type="button" class="history-toggle" data-action="toggle-plan-history" aria-expanded="'+(state.planHistoryOpen?'true':'false')+'"><span>変更履歴</span><small>'+plan.history.length+'件</small><span class="history-chevron" aria-hidden="true">⌄</span></button>'+(state.planHistoryOpen?'<ul class="history-list">'+recent.map(h=>{
+      secondaryHTML += '<div class="info-card"><button type="button" class="history-toggle" data-action="toggle-plan-history" aria-expanded="'+(state.planHistoryOpen?'true':'false')+'"><span>変更履歴</span><small>'+plan.history.length+'件</small><span class="history-chevron" aria-hidden="true">⌄</span></button>'+(state.planHistoryOpen?'<ul class="history-list">'+recent.map(h=>{
         const d = h.ts ? new Date(h.ts) : null;
         const dLabel = d ? (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()) : '';
         const summary=compactHistoryText(h.summary||'変更しました。', 118);
@@ -3916,10 +3937,9 @@
 
     }
 
-    html += '<div class="extras-grid">'
-      + '<div class="info-card"><h3>補給計画(本番想定)</h3><ul>'+plan.extras.fueling.map(f=>'<li>'+escapeHtml(f)+'</li>').join('')+'</ul></div>'
-      + '<div class="info-card"><h3>注意事項</h3><ul>'+plan.extras.cautions.map(f=>'<li>'+escapeHtml(f)+'</li>').join('')+'</ul></div>'
-      + '</div>';
+    html += planExtrasDisclosureHTML(plan);
+
+    html += secondaryHTML;
 
     html += '<div class="foot-note">実績を記録すると、予定の進捗に反映されます</div>';
     return html;
@@ -4266,14 +4286,21 @@
     const sources=(basis.sourceIds||[]).map(function(id){ return COACH_SOURCE_LABEL[id]||id; }).join('／');
     return '<details class="coach-basis"><summary>なぜ？</summary><div>'+basis.reasons.map(function(reason){ return '<p>'+escapeHtml(reason)+'</p>'; }).join('')+(sources?'<small>参照の目安: '+escapeHtml(sources)+'</small>':'')+'</div></details>';
   }
-  function coachPersona(key){ const selected=key||((state.profile&&state.profile.coachPersona)||'companion'); return COACH_PERSONAS[selected]||COACH_PERSONAS.companion; }
-  function coachPersonaKey(key){ return COACH_PERSONAS[key] ? key : 'companion'; }
+  // RUNQ.のコーチはカイに固定する。過去メッセージに保存済みの種別は表示互換のため残すが、
+  // 新しい応答・同期表示・フィードバックは常にカイの見た目と共通の判断基盤を使う。
+  function coachPersona(key){
+    const selected=key||'cheer';
+    const base=COACH_PERSONAS[selected]||COACH_PERSONAS.cheer;
+    const label=(!key||selected==='cheer') ? String((state.profile&&state.profile.coachName)||'カイ').trim().slice(0,20)||'カイ' : base.label;
+    return Object.assign({},base,{label:label});
+  }
+  function coachPersonaKey(){ return 'cheer'; }
   function coachMascotHTML(key, mood, size){
     const personaKey=coachPersonaKey(key), stateName=['normal','thinking','cheer'].indexOf(mood)>=0?mood:'normal';
     return '<span class="coach-mascot coach-mascot-'+(size||'small')+'" aria-hidden="true"><img src="assets/coach/'+personaKey+'-'+stateName+'.png" alt="" onerror="this.parentElement.style.display=\'none\'"></span>';
   }
   function coachLabelHTML(key){ return '<span class="coach-label">'+escapeHtml(coachPersona(key).label)+'</span>'; }
-  function coachCompanionSettingsHTML(){ const current=coachPersonaKey(state.profile&&state.profile.coachPersona); return '<div class="info-card coach-companion-settings"><h3>あなたのコーチ</h3><div class="li-sub">コーチによって口調は変わりますが、判断基準やプランは変わりません。</div><div class="companion-choice-list">'+Object.keys(COACH_PERSONAS).map(function(key){const p=COACH_PERSONAS[key];return '<button type="button" class="companion-choice'+(current===key?' selected':'')+'" data-action="select-coach-persona" data-persona="'+key+'" aria-pressed="'+(current===key?'true':'false')+'">'+coachMascotHTML(key,'normal','choice')+'<span class="companion-choice-copy"><strong>'+p.label+' コーチ</strong><span class="companion-type">'+p.typeLabel+'</span><span>'+p.description+'</span><small>「'+p.example+'」</small></span><span class="companion-choice-state">'+(current===key?'選択中':'選ぶ')+'</span></button>';}).join('')+'</div></div>'; }
+  function coachCompanionSettingsHTML(){ const p=coachPersona(); return '<div class="info-card coach-companion-settings"><div class="coach-inline-title">'+coachMascotHTML('cheer','normal','small')+'<div><h3>'+escapeHtml(p.label)+' コーチ</h3><div class="li-sub">明るく、実績と体調をもとに次の一歩を一緒に考えます。</div></div></div><form id="coach-name-form" class="inline-form" style="margin-top:14px"><div class="field field-full"><label for="coach_name">コーチの呼び名</label><input id="coach_name" name="coachName" type="text" maxlength="20" value="'+escapeHtml(p.label)+'" aria-describedby="coach-name-help"><small id="coach-name-help" class="hint">名前だけを変更できます。判断基準やプランは変わりません。</small></div><button type="submit" class="btn-secondary">保存</button></form></div>'; }
   function planReviewAssessment(plan){
     const today=todayLocal(), from=addDays(today,-14), items=flattenPlanItems(plan).filter(function(x){return x.date&&parseISO(x.date)>=from&&parseISO(x.date)<=today&&['easy','long','mp'].indexOf(x.type)>=0;});
     const done=items.filter(function(x){ return isItemCompleted(plan,(plan.weeks[x.wi]||{items:[]}).items[x.ii]); }).length;
@@ -4289,6 +4316,23 @@
     return '<section class="plan-review-card"><div class="plan-review-head">'+coachMascotHTML((state.profile||{}).coachPersona,'thinking','small')+'<div><h3>今週のプランを整えますか？</h3><p>'+escapeHtml(review.reason)+'</p></div></div><div class="plan-review-recommend"><strong>おすすめ</strong>未実施のイージー／ロング走を約10%軽くし、目標タイムはそのまま維持します。</div><div class="form-actions"><button type="button" class="btn-primary" data-action="apply-plan-review">この変更で進める</button><button type="button" class="btn-secondary" data-action="review-consult">別の案を相談</button><button type="button" class="btn-secondary" data-action="dismiss-plan-review">今回は変えない</button></div>'+(state.planReviewUndo?'<button type="button" class="workout-text-link" style="margin-top:10px" data-action="undo-plan-review">直前の見直しを取り消す</button>':'')+'</section>';
   }
 
+  function homeGoalSummaryHTML(plan, today){
+    const isRace=!(plan.meta&&plan.meta.questType&&plan.meta.questType!=='race');
+    const raceDate=isRace&&plan.meta.raceDate?parseISO(plan.meta.raceDate):null;
+    const daysLeft=raceDate?daysBetween(today,raceDate):null;
+    const count=daysLeft===null?'進行中':(daysLeft>0?daysLeft+'日':daysLeft===0?'本日':'完了');
+    const countLabel=daysLeft===null?'現在の目標':(daysLeft>0?'レースまで':daysLeft===0?'レース当日':'レース後');
+    const detail=isRace?(plan.meta.distanceLabel+' ・ '+(raceDate?fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）':'')):(plan.meta.distanceLabel+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間');
+    return '<section class="home-goal-summary" aria-label="現在の目標"><div class="home-goal-summary-copy"><span class="home-goal-summary-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name||'現在の目標')+'</strong><small>'+escapeHtml(detail)+'</small></div><div class="home-goal-count"><strong>'+escapeHtml(count)+'</strong><span>'+escapeHtml(countLabel)+'</span></div></section>';
+  }
+
+  function homeProgressDisclosureHTML(plan, today){
+    const open=!!state.homeProgressOpen;
+    const forecast=latestForecastFor(plan.id);
+    const summary=forecast?'走力の目安 '+forecastEstimateLabel(forecast):'次の積み上げを確認できます';
+    return '<section class="info-card disclosure-card"><button type="button" data-action="toggle-home-progress" aria-expanded="'+(open?'true':'false')+'"><span>目標への進み方<small>'+escapeHtml(summary)+'</small></span><span class="disclosure-arrow" aria-hidden="true">'+(open?'⌃':'›')+'</span></button>'+(open?'<div class="disclosure-body">'+questMomentumHTML(plan,today)+forecastCardHTML(plan)+'</div>':'')+'</section>';
+  }
+
   function homeHTML(){
     const plan = currentPlan();
     if(!plan){
@@ -4302,40 +4346,17 @@
     }
     if(plan.meta && plan.meta.questType && plan.meta.questType!=='race'){
       const today=todayLocal();
-      const stage=plan.weeks.findIndex(function(w){return w.items.some(function(i){return i.date===todayISO();});})+1;
-      return '<main class="home-dashboard">'+healthImportNoticeHTML()+coachDailyBriefHTML(plan,today)+todayCardHTML(plan,today)+'<div class="hero quest-card home-quest"><div class="hero-meta"><div class="quest-kicker">CURRENT QUEST</div><div class="hero-race">'+escapeHtml(plan.meta.name)+'</div><div class="hero-sub">'+(plan.meta.goalWeeks||plan.weeks.length)+'週間のプログラム ・ '+(stage>0?'WEEK '+stage:'開始前')+'</div><div class="hero-stats"><div class="stat"><span class="k">目標</span><span class="v">'+escapeHtml(plan.meta.distanceLabel)+'</span></div><div class="stat"><span class="k">進行</span><span class="v">'+plan.weeks.length+'週間</span></div></div></div><div class="phase-side"><button type="button" class="btn-secondary" data-action="tab" data-tab="create">＋ 新しい目標</button></div></div>'+questMomentumHTML(plan,today)+thisWeekCardHTML(plan,today)+'<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button><span class="home-coach-copy">練習・体調・予定の変更を相談できます</span></div></main>';
+      return '<main class="home-dashboard">'+healthImportNoticeHTML()+todayCardHTML(plan,today)+homeGoalSummaryHTML(plan,today)+thisWeekCardHTML(plan,today)+planReviewCardHTML(plan)+homeProgressDisclosureHTML(plan,today)+'<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div></main>';
     }
     const today = todayLocal();
-    const raceDate = parseISO(plan.meta.raceDate);
-    const daysLeft = daysBetween(today, raceDate);
-    let countdownNum, countdownLbl;
-    if(daysLeft>0){ countdownNum=daysLeft+'日'; countdownLbl='レースまで'; }
-    else if(daysLeft===0){ countdownNum='本日'; countdownLbl='RACE DAY'; }
-    else { countdownNum='+'+(-daysLeft)+'日'; countdownLbl='レース後'; }
-
-    let quest = '<div class="hero quest-card home-quest">'
-      + '<div class="hero-meta">'
-      + '<div class="quest-kicker">CURRENT QUEST</div>'
-      + '<div class="hero-race">'+escapeHtml(plan.meta.name)+'</div>'
-      + '<div class="hero-sub">'+plan.meta.distanceLabel+' ・ '+fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）</div>'
-      + '<div class="hero-stats">'
-      + '<div class="stat"><span class="k">目標タイム</span><span class="v">'+plan.meta.targetLabel+'</span></div>'
-      + '<div class="stat"><span class="k">MPペース</span><span class="v">'+plan.meta.mpLabel+'</span></div>'
-      + '</div></div>'
-      + '<div class="countdown"><div class="lbl">'+countdownLbl+'</div><div class="num mono">'+countdownNum+'</div></div>'
-      + '<div class="phase-side"><button type="button" class="btn-secondary quest-newquest-btn" data-action="tab" data-tab="create">新しい目標を追加</button></div>'
-      + '</div>';
-
     let html = '<main class="home-dashboard">';
     html += healthImportNoticeHTML();
-    html += coachDailyBriefHTML(plan, today);
     html += todayCardHTML(plan, today);
-    html += quest;
-    html += questMomentumHTML(plan, today);
+    html += homeGoalSummaryHTML(plan,today);
     html += thisWeekCardHTML(plan, today);
-    html += '<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button><span class="home-coach-copy">練習・体調・予定の変更を相談できます</span></div>';
     html += planReviewCardHTML(plan);
-    html += forecastCardHTML(plan);
+    html += homeProgressDisclosureHTML(plan,today);
+    html += '<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div>';
     return html+'</main>';
   }
 
@@ -5752,6 +5773,18 @@
     } else if(action==='toggle-plan-history'){
       state.planHistoryOpen = !state.planHistoryOpen;
       render();
+    } else if(action==='toggle-plan-journey'){
+      state.planJourneyOpen = !state.planJourneyOpen;
+      render();
+    } else if(action==='toggle-plan-goal'){
+      state.planGoalOpen = !state.planGoalOpen;
+      render();
+    } else if(action==='toggle-plan-extras'){
+      state.planExtrasOpen = !state.planExtrasOpen;
+      render();
+    } else if(action==='toggle-home-progress'){
+      state.homeProgressOpen = !state.homeProgressOpen;
+      render();
     } else if(action==='toggle-forecast-details'){
       state.forecastDetailsOpen = !state.forecastDetailsOpen;
       render();
@@ -6167,6 +6200,16 @@
       Store.setProfile(state.profile);
       state.profileEditOpen = false;
       showMypageToast('プロフィールを保存しました');
+      render();
+      return;
+    }
+    if(e.target.id==='coach-name-form'){
+      e.preventDefault();
+      const f=e.target;
+      state.profile.coachPersona='cheer';
+      state.profile.coachName=String(f.coachName.value||'').trim().slice(0,20)||'カイ';
+      Store.setProfile(state.profile);
+      showMypageToast(state.profile.coachName+' コーチに変更しました');
       render();
       return;
     }

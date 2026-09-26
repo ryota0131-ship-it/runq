@@ -177,7 +177,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 ```
 
 - **Provider選択は`selectCoachProvider()`の1箇所のみ**(`app/runq.html`)。`ClaudeArtifactProvider.available()`(=`window.claude.use('sample')`が使えるか)を優先し、使えない場合のみ`OpenAIProvider`にフォールバックする。Claude Artifactとして開いている限り、この移行前と挙動は変わらない。
-- **コーチの人格は保存・表示層で分離**: `profile/main.coachPersona`に`companion`（ナギ コーチ）/ `analyst`（リツ コーチ）/ `cheer`（カイ コーチ）を保存する。`buildAdjustPrompt()`はリクエスト開始時に固定した人格の口調指示だけを加え、判断ルール・コンテキスト・JSON形式は共通に保つ。チャット履歴とWorkoutの`metadata.feedback_coach_persona`には生成時のコーチを保存するため、後でコーチを変更しても過去の表示は書き換わらない。
+- **コーチの表示名と判断は分離**: 現在のコーチは`cheer`（カイ コーチ）に固定し、`profile/main.coachName`には利用者が変更できる呼び名だけを保存する。`buildAdjustPrompt()`は常にカイの口調指示を用い、判断ルール・コンテキスト・JSON形式は共通に保つ。チャット履歴とWorkoutの`metadata.feedback_coach_persona`は過去データとの表示互換のため残すが、新しい応答・フィードバックは`cheer`として保存する。呼び名を変えても過去の本文を再生成・書き換えしない。
 - `app/assets/coach/`には、提供された確定デザインから背景だけを透明化したコーチの静止PNG（通常・考え中・喜び）を置く。白いお腹や顔の白は透明化しない。画像は`aria-hidden`の装飾として扱い、テキストの状態表示を必ず併記する。
 - **実走・予定の共通コンテキスト**: `loadRunningPlanLogs()`と`runningEvidence()`が、重複統合済みの`workouts/main.entries[]`を正本として、直近90日の実走（距離・時間・ペース・心拍・RPE・痛み・メモ・取得元・予定との紐付け）、当日の予定、今後7日間の予定を要約して渡す。90日より前の実走は全体集計に留める。旧来の`logs/{planId}`は、`workoutId`または予定日で共通Workoutに紐付いていない記録だけを補完情報として渡すため、同じ走行を二重に判断しない。コーチ呼び出しの直前に全プランの予定日別ログを読み直し、画面を開いたまま記録・同期した内容も会話へ反映する。
 - **全プランの要約**: `allPlansCoachContext()`が、登録済みの各プランについてID、名称、種別、状態、主目標かどうか、大会日、開始日、距離、目標タイム、想定ペース、進捗、次回練習、大会までの日数、前後の大会を構造化して毎回渡す。詳細JSONは主目標だけに絞り、今回の発言に大会・プラン名が明示された場合だけ`namedPlanDetailsForCoach()`が該当する非アクティブプランの詳細を追加する。これにより、コーチは通常は主目標を優先しつつ、名称を指定された非アクティブプランや複数大会の関係も回答できる。対象が曖昧な変更は確認し、非アクティブプランを自動変更しない。
