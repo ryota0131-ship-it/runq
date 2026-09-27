@@ -844,6 +844,13 @@
   .this-week-card,.forecast-card{ padding:18px 20px; }
   .this-week-card > h3,.forecast-card > h3{ display:none; }
   .this-week-card{ gap:10px; }
+  .home-summary-toggle{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0; border:0; background:transparent; color:var(--text); text-align:left; cursor:pointer; }
+  .home-summary-toggle .eyebrow{ display:block; }
+  .home-summary-toggle strong{ display:block; margin-top:2px; font:800 19px/1.3 "Zen Kaku Gothic New",sans-serif; }
+  .home-summary-arrow{ color:var(--text-faint); font-size:22px; line-height:1; }
+  .home-week-summary{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding-top:10px; color:var(--text-muted); font-size:13px; }
+  .home-week-progress{ flex:0 0 auto; color:var(--text); font-weight:800; }
+  .home-week-next{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
   .week-mini-item{ grid-template-columns:46px 1fr 54px; padding:9px 0; }
   .week-mini-item.today{ margin:0 -6px; padding:9px 6px; background:var(--accent-soft); }
   .week-progress-line{ margin-top:2px; }
@@ -2135,6 +2142,7 @@
     planGoalOpen: false,
     planExtrasOpen: false,
     homeProgressOpen: false,
+    homeWeekOpen: false,
     forecastDetailsOpen: false,
     infoModal: null,
     forecast: {},
@@ -4282,32 +4290,34 @@
 
   function thisWeekCardHTML(plan, today){
     const cur = findCurrentWeek(plan, today);
-    let html = '<div class="info-card this-week-card"><div class="home-section-head"><div><span class="eyebrow">THIS WEEK</span><h3>今週の予定</h3></div></div>';
+    const open=!!state.homeWeekOpen;
+    let html = '<section class="info-card this-week-card"><button type="button" class="home-summary-toggle" data-action="toggle-home-week" aria-expanded="'+(open?'true':'false')+'"><span><span class="eyebrow">THIS WEEK</span><strong>今週の予定</strong></span><span class="home-summary-arrow" aria-hidden="true">'+(open?'⌃':'›')+'</span></button>';
     if(!cur){
       const startDate = parseISO(plan.meta.startDate);
-      html += '<div class="li-sub">'+(today<startDate ? 'プラン開始前です' : '今週は予定を入れていません')+'</div></div>';
+      html += '<div class="home-week-summary">'+(today<startDate ? 'プラン開始前です' : '今週は予定を入れていません')+'</div></section>';
       return html;
     }
     const wi = cur.wi, wk = cur.wk;
     const todayStr = toISO(today);
     let total=0, done=0;
-    html += '<div class="week-mini-list">';
+    let nextLabel='次の予定を確認';
+    wk.items.forEach(function(it){ if(nextLabel==='次の予定を確認' && it.date>=todayStr && it.type!=='rest' && itemCompletionState(plan,it).status!=='completed') nextLabel=it.day+' '+it.title; });
+    const rows=[];
     wk.items.forEach(function(it, ii){
       const completion=itemCompletionState(plan,it);
       const workout=workoutForCompletion(plan,it,completion);
       const isDone = completion.status==='completed';
       if(isLoggable(it)){ total++; if(isDone) done++; }
       const isToday = it.date===todayStr;
-      html += '<div class="week-mini-item'+(isToday?' today':'')+(isDone?' done':'')+'">'
+      rows.push('<div class="week-mini-item'+(isToday?' today':'')+(isDone?' done':'')+'">'
         + '<span class="wmi-day">'+it.day+'</span>'
         + '<span class="chip '+it.type+'">'+escapeHtml(it.title)+'</span>'
         + (isDone&&workout?'<button type="button" class="wmi-share" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェア</button>':'<span class="wmi-status '+completion.status+'">'+(isDone?'✓ 完了':completion.status==='skipped'?'見送り':completion.status==='partial'?'一部実施':'')+'</span>')
-        + '</div>';
+        + '</div>');
     });
-    html += '</div>';
-    html += '<div class="week-progress-line mono"><span class="wpl-kicker">今週</span>'+done+' / '+total+'回完了</div>';
-    html += '<button type="button" class="btn-secondary" data-action="tab" data-tab="view">今週のプランを見る</button>';
-    html += '</div>';
+    html += '<div class="home-week-summary"><span class="home-week-progress mono">'+done+' / '+total+'回 完了</span><span class="home-week-next">'+escapeHtml(nextLabel)+'</span></div>';
+    if(open) html += '<div class="week-mini-list">'+rows.join('')+'</div><button type="button" class="btn-secondary" data-action="tab" data-tab="view">予定を詳しく見る</button>';
+    html += '</section>';
     return html;
   }
 
@@ -5932,6 +5942,9 @@
       render();
     } else if(action==='toggle-home-progress'){
       state.homeProgressOpen = !state.homeProgressOpen;
+      render();
+    } else if(action==='toggle-home-week'){
+      state.homeWeekOpen = !state.homeWeekOpen;
       render();
     } else if(action==='toggle-forecast-details'){
       state.forecastDetailsOpen = !state.forecastDetailsOpen;
