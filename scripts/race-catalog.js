@@ -52,3 +52,13 @@ class ExternalRaceCatalogProvider {
   async search(){ throw new Error('External race catalog integration is not configured'); }
 }
 module.exports={normalize,signature,validate,parseCsv,upsert,writeBrowserCatalog,LocalRaceCatalogProvider,CsvRaceCatalogImporter,ExternalRaceCatalogProvider};
+
+// ローカル大会マスタのブラウザ用データを再生成する管理コマンド。
+// npm build / Capacitor sync が参照するファイルと、マスタJSONの差分を残さない。
+if(require.main===module){
+  const root=path.resolve(__dirname,'..');
+  const catalogPath=path.join(root,'data','race-catalog.json');
+  const catalog=JSON.parse(fs.readFileSync(catalogPath,'utf8'));
+  writeBrowserCatalog(root,catalog);
+  console.log('generated app/race-catalog.generated.js');
+}

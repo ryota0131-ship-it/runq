@@ -117,6 +117,10 @@
   .topbar .coach-mascot-small{ width:24px; height:28px; }
   .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .action-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.action-row .log-btn{margin:0}.detail-link{border:0;background:transparent;color:var(--accent);font:inherit;font-weight:700;padding:10px 4px;cursor:pointer;min-height:44px}
+  /* 予定内の相談は補助導線。本文より大きくせず、カイに話しかける操作だと分かる形にする。 */
+  .menu-consult-link,.menu-skip-link{ display:inline-flex; align-items:center; gap:6px; border:0; background:transparent; color:var(--text-muted); font:700 13px/1.35 inherit; padding:8px 2px; min-height:40px; cursor:pointer; }
+  .menu-consult-link:hover,.menu-skip-link:hover{ color:var(--accent); }
+  .menu-consult-link .coach-mascot-tiny{ width:20px; height:22px; margin:0; }
   .status-copy{font-size:14px;color:var(--text-muted);line-height:1.65}.week-card.collapsed .item-row{display:none}.week-card-toggle{border:0;background:transparent;padding:11px;min-width:44px;min-height:44px;color:var(--text-muted);cursor:pointer;font-size:14px}
   .preference-options{display:grid;gap:10px}.preference-options label{display:flex;align-items:center;gap:10px;min-height:44px;padding:10px;border:1px solid var(--border);border-radius:12px;font-size:14px}.preference-options input{width:20px;height:20px;accent-color:var(--accent)}
   :root[data-runq-large="true"] body{font-size:18px}:root[data-runq-large="true"] .li-sub,:root[data-runq-large="true"] .hint,:root[data-runq-large="true"] .item-desc{font-size:15px}:root[data-runq-contrast="true"]{--text:#0b1f3b;--text-muted:#334155;--border:#94a3b8}:root[data-runq-simple="true"] .forecast-factors,:root[data-runq-simple="true"] .extras-grid,:root[data-runq-simple="true"] .todays-point{display:none}
@@ -876,11 +880,14 @@
   .coach-composer{ flex:0 0 auto; padding:8px 12px calc(8px + var(--runq-safe-bottom)); background:var(--bg); border-top:1px solid var(--border); }
   .coach-composer .coach-suggestions{ margin:0 0 10px; padding:0 2px; }
   .coach-composer .chat-input-row{ margin:0; }
-  .race-picker{ grid-column:1/-1; border:1px solid var(--border); border-radius:12px; padding:12px; background:var(--surface-2); }
+  .race-picker{ grid-column:1/-1; border:1px solid var(--border); border-radius:12px; padding:14px; background:var(--surface-2); }
   .race-picker-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px; }
   .race-picker-head label{ font-size:13px; font-weight:700; }
   .race-picker-head span{ color:var(--text-faint); font-size:11px; }
-  .race-filter-row{ display:flex; gap:6px; overflow-x:auto; padding:0 0 8px; }
+  .race-picker > input[type="search"]{ box-sizing:border-box; display:block; width:100%; min-height:50px; margin:0 0 12px; padding:11px 13px; border:1px solid var(--border); border-radius:11px; background:var(--surface); color:var(--text); font-size:16px; line-height:1.35; -webkit-appearance:none; }
+  .race-picker > input[type="search"]::placeholder{ color:var(--text-faint); }
+  .race-picker > input[type="search"]:focus{ outline:2px solid color-mix(in srgb,var(--accent) 50%,transparent); outline-offset:1px; border-color:var(--accent); }
+  .race-filter-row{ display:flex; gap:6px; overflow-x:auto; margin:0 0 12px; padding:0; }
   .race-filter{ flex:0 0 auto; border:1px solid var(--border); border-radius:999px; background:var(--surface); color:var(--text-muted); padding:5px 9px; font-size:11px; font-weight:700; }
   .race-filter.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .race-results{ display:flex; flex-direction:column; gap:6px; max-height:210px; overflow:auto; }
@@ -1189,8 +1196,8 @@
       avgHr: f.avgHr ? f.avgHr.value : '',
       durationMin: durationMin,
       calories: f.calories ? f.calories.value : '',
-      fuelingNote: f.fuelingNote.value.trim(),
-      note: f.note.value.trim(),
+      fuelingNote: f.fuelingNote ? f.fuelingNote.value.trim() : '',
+      note: f.note ? f.note.value.trim() : '',
       shoeId: f.shoeId ? f.shoeId.value : '',
       completionType: f.completionType ? f.completionType.value : '',
       rpe: f.rpe ? f.rpe.value : '',
@@ -1256,13 +1263,23 @@
   function raceEditionFor(series){ return (RACE_CATALOG.editions||[]).find(function(edition){ return edition.race_series_id===series.id && edition.status!=='archived'; }) || null; }
   function raceCatalogSearch(query, category){
     const q=normalizeRaceText(query), distance=category==='full'?42.195:category==='half'?21.0975:category==='short'?10:null;
-    return RACE_MASTER_PRESETS.filter(function(race){
+    const results=RACE_MASTER_PRESETS.filter(function(race){
       const fields=[race.name,race.kana,race.prefecture,race.city].concat(race.aliases||[]).map(normalizeRaceText).join('|');
       const queryMatch=!q || fields.indexOf(q)>=0;
       const distanceMatch=!distance || (race.distances||[]).some(function(km){ return distance===10 ? km<=10 : km===distance; });
       const nearbyMatch=category!=='nearby' || !(state.profile||{}).homePrefecture || race.prefecture===(state.profile||{}).homePrefecture;
       return queryMatch && distanceMatch && nearbyMatch;
-    }).slice(0,12);
+    });
+    // 「おすすめ」では規模にかかわらず、公式に日程が確認できた近い大会を先に見せる。
+    // これにより地域の小規模大会も、主要大会の固定並びに埋もれない。
+    if(!category){
+      results.sort(function(a,b){
+        const aDate=(raceEditionFor(a)||{}).held_on || '9999-12-31';
+        const bDate=(raceEditionFor(b)||{}).held_on || '9999-12-31';
+        return aDate.localeCompare(bDate) || a.name.localeCompare(b.name,'ja');
+      });
+    }
+    return results.slice(0,12);
   }
   function raceResultHTML(race){
     const edition=raceEditionFor(race), date=edition&&edition.held_on ? new Date(edition.held_on+'T00:00:00').toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'}) : '';
@@ -3679,6 +3696,14 @@
     const lastSync=connection&&connection.lastSyncedAt ? new Date(connection.lastSyncedAt).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'まだ同期していません';
     const savedWorkouts=workoutsForPlanDate((currentPlan()||{}).id,dateStr);
     let html = '<form class="log-form" data-date="'+dateStr+'">';
+    if(currentCompletionType==='skipped'){
+      html += '<div class="adjust-status" style="margin:0 0 10px;">予定が入った日は、取り返さなくて大丈夫です。次の練習を優先し、必要ならカイと一緒に調整できます。</div>';
+      html += '<input type="hidden" name="completionType" value="skipped"><div class="field"><label>今回は</label><strong>見送る</strong></div>';
+      html += '<div class="field" style="margin-top:10px;"><label>メモ（任意）</label><textarea name="note" placeholder="例: 仕事の予定が入ったため">'+val('note')+'</textarea></div>';
+      if(lf.error) html += '<div class="adjust-status error" style="margin-top:6px;">'+escapeHtml(lf.error)+'</div>';
+      html += '<div class="log-form-actions"><button type="submit" class="btn-primary" '+(lf.busy?'disabled':'')+'>'+(lf.busy?'保存中…':'見送りを記録')+'</button><button type="button" class="btn-secondary" data-action="close-log">キャンセル</button></div></form>';
+      return html;
+    }
     html += '<div class="log-image-row"><div class="log-import-actions">';
     if(state.sampleImageOk || !state.sampleAvailable) html += '<label class="log-image-btn">画像から読み込む<input type="file" accept="image/*" data-action="log-image" data-date="'+dateStr+'" '+(lf.imageBusy?'disabled':'')+'></label>';
     if(health.platform){
@@ -3736,10 +3761,11 @@
 
   function logSavedHTML(dateStr, log){
     const lf=state.logForm;
+    const skipped=log.completionType==='skipped';
     const feedback=log.feedback || (lf.feedbackBusy===dateStr ? null : null);
     const previewWorkout=(state.workouts||[]).find(function(w){ return w.id===lf.selectedWorkoutId || w.id===log.workoutId; });
     const preview=previewWorkout?'<button type="button" class="share-preview" data-action="open-share" data-workout-id="'+escapeHtml(previewWorkout.id)+'"><div class="share-preview-kicker">RUNQ. TODAY\'S RUN</div><div class="share-preview-distance mono">'+formatKm(Number(previewWorkout.distance_meters||0)/1000)+'</div><div class="share-preview-sub">'+escapeHtml(workoutDurationLabel(previewWorkout.duration_seconds))+' ・ '+escapeHtml(previewWorkout.average_pace_seconds_per_km?paceSecToLabel(previewWorkout.average_pace_seconds_per_km)+'/km':'ペース未登録')+'</div><span class="share-preview-action">シェアする</span></button>':'';
-    return '<div class="log-saved" id="log-saved-'+dateStr+'"><h4>おつかれさまでした！記録を保存しました</h4><div class="log-summary-txt mono">'+escapeHtml(logSummaryLine(log))+'</div>'
+    return '<div class="log-saved" id="log-saved-'+dateStr+'"><h4>'+ (skipped?'今回は見送りにしました':'おつかれさまでした！記録を保存しました') +'</h4><div class="log-summary-txt mono">'+escapeHtml(logSummaryLine(log))+'</div>'
       + '<div class="feedback-callout'+(lf.feedbackBusy===dateStr?' busy':'')+'">'+coachMascotHTML(log.feedbackCoachPersona||((state.profile||{}).coachPersona),lf.feedbackBusy===dateStr?'thinking':'cheer','small')+(lf.feedbackBusy===dateStr?'<span>コーチが振り返りを作成しています…</span>':feedback?'<span><strong>コーチからのフィードバック</strong><br>'+escapeHtml(feedback)+'</span>'+coachBasisHTML(log.feedbackBasis):lf.feedbackError?'<span>フィードバックを取得できませんでした。記録は保存されています。<button type="button" class="workout-text-link" data-action="retry-log-feedback" data-date="'+dateStr+'">再試行</button></span>':'<span>コーチからのフィードバックを準備しています。</span>')+'</div>'
       + preview + '<div class="log-saved-actions"><button type="button" class="btn-secondary" data-action="open-log" data-date="'+dateStr+'">記録を編集</button><button type="button" class="btn-secondary" data-action="consult-item" data-date="'+dateStr+'">コーチに相談する</button><button type="button" class="btn-secondary" data-action="close-log">閉じる</button></div></div>';
   }
@@ -3793,7 +3819,7 @@
         if(it.type==='race'){
           html += '<div class="action-row"><button type="button" class="log-btn" data-action="'+(isFuture?'view-item':'open-log')+'" data-date="'+it.date+'">'+(isFuture?'レースプランを見る':'レース結果を記録する')+'</button></div>';
         } else {
-          html += '<div class="action-row"><button type="button" class="log-btn" data-action="open-log" data-date="'+it.date+'">'+(isToday?'結果を記録する':'結果を記録する')+'</button><button type="button" class="detail-link" data-action="consult-item" data-date="'+it.date+'">このメニューをコーチに相談</button></div>';
+          html += '<div class="action-row"><button type="button" class="log-btn" data-action="open-log" data-date="'+it.date+'">'+(isToday?'結果を記録する':'結果を記録する')+'</button><button type="button" class="menu-consult-link" data-action="consult-item" data-date="'+it.date+'">'+coachMascotHTML((state.profile||{}).coachPersona,'normal','tiny')+'<span>このメニューを相談する</span></button><button type="button" class="menu-skip-link" data-action="skip-item" data-date="'+it.date+'">今回は見送る</button></div>';
         }
       }
     }
@@ -4232,7 +4258,7 @@
     if(context==='today'){
       const workout=workoutForCompletion(plan,it,completion);
       html+='<div class="home-workout-actions">'+(done?(workout?'<button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">今日の達成をシェア</button>':'<span class="complete-badge">✓ 完了</span>'):'<button type="button" class="btn-primary" data-action="open-log" data-date="'+it.date+'">結果を記録する</button>')
-        + '<button type="button" class="detail-link" data-action="consult-item" data-date="'+it.date+'">コーチに相談</button></div>';
+        + '<button type="button" class="detail-link" data-action="consult-item" data-date="'+it.date+'">コーチに相談</button>'+(done?'':'<button type="button" class="menu-skip-link" data-action="skip-item" data-date="'+it.date+'">今回は見送る</button>')+'</div>';
     }
     return html+'</div>';
   }
@@ -4240,10 +4266,12 @@
   // ホーム、プラン、完了表示から同じ記録フォームを開く。入口ごとに状態を持たせず、
   // iOSのイベント委譲でも常に同じ遷移を使う。
   function openWorkoutLog(date){
+    const options=arguments[1]||null;
     const plan=currentPlan();
     if(!plan || !date) return false;
     const existing=state.logs[date]||null;
-    state.logForm={ openDate:date, values:existing?Object.assign({},existing):{}, busy:false, error:null, imageBusy:false, imageError:null, imageImport:existing&&existing.imageImport||null, selectedWorkoutId:existing&&existing.workoutId||null, feedbackBusy:null, feedbackError:null, status:null, syncMessage:null, syncError:false };
+    const values=existing?Object.assign({},existing):Object.assign({},(options&&options.values)||{});
+    state.logForm={ openDate:date, values:values, busy:false, error:null, imageBusy:false, imageError:null, imageImport:existing&&existing.imageImport||null, selectedWorkoutId:existing&&existing.workoutId||null, feedbackBusy:null, feedbackError:null, status:null, syncMessage:null, syncError:false };
     render();
     return true;
   }
@@ -5518,6 +5546,7 @@
     const painParts = values.painParts || [];
     const pain = (painLevelNum>0 || painParts.length) ? { level: painLevelNum, parts: painParts } : null;
     const selected=(state.workouts||[]).find(function(w){ return w.id===state.logForm.selectedWorkoutId; });
+    const skipped=values.completionType==='skipped';
     entries[dateStr] = {
       distanceKm: values.distanceKm ? Number(values.distanceKm) : null,
       avgPace: values.avgPace || null,
@@ -5530,19 +5559,21 @@
       rpe: values.rpe ? Number(values.rpe) : null,
       pain: pain,
       completionType: values.completionType || null,
-      source: selected ? selected.source : (imageImport ? 'screenshot' : 'manual'),
-      sourceWorkoutId:selected ? selected.source_workout_id : null,
-      workoutId:selected ? selected.id : null,
+      source: skipped ? 'manual' : (selected ? selected.source : (imageImport ? 'screenshot' : 'manual')),
+      sourceWorkoutId:skipped ? null : (selected ? selected.source_workout_id : null),
+      workoutId:skipped ? null : (selected ? selected.id : null),
       // 元画像は保存せず、読み取れた構造化データだけを通常の走行実績に残す。
       imageImport: imageImport,
-      feedback: prevFeedback || null,
-      feedbackCoachPersona: prevFeedbackCoachPersona || null,
+      feedback: skipped ? '予定が入った日は、取り返そうとしなくて大丈夫です。次の練習を優先して、続けられそうか一緒に考えましょう。' : (prevFeedback || null),
+      feedbackCoachPersona: skipped ? coachPersonaKey((state.profile||{}).coachPersona) : (prevFeedbackCoachPersona || null),
       loggedAt: new Date().toISOString()
     };
     state.logs = entries;
     await Store.setLogs(plan.id, entries);
-    let savedWorkout=selected;
-    if(selected){
+    let savedWorkout=skipped ? null : selected;
+    if(skipped){
+      // 見送りは実走ではないため、ワークアウトを新規作成・更新しない。
+    } else if(selected){
       const idx=state.workouts.findIndex(function(w){return w.id===selected.id;});
       if(idx>=0){
         state.workouts[idx]=Object.assign({},selected,{metadata:Object.assign({},selected.metadata||{},{note:entries[dateStr].note,rpe:entries[dateStr].rpe,pain:entries[dateStr].pain,feedback:entries[dateStr].feedback,feedback_basis:entries[dateStr].feedbackBasis||null,feedback_coach_persona:entries[dateStr].feedbackCoachPersona||null,image_import:entries[dateStr].imageImport||null}),plan_id:plan.id,scheduled_item_date:dateStr,completion_status:'matched',updated_at:new Date().toISOString()});
@@ -5553,10 +5584,10 @@
       entries[dateStr].workoutId=savedWorkout.id;
       await Store.setLogs(plan.id,entries);
     }
-    state.logForm=Object.assign({},state.logForm,{openDate:dateStr,status:'saved',values:null,busy:false,error:null,imageBusy:false,imageError:null,imageImport:null,selectedWorkoutId:savedWorkout&&savedWorkout.id,feedbackBusy:dateStr,feedbackError:null});
+    state.logForm=Object.assign({},state.logForm,{openDate:dateStr,status:'saved',values:null,busy:false,error:null,imageBusy:false,imageError:null,imageImport:null,selectedWorkoutId:savedWorkout&&savedWorkout.id,feedbackBusy:skipped?null:dateStr,feedbackError:null});
     render();
     requestAnimationFrame(function(){ const el=document.getElementById('log-saved-'+dateStr); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}); });
-    if(found) runLogFeedback(found.it, entries[dateStr]);
+    if(found && !skipped) runLogFeedback(found.it, entries[dateStr]);
     recomputeAndSaveForecast(plan).then(function(){ render(); });
   }
 
@@ -6116,6 +6147,8 @@
       render();
     } else if(action==='open-log'){
       openWorkoutLog(btn.dataset.date);
+    } else if(action==='skip-item'){
+      openWorkoutLog(btn.dataset.date,{values:{completionType:'skipped'}});
     } else if(action==='close-log'){
       state.logForm.openDate = null;
       state.logForm.values = null;
@@ -6365,7 +6398,7 @@
       const f = e.target;
       const dateStr = f.dataset.date;
       const values = readLogFormValues(f);
-      if(!values.distanceKm && !values.avgPace && !values.durationMin){
+      if(values.completionType!=='skipped' && !values.distanceKm && !values.avgPace && !values.durationMin){
         state.logForm.error = '距離・ペース・時間のいずれかは入力してください';
         render();
         return;

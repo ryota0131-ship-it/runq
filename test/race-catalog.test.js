@@ -8,6 +8,10 @@ assert(catalog.editions.every(e=>e.race_series_id),'editions must reference a se
 assert.strictEqual(normalize('第12回　東京マラソン大会'),normalize('東京マラソン'),'normalizes ordinal and tournament suffix');
 assert(catalog.series.some(r=>[r.name,r.kana].join('|').includes('とうきょう')),'kana is searchable');
 assert(catalog.series.some(r=>r.aliases.includes('アオタイ')),'aliases are retained');
+const akabane=catalog.series.find(r=>r.id==='akabane-october');
+assert(akabane,'officially verified local races are included in the catalog');
+assert(akabane.aliases.includes('赤羽オクトーバーマラソン'),'local race aliases are searchable');
+assert(catalog.editions.some(e=>e.race_series_id==='akabane-october' && e.held_on==='2026-10-10'),'verified edition date is retained');
 const clone=JSON.parse(JSON.stringify(catalog));
 const rows=parseCsv('id,name,kana,aliases,prefecture,city,distance,kind,official_url,year,date\nnew-race,新規マラソン,しんきまらそん,新規,東京都,例市,10,road,https://example.org,2027,');
 const first=upsert(clone,rows); assert.strictEqual(first.added,1); assert.strictEqual(clone.series.length,catalog.series.length+1);
