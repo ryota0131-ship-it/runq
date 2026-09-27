@@ -16,25 +16,16 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask"/>
                         <subviews>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="RUNQ." textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="runq-launch-title">
-                                <rect key="frame" x="99" y="307" width="177" height="53"/>
-                                <fontDescription key="fontDescription" type="system" weight="bold" pointSize="38"/>
-                                <color key="textColor" red="0.0" green="0.4" blue="1.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="Run your quest." textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="runq-launch-subtitle">
-                                <rect key="frame" x="99" y="369" width="177" height="18"/>
-                                <fontDescription key="fontDescription" type="system" pointSize="13"/>
-                                <color key="textColor" red="0.043" green="0.122" blue="0.231" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="runq-launch-logo">
+                                <rect key="frame" x="45" y="228" width="285" height="214"/>
+                            </imageView>
                         </subviews>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                         <constraints>
-                            <constraint firstItem="runq-launch-title" firstAttribute="centerX" secondItem="snD-IY-ifK" secondAttribute="centerX" id="runq-title-x"/>
-                            <constraint firstItem="runq-launch-title" firstAttribute="centerY" secondItem="snD-IY-ifK" secondAttribute="centerY" constant="-16" id="runq-title-y"/>
-                            <constraint firstItem="runq-launch-subtitle" firstAttribute="centerX" secondItem="snD-IY-ifK" secondAttribute="centerX" id="runq-subtitle-x"/>
-                            <constraint firstItem="runq-launch-subtitle" firstAttribute="top" secondItem="runq-launch-title" secondAttribute="bottom" constant="7" id="runq-subtitle-y"/>
+                            <constraint firstItem="runq-launch-logo" firstAttribute="centerX" secondItem="snD-IY-ifK" secondAttribute="centerX" id="runq-logo-x"/>
+                            <constraint firstItem="runq-launch-logo" firstAttribute="centerY" secondItem="snD-IY-ifK" secondAttribute="centerY" id="runq-logo-y"/>
+                            <constraint firstItem="runq-launch-logo" firstAttribute="width" constant="285" id="runq-logo-width"/>
+                            <constraint firstItem="runq-launch-logo" firstAttribute="height" constant="214" id="runq-logo-height"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -44,6 +35,7 @@
         </scene>
     </scenes>
     <resources>
+        <image name="LaunchLogo" width="480" height="360"/>
         <systemColor name="systemBackgroundColor">
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
