@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-// ユーザー単位のコーチ会話・主目標切替・旧ログ移行をブラウザで確認する回帰テスト。
+// ユーザー単位のコーチ会話・次のゴール自動選択・旧ログ移行をブラウザで確認する回帰テスト。
 const assert = require('assert');
 const fs = require('fs');
 const http = require('http');
@@ -50,33 +50,35 @@ async function main(){
     check('2. 旧プラン別の埼玉会話も時系列で保持する',thread.includes('埼玉も把握しています'));
     check('3. 別ユーザーの会話を混在させない',!thread.includes('別ユーザーの会話'));
     await page.locator('.bottom-nav-btn[data-tab="view"]').click();
+    check('4. 開催日が最も近い大会を次のゴールに自動表示する',(await page.locator('#app').innerText()).includes('千葉アクアラインマラソン'));
     await page.locator('[data-action="open-plan-switcher"]').click();
-    await page.locator('[data-action="set-active-plan"][data-id="saitama"]').click();
-    await page.waitForFunction(()=>document.querySelector('#coach-thread') === null);
+    const switcher=await page.locator('#app').innerText();
+    check('5. 手動の主目標切替ではなく大会の詳細を開ける',switcher.includes('次のゴール')&&switcher.includes('埼玉マラソン'));
+    await page.getByRole('button',{name:'閉じる'}).click();
+    check('5-2. 表示対象を切り替えずに一覧を閉じられる',await page.locator('[data-action="open-plan-switcher"]').count()===1);
     await page.locator('.bottom-nav-btn[data-tab="coach"]').click();
+    await page.waitForFunction(()=>document.querySelector('#coach-thread') && document.querySelector('#coach-thread').innerText.includes('千葉の準備を相談したい'));
     thread=await page.locator('#coach-thread').innerText();
-    check('4. 主目標の切替後も会話履歴が消えない',thread.includes('千葉の準備を相談したい')&&thread.includes('埼玉も把握しています'));
-    check('5. 切替を控えめなシステム表示で残す',thread.includes('主目標を「埼玉マラソン」に切り替えました'));
+    check('5-3. 大会の詳細を見ても会話履歴が消えない',thread.includes('千葉の準備を相談したい')&&thread.includes('埼玉も把握しています'));
     await page.locator('#adjust-input').fill('登録中の全プランを教えて');
     await page.locator('.chat-send-btn').click();
     await page.waitForFunction(()=>!document.querySelector('#coach-thread .chat-typing'));
-    check('6. コーチへ全プランの要約と新しい主目標を渡す',lastPrompt.includes('千葉アクアラインマラソン')&&lastPrompt.includes('埼玉マラソン')&&lastPrompt.includes('八千代ラン')&&lastPrompt.includes('"active":true'));
+    check('6. コーチへ全プランの要約と次のゴールを渡す',lastPrompt.includes('千葉アクアラインマラソン')&&lastPrompt.includes('埼玉マラソン')&&lastPrompt.includes('八千代ラン')&&lastPrompt.includes('"next_goal":true'));
     await page.locator('#adjust-input').fill('八千代ランについて教えて');
     await page.locator('.chat-send-btn').click();
     await page.waitForFunction(()=>!document.querySelector('#coach-thread .chat-typing'));
-    check('7. 非アクティブな八千代もコーチの参照対象',lastPrompt.includes('八千代ラン')&&lastPrompt.includes('今回名前が指定された非アクティブプランの詳細'));
+    check('7. 次のゴール以外の八千代もコーチの参照対象',lastPrompt.includes('八千代ラン')&&lastPrompt.includes('今回名前が指定された次のゴール以外のプランの詳細'));
     await page.locator('#adjust-input').fill('胸が痛い');
     await page.locator('.chat-send-btn').click();
     await page.waitForFunction(()=>!document.querySelector('#coach-thread .chat-typing'));
     await page.locator('.bottom-nav-btn[data-tab="view"]').click();
-    await page.locator('[data-action="open-plan-switcher"]').click();
-    await page.locator('[data-action="set-active-plan"][data-id="chiba"]').click();
     await page.locator('.bottom-nav-btn[data-tab="coach"]').click();
+    await page.waitForFunction(()=>document.querySelector('#coach-thread') && document.querySelector('#coach-thread').innerText.includes('八千代ランについて教えて'));
     thread=await page.locator('#coach-thread').innerText();
-    check('8. 千葉へ戻しても同じ会話を維持する',thread.includes('主目標を「埼玉マラソン」に切り替えました')&&thread.includes('八千代ランについて教えて'));
+    check('8. 大会の詳細を行き来しても同じ会話を維持する',thread.includes('八千代ランについて教えて'));
     await page.locator('#adjust-input').fill('まだ痛い');
     await page.locator('.chat-send-btn').click();
-    check('9. 主目標を切り替えても安全状態を不正にリセットしない',(await page.locator('#coach-thread').innerText()).includes('症状が続いているなら'));
+    check('9. 次のゴール表示の変更で安全状態を不正にリセットしない',(await page.locator('#coach-thread').innerText()).includes('症状が続いているなら'));
     await page.locator('.bottom-nav-btn[data-tab="profile"]').click();
     await page.getByRole('button',{name:/目標・大会/}).click();
     const management=await page.locator('#app').innerText();

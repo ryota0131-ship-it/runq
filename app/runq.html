@@ -2158,7 +2158,19 @@
     ,planEditOpen: false
   };
 
-  function currentPlan(){ return state.plans.find(p=>p.id===state.currentId) || state.plans[0]; }
+  // 手動で固定せず、進行中の大会なら開催日が最も近いものを次のゴールにする。
+  // 大会がない場合だけ進行中の通常プランを使い、完了・休止中は候補から外す。
+  function nextGoalPlan(){
+    const active=(state.plans||[]).filter(function(plan){ return planStatus(plan).key==='active'; });
+    const today=toISO(todayLocal());
+    const upcomingRaces=active.filter(function(plan){ return plan.meta&&plan.meta.raceDate&&plan.meta.raceDate>=today; }).sort(function(a,b){ return a.meta.raceDate.localeCompare(b.meta.raceDate); });
+    if(upcomingRaces.length) return upcomingRaces[0];
+    const regular=active.filter(function(plan){ return !(plan.meta&&plan.meta.raceDate); }).sort(function(a,b){ return String((a.meta||{}).startDate||'').localeCompare(String((b.meta||{}).startDate||'')); });
+    return regular[0]||active[0]||(state.plans||[])[0]||null;
+  }
+  // 画面とコーチが参照するプランは常に日程から求める。state.currentId は
+  // 対応する進捗・ログをキャッシュするためのIDであり、手動選択の永続状態ではない。
+  function currentPlan(){ return nextGoalPlan(); }
 
   function planStatus(plan){
     const status=(plan&&plan.meta&&plan.meta.status)||'active';
@@ -2169,33 +2181,16 @@
     return {key:'active',label:'進行中'};
   }
 
-  async function setActivePlan(id, announce){
-    const next=state.plans.find(function(plan){ return plan.id===id; });
-    if(!next || state.currentId===id) return;
-    const previous=currentPlan();
+  async function refreshScheduledGoal(){
+    const next=nextGoalPlan(), id=next&&next.id||null;
+    if(id===state.currentId) return next;
     state.currentId=id;
-    state.profile.activePlanId=id;
-    state.planHistoryOpen=false;
-    state.planJourneyOpen=false;
-    state.planGoalOpen=false;
-    state.planExtrasOpen=false;
-    state.homeProgressOpen=false;
-    state.forecastDetailsOpen=false;
-    state.adjust.draft=''; state.adjust.error=null; state.adjust.context=null;
-    state.logForm={ openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy:null };
-    state.logUndo=null; state.logProposal=null; state.calendarSelected=null;
-    await Store.setProfile(state.profile);
+    state.completed={}; state.logs={};
+    if(!id) return null;
     const loaded=await Promise.all([Store.getProgress(id),Store.getLogs(id),Store.getForecast(id)]);
     state.completed=loaded[0]||{}; state.logs=loaded[1]||{};
     if(loaded[2]) state.forecast[id]=loaded[2];
-    if(announce){
-      // プラン画面から先に切り替えた場合でも、未読込のユーザー会話を空配列で
-      // 上書きしないよう、システム表示を追加する前に必ずスレッドを読み込む。
-      await loadCoachThread();
-      addCoachMessage({role:'system',kind:'system',text:'主目標を「'+(next.meta.name||'このプラン')+'」に切り替えました。'+(previous?'これまでの会話と実績はそのまま引き継がれます。':'')});
-    }
-    render();
-    if(forecastNeedsRefresh(next)) recomputeAndSaveForecast(next).then(function(){ render(); });
+    return next;
   }
 
   const ONBOARDING_VERSION = 1;
@@ -2408,7 +2403,8 @@
     }
     if(state.planSwitchOpen){
       const plans=plansForManagement();
-      return '<div class="modal-backdrop" data-action="close-plan-switcher"><div class="modal-card" data-action="noop"><h3>主目標を切り替える</h3><p>会話や実績はそのまま、コーチが最も重視する目標だけを切り替えます。</p><div class="option-list">'+plans.filter(function(plan){return planStatus(plan).key==='active';}).map(function(plan){return '<button type="button" class="option-card" data-action="set-active-plan" data-id="'+escapeHtml(plan.id)+'"><div class="option-label">'+escapeHtml(plan.meta.name||'プラン')+(plan.id===state.currentId?' <span class="chosen-tag">主目標</span>':'')+'</div><div class="option-summary">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(plan.meta.distanceLabel||'距離未設定')+'</div></button>';}).join('')+'</div><div class="modal-actions"><button type="button" class="btn-secondary" data-action="open-plan-manager">目標・大会を管理する</button><button type="button" class="btn-primary" data-action="close-plan-switcher">閉じる</button></div></div></div>';
+      const next=nextGoalPlan();
+      return '<div class="modal-backdrop" data-action="close-plan-switcher"><div class="modal-card" data-action="noop"><h3>目標・大会</h3><p>開催日が最も近い進行中の大会を、次のゴールとして自動表示します。</p><div class="option-list">'+plans.filter(function(plan){return planStatus(plan).key==='active';}).map(function(plan){return '<button type="button" class="option-card" data-action="open-plan-detail" data-id="'+escapeHtml(plan.id)+'"><div class="option-label">'+escapeHtml(plan.meta.name||'プラン')+(next&&plan.id===next.id?' <span class="chosen-tag">次のゴール</span>':'')+'</div><div class="option-summary">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(plan.meta.distanceLabel||'距離未設定')+'</div></button>';}).join('')+'</div><div class="modal-actions"><button type="button" class="btn-secondary" data-action="open-plan-manager">すべて管理する</button><button type="button" class="btn-primary" data-action="close-plan-switcher">閉じる</button></div></div></div>';
     }
     if(state.infoModal==='forecast'){
       return '<div class="modal-backdrop" data-action="close-info-modal"><div class="modal-card" data-action="noop"><h3>レース予測の見方</h3><p><strong>走力の目安</strong>は、自己ベストと複数回のペース走など、再現性を確認できる実走から算出します。</p><p><strong>フルへの準備度</strong>は、最長走・週ごとの距離・体調記録を別に確認する指標です。走力があっても、長い距離への準備が十分とは限りません。</p><p><strong>データの確かさ</strong>は実走の件数と期間を表します。少ない間は幅のある参考値として表示し、目標達成を保証するものではありません。</p><div class="modal-actions"><button type="button" class="btn-primary" data-action="close-info-modal">閉じる</button></div></div></div>';
@@ -3097,9 +3093,9 @@
     return '期間未設定';
   }
   function plansForManagement(){
-    const active=state.currentId;
+    const next=nextGoalPlan()&&nextGoalPlan().id;
     const score=function(plan){
-      if(plan.id===active) return 0;
+      if(plan.id===next) return 0;
       const status=planStatus(plan).key;
       if(status==='active'&&plan.meta&&plan.meta.raceDate) return 1;
       if(status==='active') return 2;
@@ -3112,21 +3108,21 @@
     });
   }
   function planManagementCardHTML(plan){
-    const meta=plan.meta||{}, status=planStatus(plan), active=plan.id===state.currentId;
-    return '<div class="info-card"><div class="workout-section-head"><div><h3>'+escapeHtml(meta.name||'名称未設定のプラン')+'</h3><div class="li-sub">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(meta.distanceLabel||'距離未設定')+' ・ '+escapeHtml(meta.targetLabel||'目標タイム未設定')+'</div></div><span class="phase-badge">'+(active?'主目標':escapeHtml(status.label))+'</span></div><div class="plan-management-actions"><button type="button" class="btn-secondary" data-action="open-plan-detail" data-id="'+escapeHtml(plan.id)+'">詳細を見る</button><button type="button" class="btn-secondary" data-action="set-active-plan" data-id="'+escapeHtml(plan.id)+'" '+(active?'disabled':'')+'>主目標に設定</button></div></div>';
+    const meta=plan.meta||{}, status=planStatus(plan), next=nextGoalPlan(), isNext=next&&plan.id===next.id;
+    return '<div class="info-card"><div class="workout-section-head"><div><h3>'+escapeHtml(meta.name||'名称未設定のプラン')+'</h3><div class="li-sub">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(meta.distanceLabel||'距離未設定')+' ・ '+escapeHtml(meta.targetLabel||'目標タイム未設定')+'</div></div><span class="phase-badge">'+(isNext?'次のゴール':escapeHtml(status.label))+'</span></div><div class="plan-management-actions"><button type="button" class="btn-secondary" data-action="open-plan-detail" data-id="'+escapeHtml(plan.id)+'">詳細を見る</button></div></div>';
   }
   function goalsPlansHTML(){
     const plans=plansForManagement();
-    const active=plans.filter(function(plan){return plan.id===state.currentId;}), upcoming=plans.filter(function(plan){return plan.id!==state.currentId&&planStatus(plan).key==='active';}), inactive=plans.filter(function(plan){return planStatus(plan).key!=='active';});
+    const next=nextGoalPlan(), nextPlans=plans.filter(function(plan){return next&&plan.id===next.id;}), upcoming=plans.filter(function(plan){return (!next||plan.id!==next.id)&&planStatus(plan).key==='active';}), inactive=plans.filter(function(plan){return planStatus(plan).key!=='active';});
     const section=function(title,items){return items.length?'<section class="mypage-grid"><div class="settings-section-title">'+title+'</div>'+items.map(planManagementCardHTML).join('')+'</section>':'';};
-    return '<div class="form-card">'+mypageBackHeaderHTML('目標・大会')+mypageToastHTML()+section('現在の主目標',active)+section('今後の大会・プラン',upcoming)+section('完了・休止中のプラン',inactive)+'<div class="form-actions"><button type="button" class="btn-primary" data-action="tab" data-tab="create">新しいプランを作成</button></div></div>';
+    return '<div class="form-card">'+mypageBackHeaderHTML('目標・大会')+mypageToastHTML()+section('次のゴール',nextPlans)+section('今後の大会・プラン',upcoming)+section('完了・休止中のプラン',inactive)+'<div class="form-actions"><button type="button" class="btn-primary" data-action="tab" data-tab="create">新しいプランを作成</button></div></div>';
   }
   function planDetailHTML(){
     const plan=(state.plans||[]).find(function(item){return item.id===state.managedPlanId;});
     if(!plan) return goalsPlansHTML();
-    const meta=plan.meta||{}, status=planStatus(plan), active=plan.id===state.currentId;
+    const meta=plan.meta||{}, status=planStatus(plan), next=nextGoalPlan(), isNext=next&&plan.id===next.id;
     const edit=state.planEditOpen?'<form id="plan-settings-form" class="mypage-edit-block" data-id="'+escapeHtml(plan.id)+'"><div class="field"><label>名前</label><input name="name" value="'+escapeHtml(meta.name||'')+'"></div><div class="field"><label>大会日・目標日</label><input name="raceDate" type="date" value="'+escapeHtml(meta.raceDate||'')+'"></div><div class="field"><label>距離表示</label><input name="distanceLabel" value="'+escapeHtml(meta.distanceLabel||'')+'"></div><div class="field"><label>目標タイム</label><input name="targetLabel" value="'+escapeHtml(meta.targetLabel||'')+'"></div><div class="form-actions"><button class="btn-primary" type="submit">保存する</button><button class="btn-secondary" type="button" data-action="toggle-plan-edit">キャンセル</button></div></form>':'';
-    return '<div class="form-card">'+mypageBackHeaderHTML('目標・大会の詳細')+'<div class="mypage-grid"><div class="info-card"><h2>'+escapeHtml(meta.name||'名称未設定のプラン')+'</h2><div class="li-sub">'+escapeHtml(planDateLabel(plan))+'</div><div class="hero-stats"><div class="stat"><span class="k">距離</span><span class="v">'+escapeHtml(meta.distanceLabel||'—')+'</span></div><div class="stat"><span class="k">目標タイム</span><span class="v mono">'+escapeHtml(meta.targetLabel||'—')+'</span></div><div class="stat"><span class="k">状態</span><span class="v">'+(active?'主目標':escapeHtml(status.label))+'</span></div></div><div class="plan-management-actions"><button type="button" class="btn-secondary" data-action="toggle-plan-edit">編集する</button><button type="button" class="btn-secondary" data-action="set-active-plan" data-id="'+escapeHtml(plan.id)+'" '+(active?'disabled':'')+'>主目標に設定する</button><button type="button" class="btn-secondary" data-action="toggle-plan-status" data-id="'+escapeHtml(plan.id)+'" data-status="'+(status.key==='paused'?'active':'paused')+'">'+(status.key==='paused'?'再開する':'休止する')+'</button><button type="button" class="btn-secondary" data-action="toggle-plan-status" data-id="'+escapeHtml(plan.id)+'" data-status="archived">完了・アーカイブする</button><button type="button" class="btn-danger" data-action="open-delete-modal" data-id="'+escapeHtml(plan.id)+'">削除する</button></div>'+edit+'</div></div></div>';
+    return '<div class="form-card">'+mypageBackHeaderHTML('目標・大会の詳細')+'<div class="mypage-grid"><div class="info-card"><h2>'+escapeHtml(meta.name||'名称未設定のプラン')+'</h2><div class="li-sub">'+escapeHtml(planDateLabel(plan))+'</div><div class="hero-stats"><div class="stat"><span class="k">距離</span><span class="v">'+escapeHtml(meta.distanceLabel||'—')+'</span></div><div class="stat"><span class="k">目標タイム</span><span class="v mono">'+escapeHtml(meta.targetLabel||'—')+'</span></div><div class="stat"><span class="k">状態</span><span class="v">'+(isNext?'次のゴール':escapeHtml(status.label))+'</span></div></div><div class="plan-management-actions"><button type="button" class="btn-secondary" data-action="toggle-plan-edit">編集する</button><button type="button" class="btn-secondary" data-action="toggle-plan-status" data-id="'+escapeHtml(plan.id)+'" data-status="'+(status.key==='paused'?'active':'paused')+'">'+(status.key==='paused'?'再開する':'休止する')+'</button><button type="button" class="btn-secondary" data-action="toggle-plan-status" data-id="'+escapeHtml(plan.id)+'" data-status="archived">完了・アーカイブする</button><button type="button" class="btn-danger" data-action="open-delete-modal" data-id="'+escapeHtml(plan.id)+'">削除する</button></div>'+edit+'</div></div></div>';
   }
   // 指定距離の自己ベストを「厳密一致」で1件返す(bestPbForDistanceは近い距離も許容するのでRUNNER PROFILEのPB一覧表示には使わない)
   function bestPbExact(distanceKm){
@@ -3260,7 +3256,7 @@
     html += personalBestCardHTML();
     html += coachCompanionSettingsHTML();
     html += '<div class="settings-section-title">目標と大会</div>';
-    html += mypageSettingsRowHTML('goals-plans','目標・大会','主目標、今後の大会、完了したプランを管理','training');
+    html += mypageSettingsRowHTML('goals-plans','目標・大会','次のゴール、今後の大会、完了したプランを管理','training');
     html += '<div class="settings-section-title">ランニングプロフィール</div>';
     html += mypageSettingsRowHTML('runner-profile','ランナープロフィール','走力・自己ベスト・プロフィール','profile');
     html += myShoesCardHTML();
@@ -3810,9 +3806,10 @@
   }
 
   function planPillsHTML(){
-    const plan=currentPlan();
-    if(!plan) return '<div class="plan-focus-bar"><span>主目標はまだありません</span><button type="button" class="btn-primary" data-action="tab" data-tab="create">新しい目標を作る</button></div>';
-    return '<div class="plan-focus-bar"><div><span class="quest-kicker">MAIN GOAL</span><strong>'+escapeHtml(plan.meta.name||'現在の主目標')+'</strong><small>主目標として表示中</small></div><div class="plan-focus-actions"><button type="button" class="btn-secondary" data-action="open-plan-switcher">切り替える</button><button type="button" class="btn-secondary" data-action="open-plan-manager">目標・大会を見る</button></div></div>';
+    const plan=nextGoalPlan();
+    if(!plan) return '<div class="plan-focus-bar"><span>次のゴールはまだありません</span><button type="button" class="btn-primary" data-action="tab" data-tab="create">新しい目標を作る</button></div>';
+    const isRace=!!(plan.meta&&plan.meta.raceDate);
+    return '<div class="plan-focus-bar"><div><span class="quest-kicker">NEXT GOAL</span><strong>'+escapeHtml(plan.meta.name||'次のゴール')+'</strong><small>'+escapeHtml(isRace?'開催日が最も近い大会を自動表示':'進行中の目標を表示中')+'</small></div><div class="plan-focus-actions"><button type="button" class="btn-secondary" data-action="open-plan-switcher">ほかの目標を見る</button><button type="button" class="btn-secondary" data-action="open-plan-manager">目標・大会を管理</button></div></div>';
   }
 
   function compactHistoryText(value, limit){
@@ -4918,7 +4915,8 @@
     }).length;
     const next=items.filter(function(item){ return item.date&&item.date>=today; }).sort(function(a,b){ return a.date.localeCompare(b.date); })[0];
     const raceDate=meta.raceDate||null, days=raceDate?daysBetween(todayLocal(),parseISO(raceDate)):null;
-    return {plan_id:plan.id,name:meta.name||'名称未設定のプラン',type:meta.questType&&meta.questType!=='race'?'通常目標':'大会プラン',status:status.label,active:plan.id===state.currentId,race_date:raceDate,start_date:meta.startDate||null,target_distance:meta.distanceLabel||null,target_time:meta.targetLabel||null,target_pace:meta.mpLabel||null,progress:completed+'/'+items.length,next_workout:next?(next.date+' '+next.title+(next.desc?'（'+next.desc+'）':'')):'予定なし',days_to_race:days};
+    const scheduled=nextGoalPlan();
+    return {plan_id:plan.id,name:meta.name||'名称未設定のプラン',type:meta.questType&&meta.questType!=='race'?'通常目標':'大会プラン',status:status.label,next_goal:!!(scheduled&&plan.id===scheduled.id),race_date:raceDate,start_date:meta.startDate||null,target_distance:meta.distanceLabel||null,target_time:meta.targetLabel||null,target_pace:meta.mpLabel||null,progress:completed+'/'+items.length,next_workout:next?(next.date+' '+next.title+(next.desc?'（'+next.desc+'）':'')):'予定なし',days_to_race:days};
   }
 
   async function allPlansCoachContext(planLogs){
@@ -4947,7 +4945,7 @@
       coachPersona(personaKey).prompt,
       '今日の日付: '+todayStr,
       context.length ? ('ランナーの背景情報:\n- '+context.join('\n- ')) : '',
-      (allPlanSummaries&&allPlanSummaries.length) ? ('# 登録されている全目標・大会（主目標だけで判断範囲を狭めない）\n'+JSON.stringify(allPlanSummaries)) : '',
+      (allPlanSummaries&&allPlanSummaries.length) ? ('# 登録されている全目標・大会（次のゴールだけで判断範囲を狭めない）\n'+JSON.stringify(allPlanSummaries)) : '',
       (runningContext&&runningContext.length) ? ('# RUNQ.に保存されたランニング実績・予定\n'+runningContext.map(function(line){ return '- '+line; }).join('\n')) : '',
       (historyLines && historyLines.length) ? ('# これまでの会話の流れ(直近、参考情報。矛盾する場合は現在のプランと今回の依頼を優先する)\n- '+historyLines.join('\n- ')) : '',
       '',
@@ -4956,7 +4954,7 @@
       '',
       '# 現在のプラン(JSON)',
       JSON.stringify(payload),
-      (namedPlanDetails&&namedPlanDetails.length) ? '# 今回名前が指定された非アクティブプランの詳細(JSON)\n'+JSON.stringify(namedPlanDetails) : '',
+      (namedPlanDetails&&namedPlanDetails.length) ? '# 今回名前が指定された次のゴール以外のプランの詳細(JSON)\n'+JSON.stringify(namedPlanDetails) : '',
       '',
       '# 判断ルール(必ず考慮すること)',
       '0. 安全: '+COACHING_RULES.safety,
@@ -4971,7 +4969,7 @@
       '6. イベント衝突時の調整: 高負荷練習(ロング走・MP走)とイベント(大会、旅行、繁忙期など)の間隔が短い場合はリスクを明示し、間隔を空ける代替日程を提案する。',
       '7. 今日('+todayStr+')より前の日付の項目(実施済み)は内容を変更しない。日付がない項目(完全休養など)は今後分とみなしてよい。',
       '8. meta.raceDate(レース日)やmeta.targetLabel(目標タイム)など、依頼と無関係な値は変えない。',
-      '9. 通常の練習相談では active:true の主目標を中心に扱う。大会名・プラン名が指定された場合は、その非アクティブプランを参照して回答する。変更対象が曖昧な場合は、どのプランか確認する。非アクティブプランを勝手に変更しない。',
+      '9. 通常の練習相談では next_goal:true の次のゴールを中心に扱う。大会名・プラン名が指定された場合は、そのプランを参照して回答する。変更対象が曖昧な場合は、どのプランか確認する。次のゴール以外のプランを勝手に変更しない。',
       '',
       '# 対応フロー',
       '- まず、依頼が「相談・質問」(〜した方がいい?、〜は妥当?など、意見を求めるだけでスケジュール変更を伴わないもの。「速く走るコツは?」「フォームの改善点は?」のような、プランの日程と直接関係しない一般的なランニングの質問も含む)かどうかを判断する。',
@@ -4993,7 +4991,7 @@
 
   /* ============================================================
      AIコーチのチャットスレッド管理
-     会話は「ユーザー × 1スレッド」。activePlanは現在の主目標を示すだけで、
+     会話は「ユーザー × 1スレッド」。次のゴールは開催日から自動的に求める表示で、
      スレッドを分割しない。旧 coachLog/{planId} は初回読込時に安全に統合する。
   ============================================================ */
   function genMsgId(){ return 'msg'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -5824,7 +5822,11 @@
       const currentCondition=currentPainCondition();
       const plan=o.questType==='race' ? generatePlan({name:d.name,distanceLabel:d.distanceKm===42.195?'フルマラソン':d.distanceKm===21.0975?'ハーフマラソン':d.distanceKm+'km',distanceKm:d.distanceKm,raceDate:parseISO(d.raceDate),startDate:parseISO(d.startDate),targetSec:4*3600,targetLabel:'4:00:00',longRunStart:Math.max(3,Number(state.profile.longestRunManualKm)||3),pbLabel:null,heelCaution:currentCondition.status==='active',injuryNote:currentCondition.status==='active'?state.profile.injuryNote:null,courseNote:null,constitutionNote:state.profile.constitutionNote,scheduleNote:state.profile.scheduleNote,mpWeekday:1,easyWeekdays:[3],longWeekday:6}) : generateBeginnerPlan(Object.assign({},d,{questType:o.questType,availableWeekdays:d.availableWeekdays||state.profile.availableWeekdays}));
       if(!plan){ o.busy=false; o.screen='quest-form'; render(); return; }
-      Store.savePlan(plan).then(function(){ state.plans.push(plan); state.currentId=plan.id; state.completed={}; state.logs={}; d.firstMenu=(plan.weeks[0].items[0]||{}).title||''; return onboardingSave({walkthroughCompleted:true,profileCompleted:true,draft:null}); }).then(function(){ o.busy=false;o.screen='done';render(); });
+      Store.savePlan(plan).then(async function(){
+        state.plans.push(plan); await refreshScheduledGoal();
+        d.firstMenu=(plan.weeks[0].items[0]||{}).title||'';
+        return onboardingSave({walkthroughCompleted:true,profileCompleted:true,draft:null});
+      }).then(function(){ o.busy=false;o.screen='done';render(); });
     } else if(action==='onboarding-finish'){
       state.mode='home'; state.onboarding={screen:'walkthrough',step:0,profileStep:0,questType:null,draft:{},replay:false,busy:false}; render();
     } else if(action==='dismiss-health-notice'){
@@ -5858,7 +5860,10 @@
       const plan=state.plans.find(function(item){return item.id===btn.dataset.id;});
       if(!plan) return;
       plan.meta=Object.assign({},plan.meta,{status:btn.dataset.status});
-      Store.savePlan(plan).then(function(){ showMypageToast(btn.dataset.status==='paused'?'プランを休止しました':'プランをアーカイブしました'); render(); });
+      Store.savePlan(plan).then(async function(){
+        await refreshScheduledGoal();
+        showMypageToast(btn.dataset.status==='paused'?'プランを休止しました':'プランをアーカイブしました'); render();
+      });
     } else if(action==='toggle-week'){
       const key=(btn.dataset.plan||'')+':'+btn.dataset.week; state.expandedWeeks[key]=!state.expandedWeeks[key]; render();
     } else if(action==='path-node'){
@@ -5874,11 +5879,10 @@
           if(el) el.scrollIntoView({block:'start',behavior:'smooth'});
         });
       };
-      if(planId && state.currentId!==planId){
-        setActivePlan(planId,false).then(jumpToWeek);
-      } else {
-        jumpToWeek();
-      }
+      // 次のゴール以外のノードは、表示中の練習を入れ替えず管理画面から確認する。
+      if(planId && currentPlan() && currentPlan().id!==planId){
+        state.managedPlanId=planId; state.mode='profile'; state.mypageView='plan-detail'; render();
+      } else jumpToWeek();
     } else if(action==='toggle-policy'){
       state.policyOpen = !state.policyOpen;
       render();
@@ -5972,7 +5976,8 @@
       refreshTargetPacePreview(form);
     } else if(action==='select-plan' || action==='set-active-plan'){
       state.planSwitchOpen=false;
-      setActivePlan(btn.dataset.id,true);
+      state.managedPlanId=btn.dataset.id;
+      state.mode='profile'; state.mypageView='plan-detail'; render();
     } else if(action==='open-delete-modal'){
       state.deleteModal = btn.dataset.id;
       render();
@@ -6010,17 +6015,12 @@
       Store.deletePlan(id).then(()=>{
         state.plans = state.plans.filter(p=>p.id!==id);
         if(state.forecast[id]) delete state.forecast[id];
-        if(state.currentId===id){
-          state.currentId = state.plans[0] && state.plans[0].id;
-          state.profile.activePlanId=state.currentId||null;
-          Store.setProfile(state.profile);
-        }
         state.deleteModal = null;
         state.mypageView='goals-plans'; state.planEditOpen=false;
         if(state.logUndo && state.logUndo.planId===id){ state.logUndo=null; }
         if(state.logProposal){ state.logProposal=null; }
-        return state.currentId ? Promise.all([Store.getProgress(state.currentId), Store.getLogs(state.currentId)]) : Promise.resolve([{},{}]);
-      }).then(([c,l])=>{ state.completed=c||{}; state.logs=l||{}; render(); });
+        return refreshScheduledGoal();
+      }).then(()=>{ render(); });
     } else if(action==='cancel-adjust'){
       if(adjustController) adjustController.abort();
     } else if(action==='undo-adjust'){
@@ -6426,10 +6426,9 @@
       plan.meta.plan_goal_type=purpose==='fitness'?'fitness_weight':'beginner';
       plan.meta.goal_type=plan.meta.plan_goal_type;
       plan.meta.fitnessMinutes=f.fitnessMinutes ? Number(f.fitnessMinutes.value) : null;
-      Store.savePlan(plan).then(function(){
-        state.plans.push(plan); state.currentId=plan.id; state.profile.activePlanId=plan.id;
-        Store.setProfile(state.profile);
-        state.completed={}; state.logs={}; state.mode='view'; state.formError={};
+      Store.savePlan(plan).then(async function(){
+        state.plans.push(plan); await refreshScheduledGoal();
+        state.mode='view'; state.formError={};
         render();
       });
       return;
@@ -6500,11 +6499,9 @@
       }
     }
 
-    Store.savePlan(plan).then(()=>{
+    Store.savePlan(plan).then(async ()=>{
       state.plans.push(plan);
-      state.currentId = plan.id;
-      state.completed = {};
-      state.logs = {};
+      await refreshScheduledGoal();
       state.logForm = { openDate:null, values:null, busy:false, error:null, imageBusy:false, imageError:null, imageImport:null, feedbackBusy:null };
       state.logUndo = null;
       state.logProposal = null;
@@ -6563,7 +6560,7 @@
       await Promise.all(seedPlans.map(function(p){ return Store.deletePlan(p.id); }));
     }
     state.plans = plans;
-    state.currentId = plans[0] && plans[0].id;
+    state.currentId = null;
     try{ state.profile = await Store.getProfile(); }catch(e){ /* keep default */ }
     // 認証導入前でもWorkoutを同一端末の利用者に紐付けられるよう、端末内IDを一度だけ発行する。
     if(!state.profile.workoutUserId){
@@ -6571,14 +6568,9 @@
       // 初回起動時のプロフィール初期化が、直後の設定変更を古い値で上書きしないよう完了を待つ。
       await Store.setProfile(state.profile);
     }
-    // 既存ユーザーは従来の先頭プランを主目標として一度だけ引き継ぐ。
-    // 以後はprofile.activePlanIdが、会話を分割しない「現在の主目標」を表す。
-    if(state.profile.activePlanId && plans.some(function(plan){ return plan.id===state.profile.activePlanId; })){
-      state.currentId=state.profile.activePlanId;
-    }else if(state.currentId){
-      state.profile.activePlanId=state.currentId;
-      await Store.setProfile(state.profile);
-    }
+    // 旧 activePlanId は会話履歴と既存プロフィールの互換性のため読み残すだけにする。
+    // 現在は毎回、進行中で開催日が最も近い大会を「次のゴール」として選ぶ。
+    state.currentId=(nextGoalPlan()||{}).id||null;
     try{ state.completed = await Store.getProgress(state.currentId); }catch(e){ state.completed = {}; }
     try{ state.logs = await Store.getLogs(state.currentId); }catch(e){ state.logs = {}; }
     try{
