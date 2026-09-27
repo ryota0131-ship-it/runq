@@ -120,6 +120,11 @@
   :root[data-runq-large="true"] body{font-size:18px}:root[data-runq-large="true"] .li-sub,:root[data-runq-large="true"] .hint,:root[data-runq-large="true"] .item-desc{font-size:15px}:root[data-runq-contrast="true"]{--text:#0b1f3b;--text-muted:#334155;--border:#94a3b8}:root[data-runq-simple="true"] .forecast-factors,:root[data-runq-simple="true"] .extras-grid,:root[data-runq-simple="true"] .todays-point{display:none}
 
   .tabs{ display:flex; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:4px; }
+  /* 画面の主な情報を三つに絞る共通の上タブ。小さい画面でも文字を切らずに操作できる。 */
+  .page-section-tabs{ width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .page-section-tabs::-webkit-scrollbar{ display:none; }
+  .page-section-tabs .tabs{ min-width:max-content; }
+  .page-section-tabs .tab-btn{ min-height:42px; }
   .tab-btn{ border:none; background:transparent; color:var(--text-muted); font-weight:600; font-size:13px; padding:9px 18px; border-radius:999px; cursor:pointer; white-space:nowrap; }
   .tab-btn.active{ background:var(--surface); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
   .tab-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
@@ -2108,6 +2113,7 @@
     // AIコーチはユーザー専属の1人。会話はプランではなくユーザー単位で保持する。
     coach: { messages:[], loadedForUser:null, loading:false, migratedPlanIds:[] },
     viewMode: 'week',
+    planTab: 'current',
     calendarMonth: null,
     calendarSelected: null,
     sampleImageOk: false,
@@ -2135,6 +2141,7 @@
     shoeEditId: null,
     // マイページの表示状態(UI専用、永続化しない): 'main'|'profile-edit'|'shoes-add'|'training-settings'|'pace-calculator'|'race-predictor'|'settings'
     mypageView: 'main',
+    mypageTab: 'workouts',
     profileEditOpen: false,
     shoeFormOpen: false,
     trainingEditOpen: false,
@@ -3245,28 +3252,35 @@
   function personalBestCardHTML(){
     return '<div class="info-card"><div class="runner-profile-head"><h3>自己ベスト</h3><button type="button" class="workout-text-link" data-action="mypage-nav" data-view="runner-profile">編集する</button></div><div class="runner-pb-grid">'+runnerPbTileHTML('5km',5)+runnerPbTileHTML('10km',10)+runnerPbTileHTML('HALF',21.0975)+runnerPbTileHTML('FULL',42.195)+'</div></div>';
   }
+  function mypageTabsHTML(){
+    const active=state.mypageTab||'workouts';
+    const items=[['workouts','記録'],['profile','プロフィール'],['settings','設定']];
+    return '<nav class="page-section-tabs" aria-label="マイページの表示"><div class="tabs">'+items.map(function(item){return '<button type="button" class="tab-btn'+(active===item[0]?' active':'')+'" data-action="mypage-tab" data-tab="'+item[0]+'">'+item[1]+'</button>';}).join('')+'</div></nav>';
+  }
   function mypageMainHTML(){
     const workouts=allWorkouts();
+    const tab=state.mypageTab||'workouts';
     let html = '<div class="mypage-main">';
     html += mypageToastHTML();
+    html += mypageTabsHTML();
     html += '<div class="mypage-grid">';
-    html += currentGoalCardHTML();
-    html += monthlyRunningCardHTML(workouts);
-    html += '<div class="info-card"><div class="workout-section-head"><h3>最近のワークアウト</h3><button type="button" class="workout-text-link" data-action="mypage-nav" data-view="workout-history">すべて見る</button></div><div class="recent-workouts">'+(workouts.length?workouts.slice(0,3).map(workoutRowHTML).join(''):'<div class="workout-empty">走った記録が追加されると、ここで振り返れます。</div>')+'</div></div>';
-    html += personalBestCardHTML();
-    html += coachCompanionSettingsHTML();
-    html += '<div class="settings-section-title">目標と大会</div>';
-    html += mypageSettingsRowHTML('goals-plans','目標・大会','次のゴール、今後の大会、完了したプランを管理','training');
-    html += '<div class="settings-section-title">ランニングプロフィール</div>';
-    html += mypageSettingsRowHTML('runner-profile','ランナープロフィール','走力・自己ベスト・プロフィール','profile');
-    html += myShoesCardHTML();
-    html += mypageSettingsRowHTML('training-settings','トレーニング設定','走れる曜日・生活スタイル','training');
-    html += '<div class="settings-section-title">データとツール</div>';
-    html += mypageSettingsRowHTML('data-connections','データ連携','Appleヘルスケア・Health Connect','health');
-    html += runningToolsMenuHTML();
-    html += '<div class="settings-section-title">アプリについて</div>';
-    html += mypageSettingsRowHTML('settings','表示・アプリ設定','文字の大きさ・見やすさ','settings');
-    html += mypageSettingsRowHTML('','使い方をもう一度見る','RUNQ.の基本を確認する','guide','replay-walkthrough');
+    if(tab==='workouts'){
+      html += monthlyRunningCardHTML(workouts);
+      html += '<div class="info-card"><div class="workout-section-head"><h3>最近のワークアウト</h3><button type="button" class="workout-text-link" data-action="mypage-nav" data-view="workout-history">すべて見る</button></div><div class="recent-workouts">'+(workouts.length?workouts.slice(0,3).map(workoutRowHTML).join(''):'<div class="workout-empty">走った記録が追加されると、ここで振り返れます。</div>')+'</div></div>';
+      html += myShoesCardHTML();
+    } else if(tab==='profile'){
+      html += currentGoalCardHTML();
+      html += mypageSettingsRowHTML('goals-plans','目標・大会','次のゴール、今後の大会、完了したプランを管理','training');
+      html += mypageSettingsRowHTML('runner-profile','ランナープロフィール','走力・自己ベスト・プロフィール','profile');
+      html += personalBestCardHTML();
+      html += mypageSettingsRowHTML('training-settings','トレーニング設定','走れる曜日・生活スタイル','training');
+      html += runningToolsMenuHTML();
+    } else {
+      html += mypageSettingsRowHTML('settings','表示・アプリ設定','背景テーマ・文字の大きさ・見やすさ','settings');
+      html += mypageSettingsRowHTML('data-connections','データ連携','Appleヘルスケア・Health Connect','health');
+      html += coachCompanionSettingsHTML();
+      html += mypageSettingsRowHTML('','使い方をもう一度見る','RUNQ.の基本を確認する','guide','replay-walkthrough');
+    }
     html += '</div></div>';
     return html;
   }
@@ -3811,6 +3825,11 @@
     const isRace=!!(plan.meta&&plan.meta.raceDate);
     return '<div class="plan-focus-bar"><div><span class="quest-kicker">NEXT GOAL</span><strong>'+escapeHtml(plan.meta.name||'次のゴール')+'</strong><small>'+escapeHtml(isRace?'開催日が最も近い大会を自動表示':'進行中の目標を表示中')+'</small></div><div class="plan-focus-actions"><button type="button" class="btn-secondary" data-action="open-plan-switcher">ほかの目標を見る</button><button type="button" class="btn-secondary" data-action="open-plan-manager">目標・大会を管理</button></div></div>';
   }
+  function planTabsHTML(){
+    const active=state.planTab||'current';
+    const items=[['current','今のプラン'],['schedule','予定'],['create','作成']];
+    return '<nav class="page-section-tabs" aria-label="プランの表示"><div class="tabs">'+items.map(function(item){return '<button type="button" class="tab-btn'+(active===item[0]?' active':'')+'" data-action="plan-tab" data-tab="'+item[0]+'">'+item[1]+'</button>';}).join('')+'</div></nav>';
+  }
 
   function compactHistoryText(value, limit){
     const text=String(value||'').replace(/\s+/g,' ').trim();
@@ -3930,11 +3949,15 @@
   }
 
   function planViewHTML(plan){
-    if(!plan) return planPillsHTML()+'<div class="info-card">プランがありません。「プラン作成」から作成してください。</div>';
+    const tab=state.planTab||'current';
+    if(tab==='create') return '<main class="wrap">'+planTabsHTML()+createFormHTML()+'</main>';
+    if(!plan) return '<main class="wrap">'+planTabsHTML()+planPillsHTML()+'<div class="info-card">プランがありません。「作成」から新しい目標を作れます。</div></main>';
     if(plan.meta && plan.meta.questType && plan.meta.questType!=='race'){
       const beginnerToday=todayLocal(), beginnerCur=findCurrentWeek(plan,beginnerToday);
       let total=0,done=0; plan.weeks.forEach(function(w){w.items.forEach(function(it){if(isLoggable(it)){total++;if(isItemCompleted(plan,it))done++;}});});
-      return '<main class="wrap">'+planPillsHTML()+'<section class="plan-overview"><div class="plan-overview-copy"><span class="quest-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name)+'</strong><small>'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</small></div><div class="plan-overview-status"><strong>'+done+'/'+total+'</strong><span>メニュー完了</span></div></section>'+planJourneyDisclosureHTML(plan)+'<div class="weeks journey-weeks">'+plan.weeks.map(function(w,wi){const current=beginnerCur&&beginnerCur.wi===wi;return '<section class="week-card'+(current?' current':'')+'" id="week-card-'+escapeHtml(plan.id)+'-'+wi+'"><div class="week-head"><div class="week-head-left"><span class="week-num">'+escapeHtml(w.label)+'</span><span class="week-phase">'+escapeHtml(w.phase)+'</span><span class="week-range mono">'+escapeHtml(w.dateRange||'')+'</span></div></div>'+w.items.map(function(it,ii){return itemRowHTML(plan,wi,ii,it,beginnerToday);}).join('')+'</section>';}).join('')+'</div></main>';
+      const overview='<section class="plan-overview"><div class="plan-overview-copy"><span class="quest-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name)+'</strong><small>'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</small></div><div class="plan-overview-status"><strong>'+done+'/'+total+'</strong><span>メニュー完了</span></div></section>'+planJourneyDisclosureHTML(plan);
+      const schedule='<div class="weeks journey-weeks">'+plan.weeks.map(function(w,wi){const current=beginnerCur&&beginnerCur.wi===wi;return '<section class="week-card'+(current?' current':'')+'" id="week-card-'+escapeHtml(plan.id)+'-'+wi+'"><div class="week-head"><div class="week-head-left"><span class="week-num">'+escapeHtml(w.label)+'</span><span class="week-phase">'+escapeHtml(w.phase)+'</span><span class="week-range mono">'+escapeHtml(w.dateRange||'')+'</span></div></div>'+w.items.map(function(it,ii){return itemRowHTML(plan,wi,ii,it,beginnerToday);}).join('')+'</section>';}).join('')+'</div>';
+      return '<main class="wrap">'+planTabsHTML()+planPillsHTML()+(tab==='schedule'?schedule:overview)+'</main>';
     }
     const today = todayLocal();
     const raceDate = parseISO(plan.meta.raceDate);
@@ -3966,12 +3989,14 @@
         }
       });
     });
-    let html = planPillsHTML();
+    let html = planTabsHTML()+planPillsHTML();
     const raceStatus=daysLeft>0?'あと '+daysLeft+'日':daysLeft===0?'レース当日':'レース後';
     const goalDetails='<div class="hero-stats"><div class="stat"><span class="k">大会日</span><span class="v">'+fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）</span></div><div class="stat"><span class="k">目標タイム</span><span class="v mono">'+escapeHtml(plan.meta.targetLabel||'—')+'</span></div><div class="stat"><span class="k">MPペース</span><span class="v">'+escapeHtml(plan.meta.mpLabel||'—')+'</span></div><div class="stat"><span class="k">イージー</span><span class="v">'+escapeHtml(plan.meta.easyLabel||'—')+'</span></div>'+(plan.meta.pbLabel?'<div class="stat"><span class="k">現在PB</span><span class="v">'+escapeHtml(plan.meta.pbLabel)+'</span></div>':'')+'</div>'+(plan.meta.linkedFromPlanId?(function(){const src=state.plans.find(function(p){return p.id===plan.meta.linkedFromPlanId;});return src?'<div class="hero-link-note">'+escapeHtml(src.meta.name)+'からの継続プラン</div>':'';})():'');
-    html += '<section class="plan-overview"><div class="plan-overview-copy"><span class="quest-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name)+'</strong><small>'+escapeHtml(plan.meta.distanceLabel)+' ・ '+escapeHtml(phaseLabel)+'</small></div><div class="plan-overview-status"><strong>'+done+'/'+total+'</strong><span>'+escapeHtml(raceStatus)+' ・ 完了</span></div></section>';
-    html += planGoalDisclosureHTML(plan,goalDetails);
-    html += planJourneyDisclosureHTML(plan);
+    if(tab==='current'){
+      html += '<section class="plan-overview"><div class="plan-overview-copy"><span class="quest-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name)+'</strong><small>'+escapeHtml(plan.meta.distanceLabel)+' ・ '+escapeHtml(phaseLabel)+'</small></div><div class="plan-overview-status"><strong>'+done+'/'+total+'</strong><span>'+escapeHtml(raceStatus)+' ・ 完了</span></div></section>';
+      html += planGoalDisclosureHTML(plan,goalDetails);
+      html += planJourneyDisclosureHTML(plan);
+    }
 
     const contextLines = [];
     if(plan.meta.courseNote) contextLines.push('コース特性・気候: '+plan.meta.courseNote);
@@ -3991,6 +4016,13 @@
         const reason=compactHistoryText(h.reason||'プランの見直し', 78);
         return '<li><span class="history-date mono">'+dLabel+'</span><div><div class="history-detail"><strong>変更内容</strong><span class="history-summary">'+escapeHtml(summary)+'</span></div><div class="history-detail"><strong>変更理由</strong><span class="history-reason">'+escapeHtml(reason)+'</span></div></div></li>';
       }).join('')+'</ul>':'')+'</div>';
+    }
+
+    if(tab==='current'){
+      html += planExtrasDisclosureHTML(plan);
+      html += secondaryHTML;
+      html += '<div class="foot-note">実績を記録すると、予定の進捗に反映されます</div>';
+      return html;
     }
 
     html += '<div class="view-toggle">'
@@ -4030,10 +4062,6 @@
     html += '</div>';
 
     }
-
-    html += planExtrasDisclosureHTML(plan);
-
-    html += secondaryHTML;
 
     html += '<div class="foot-note">実績を記録すると、予定の進捗に反映されます</div>';
     return html;
@@ -5778,7 +5806,9 @@
       Store.setProfile(state.profile);
       render();
     } else if(action==='tab'){
-      state.mode = btn.dataset.tab;
+      // 「作成」はプラン画面の上タブへ集約する。古い導線もこの入口にそろえる。
+      state.mode = btn.dataset.tab==='create' ? 'view' : btn.dataset.tab;
+      if(btn.dataset.tab==='create') state.planTab='create';
       state.formError = {};
       if(state.mode==='coach') state.adjust.context=null;
       if(state.mode==='profile'){
@@ -5787,7 +5817,9 @@
         state.profileEditOpen = false;
         state.shoeFormOpen = false;
         state.trainingEditOpen = false;
+        state.mypageTab = 'workouts';
       }
+      if(state.mode==='view' && btn.dataset.tab!=='create') state.planTab='current';
       render();
       if(state.mode==='profile') refreshShoeMileage();
       if(state.mode==='coach'){
@@ -6083,6 +6115,17 @@
       applyLogProposal(idx);
     } else if(action==='dismiss-log-proposal'){
       dismissLogProposal();
+    } else if(action==='plan-tab'){
+      state.planTab=btn.dataset.tab||'current';
+      state.formError={};
+      render();
+    } else if(action==='mypage-tab'){
+      state.mypageTab=btn.dataset.tab||'workouts';
+      state.mypageView='main';
+      state.profileEditOpen=false;
+      state.shoeFormOpen=false;
+      state.trainingEditOpen=false;
+      render();
     } else if(action==='mypage-nav'){
       state.mypageView = btn.dataset.view || 'main';
       render();
