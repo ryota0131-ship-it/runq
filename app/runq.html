@@ -112,7 +112,9 @@
   .topbar-copy{ display:flex; flex-direction:column; justify-content:center; min-width:0; }
   .topbar-kicker{ color:var(--accent); font-size:10px; font-weight:800; letter-spacing:.1em; line-height:1.2; }
   .topbar-title{ margin:2px 0 0; color:var(--text); font-family:"Zen Kaku Gothic New",sans-serif; font-size:17px; font-weight:800; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .topbar .coach-mascot-small{ width:27px; height:31px; }
+  /* プラン／マイページは画面名だけを青いセクションラベルとして扱う。 */
+  .topbar-title.topbar-section-title{ margin:0; color:var(--accent); font-family:inherit; font-size:13px; font-weight:800; letter-spacing:.12em; line-height:1.2; }
+  .topbar .coach-mascot-small{ width:24px; height:28px; }
   .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .action-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}.action-row .log-btn{margin:0}.detail-link{border:0;background:transparent;color:var(--accent);font:inherit;font-weight:700;padding:10px 4px;cursor:pointer;min-height:44px}
   .status-copy{font-size:14px;color:var(--text-muted);line-height:1.65}.week-card.collapsed .item-row{display:none}.week-card-toggle{border:0;background:transparent;padding:11px;min-width:44px;min-height:44px;color:var(--text-muted);cursor:pointer;font-size:14px}
@@ -121,9 +123,9 @@
 
   .tabs{ display:flex; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:999px; padding:4px; }
   /* 画面の主な情報を三つに絞る共通の上タブ。小さい画面でも文字を切らずに操作できる。 */
-  .page-section-tabs{ width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .page-section-tabs{ width:100%; display:flex; justify-content:center; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .page-section-tabs::-webkit-scrollbar{ display:none; }
-  .page-section-tabs .tabs{ min-width:max-content; }
+  .page-section-tabs .tabs{ min-width:max-content; margin:0 auto; }
   .page-section-tabs .tab-btn{ min-height:42px; }
   .tab-btn{ border:none; background:transparent; color:var(--text-muted); font-weight:600; font-size:13px; padding:9px 18px; border-radius:999px; cursor:pointer; white-space:nowrap; }
   .tab-btn.active{ background:var(--surface); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
@@ -578,7 +580,7 @@
 
   /* ---------- my page ---------- */
   .mypage-grid{ display:flex; flex-direction:column; gap:18px; }
-  .mypage-main{ width:100%; }
+  .mypage-main{ width:100%; display:flex; flex-direction:column; gap:20px; }
   .mypage-main > .mypage-grid{ gap:20px; }
   .mypage-main .settings-section-title{ margin-top:4px; }
   .list-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-top:1px solid var(--border); }
@@ -2357,30 +2359,31 @@
 
   function topbarHTML(){
     const plan=currentPlan(), profile=state.profile||{};
-    let kicker='', title='RUNQ.', leading='';
+    let kicker='', title='RUNQ.', leading='', sectionTitle=false;
     if(state.mode==='home'){
       const hour=new Date().getHours();
       const greeting=hour<11?'おはよう':hour<18?'こんにちは':'こんばんは';
       kicker='TODAY';
       title=profile.name ? greeting+'、'+profile.name+(String(profile.name).endsWith('さん')?'':'さん') : '今日も、次の一歩へ';
     } else if(state.mode==='view'){
-      kicker='TRAINING PLAN';
-      title=plan&&plan.meta&&plan.meta.name ? plan.meta.name : 'トレーニングプラン';
+      // 大会名は「今のプラン」内だけで示す。固定ヘッダーは画面の現在地だけに絞る。
+      title='TRAINING PLAN';
+      sectionTitle=true;
     } else if(state.mode==='coach'){
-      const persona=coachPersona();
-      kicker='一緒に考えます';
-      title=persona.label+' コーチ';
+      title='YOUR COACH';
+      sectionTitle=true;
       leading=coachMascotHTML(profile.coachPersona,'normal','small');
     } else if(state.mode==='profile'){
-      kicker='MY RUNNING';
-      title='マイページ';
+      // マイページは画面名を重ねず、ランニングの自分用スペースであることだけを示す。
+      title='MY RUNNING';
+      sectionTitle=true;
     } else if(state.mode==='create'){
       kicker='NEW QUEST';
       title='新しい目標';
     }
     return '<header class="topbar"><div class="topbar-main">'+leading
       + '<div class="topbar-copy">'+(kicker?'<span class="topbar-kicker">'+escapeHtml(kicker)+'</span>':'')
-      + '<h1 class="topbar-title">'+escapeHtml(title)+'</h1></div>'
+      + '<h1 class="topbar-title'+(sectionTitle?' topbar-section-title':'')+'">'+escapeHtml(title)+'</h1></div>'
       + '<span class="sr-only">RUNQ. Run your quest.</span></div></header>';
   }
 
@@ -3958,14 +3961,16 @@
 
   function planViewHTML(plan){
     const tab=state.planTab||'current';
-    if(tab==='create') return '<main class="wrap">'+planTabsHTML()+createFormHTML()+'</main>';
-    if(!plan) return '<main class="wrap">'+planTabsHTML()+planPillsHTML()+'<div class="info-card">プランがありません。「作成」から新しい目標を作れます。</div></main>';
+    // 目標の切り替え・大会管理・新規作成は「作成」にまとめる。
+    // 今のプラン／予定では、選んでいるプランの内容だけを表示して重複をなくす。
+    if(tab==='create') return '<main class="wrap">'+planTabsHTML()+planPillsHTML()+createFormHTML()+'</main>';
+    if(!plan) return '<main class="wrap">'+planTabsHTML()+'<div class="info-card">プランがありません。「作成」から新しい目標を作れます。</div></main>';
     if(plan.meta && plan.meta.questType && plan.meta.questType!=='race'){
       const beginnerToday=todayLocal(), beginnerCur=findCurrentWeek(plan,beginnerToday);
       let total=0,done=0; plan.weeks.forEach(function(w){w.items.forEach(function(it){if(isLoggable(it)){total++;if(isItemCompleted(plan,it))done++;}});});
       const overview='<section class="plan-overview"><div class="plan-overview-copy"><span class="quest-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name)+'</strong><small>'+escapeHtml(plan.meta.distanceLabel)+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間</small></div><div class="plan-overview-status"><strong>'+done+'/'+total+'</strong><span>メニュー完了</span></div></section>'+planJourneyDisclosureHTML(plan);
       const schedule='<div class="weeks journey-weeks">'+plan.weeks.map(function(w,wi){const current=beginnerCur&&beginnerCur.wi===wi;return '<section class="week-card'+(current?' current':'')+'" id="week-card-'+escapeHtml(plan.id)+'-'+wi+'"><div class="week-head"><div class="week-head-left"><span class="week-num">'+escapeHtml(w.label)+'</span><span class="week-phase">'+escapeHtml(w.phase)+'</span><span class="week-range mono">'+escapeHtml(w.dateRange||'')+'</span></div></div>'+w.items.map(function(it,ii){return itemRowHTML(plan,wi,ii,it,beginnerToday);}).join('')+'</section>';}).join('')+'</div>';
-      return '<main class="wrap">'+planTabsHTML()+planPillsHTML()+(tab==='schedule'?schedule:overview)+'</main>';
+      return '<main class="wrap">'+planTabsHTML()+(tab==='schedule'?schedule:overview)+'</main>';
     }
     const today = todayLocal();
     const raceDate = parseISO(plan.meta.raceDate);
@@ -3997,7 +4002,7 @@
         }
       });
     });
-    let html = planTabsHTML()+planPillsHTML();
+    let html = planTabsHTML();
     const raceStatus=daysLeft>0?'あと '+daysLeft+'日':daysLeft===0?'レース当日':'レース後';
     const goalDetails='<div class="hero-stats"><div class="stat"><span class="k">大会日</span><span class="v">'+fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）</span></div><div class="stat"><span class="k">目標タイム</span><span class="v mono">'+escapeHtml(plan.meta.targetLabel||'—')+'</span></div><div class="stat"><span class="k">MPペース</span><span class="v">'+escapeHtml(plan.meta.mpLabel||'—')+'</span></div><div class="stat"><span class="k">イージー</span><span class="v">'+escapeHtml(plan.meta.easyLabel||'—')+'</span></div>'+(plan.meta.pbLabel?'<div class="stat"><span class="k">現在PB</span><span class="v">'+escapeHtml(plan.meta.pbLabel)+'</span></div>':'')+'</div>'+(plan.meta.linkedFromPlanId?(function(){const src=state.plans.find(function(p){return p.id===plan.meta.linkedFromPlanId;});return src?'<div class="hero-link-note">'+escapeHtml(src.meta.name)+'からの継続プラン</div>':'';})():'');
     if(tab==='current'){
