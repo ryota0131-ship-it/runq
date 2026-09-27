@@ -12,6 +12,10 @@ assert.ok(!app.includes('今日は予定を入れていません'), 'home no lon
 assert.ok(app.includes('class="home-workout-details"'), 'long workout instructions are expandable');
 assert.ok(app.includes('NEXT MILESTONE'), 'home shows the next achievable milestone');
 assert.ok(app.includes('RECENT WIN'), 'home shows a recent achievement');
+assert.ok(app.includes('function journeyMomentHTML(plan,today,placement)'), 'journey moments are rendered from structured run and race context');
+assert.ok(app.includes('assets/journey-dawn-v1.png'), 'journey moments use the local RUNQ scenic asset');
+assert.ok(fs.existsSync(path.join(__dirname, '..', 'app', 'assets', 'journey-dawn-v1.png')), 'the scenic asset is included with the app');
+assert.ok(app.includes("journeyMomentHTML(plan,today,'home')"), 'home only renders the scenic moment when its conditions are met');
 // ROAD TO GOAL: 5段階の抽象ステージ表示(quest-journey)は廃止し、週単位のノードを
 // 蛇行パスでつなぐ表示(quest-path / planPathHTML)に置き換えた(2026-09-18)。
 assert.ok(app.includes('class="quest-path"'), 'plan view renders the road-to-goal path');

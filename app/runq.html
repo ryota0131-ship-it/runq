@@ -382,6 +382,13 @@
   .journey-board-head{ position:relative; z-index:1; display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:0 4px 4px; }
   .journey-board-head h3{ margin:0; font-size:16px; }
   .journey-board-head span{ color:var(--text-faint); font-size:11px; white-space:nowrap; }
+  /* 旅の景色は、実績や節目を感じる短い間。情報を読む背景や常設ギャラリーにはしない。 */
+  .journey-scenery{ position:relative; isolation:isolate; min-height:144px; overflow:hidden; margin:4px 0 8px; padding:16px; border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border)); border-radius:14px; background:#dbe9ef url("assets/journey-dawn-v1.png") center/cover no-repeat; color:#fff; }
+  .journey-scenery::before{ content:""; position:absolute; z-index:-1; inset:0; background:linear-gradient(100deg,rgba(8,31,52,.82),rgba(8,31,52,.46) 62%,rgba(8,31,52,.15)); }
+  .journey-scenery--home{ min-height:132px; margin:0; }
+  .journey-scenery-kicker{ display:block; font-size:10px; font-weight:800; letter-spacing:.11em; opacity:.82; }
+  .journey-scenery strong{ display:block; max-width:245px; margin-top:7px; font:800 18px/1.35 "Zen Kaku Gothic New",sans-serif; }
+  .journey-scenery small{ display:block; max-width:240px; margin-top:5px; color:rgba(255,255,255,.88); font-size:12px; line-height:1.5; }
   .journey-step{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; width:fit-content; max-width:91%; border:0; background:transparent; color:var(--text); padding:3px 0; text-align:left; cursor:pointer; font:inherit; }
   .journey-step:nth-of-type(2n){ align-self:flex-end; flex-direction:row-reverse; text-align:right; }
   .journey-step.is-static{ cursor:default; }
@@ -4015,7 +4022,32 @@
     const raceDate=plan.meta&&plan.meta.raceDate?parseISO(plan.meta.raceDate):null;
     const goalSub=raceDate?fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）':'今の目標を達成する日';
     steps.push(step('goal','GOAL',plan.meta&&plan.meta.name||'ゴール',goalSub,null,'🏁'));
-    return '<section class="journey-board" aria-label="ゴールまでの進み方"><div class="journey-board-head"><div><span class="quest-kicker">YOUR JOURNEY</span><h3>次の一歩へ</h3></div><span>'+completed.length+'/'+items.length+'完了</span></div>'+steps.join('')+'</section>';
+    return '<section class="journey-board" aria-label="ゴールまでの進み方"><div class="journey-board-head"><div><span class="quest-kicker">YOUR JOURNEY</span><h3>次の一歩へ</h3></div><span>'+completed.length+'/'+items.length+'完了</span></div>'+journeyMomentHTML(plan,today,'plan')+steps.join('')+'</section>';
+  }
+
+  // 写真は常設の装飾ではなく、直近の積み上げや大会の節目だけに現れる「旅の景色」として扱う。
+  function journeyMomentHTML(plan,today,placement){
+    const latest=allWorkouts()[0]||null;
+    const latestDate=latest&&workoutDate(latest);
+    const recent=latestDate&&daysBetween(latestDate,today)>=0&&daysBetween(latestDate,today)<=7;
+    const raceDate=plan&&plan.meta&&plan.meta.raceDate?parseISO(plan.meta.raceDate):null;
+    const daysLeft=raceDate?daysBetween(today,raceDate):null;
+    const countdown=daysLeft!==null&&[30,14,7,1,0].indexOf(daysLeft)>=0;
+    if(placement==='home'&&!recent&&!countdown) return '';
+    let kicker='YOUR JOURNEY';
+    let title='今日も、ゴールへ続く道。';
+    let sub='小さな一歩を、次の景色につなげていこう。';
+    if(recent){
+      kicker='RUN MOMENT';
+      title=formatKm(Number(latest.distance_meters||0)/1000)+'を積み上げました';
+      sub=workoutDateLabel(latest)+'のランが、ゴールまでの道を進めています。';
+    }
+    if(countdown){
+      kicker='RACE COUNTDOWN';
+      title=daysLeft===0?'今日はレース当日。':'レースまで、あと'+daysLeft+'日。';
+      sub=daysLeft===0?'ここまでの積み上げを信じて、楽しんで走ろう。':'焦らず、今できる一歩を大切にしよう。';
+    }
+    return '<section class="journey-scenery'+(placement==='home'?' journey-scenery--home':'')+'" aria-label="'+escapeHtml(title)+'"><span class="journey-scenery-kicker">'+escapeHtml(kicker)+'</span><strong>'+escapeHtml(title)+'</strong><small>'+escapeHtml(sub)+'</small></section>';
   }
 
   function planJourneyDisclosureHTML(plan){
@@ -4567,13 +4599,14 @@
     }
     if(plan.meta && plan.meta.questType && plan.meta.questType!=='race'){
       const today=todayLocal();
-      return '<main class="home-dashboard">'+healthImportNoticeHTML()+todayCardHTML(plan,today)+homeGoalSummaryHTML(plan,today)+thisWeekCardHTML(plan,today)+planReviewCardHTML(plan)+homeProgressDisclosureHTML(plan,today)+'<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div></main>';
+      return '<main class="home-dashboard">'+healthImportNoticeHTML()+todayCardHTML(plan,today)+homeGoalSummaryHTML(plan,today)+journeyMomentHTML(plan,today,'home')+thisWeekCardHTML(plan,today)+planReviewCardHTML(plan)+homeProgressDisclosureHTML(plan,today)+'<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div></main>';
     }
     const today = todayLocal();
     let html = '<main class="home-dashboard">';
     html += healthImportNoticeHTML();
     html += todayCardHTML(plan, today);
     html += homeGoalSummaryHTML(plan,today);
+    html += journeyMomentHTML(plan,today,'home');
     html += thisWeekCardHTML(plan, today);
     html += planReviewCardHTML(plan);
     html += homeProgressDisclosureHTML(plan,today);
