@@ -991,6 +991,55 @@
   .onboarding-progress{height:4px;background:var(--border);border-radius:999px;margin:0 0 24px}.onboarding-progress i{display:block;height:100%;background:var(--accent);border-radius:inherit}.onboarding-review{display:grid;gap:10px;margin:16px 0}.onboarding-review div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border);padding:9px 0;font-size:13px}.onboarding-review span{color:var(--text-muted)}
   body.mode-onboarding{padding-top:calc(18px + var(--runq-safe-top));padding-bottom:calc(22px + env(safe-area-inset-bottom));}
   @media(max-width:480px){.onboarding{padding-top:4px}.onboarding-card{padding:24px 18px}.onboarding h1{font-size:24px}}
+
+  /* ---------- typography scale ----------
+     画面ごとに 11.5px / 12.5px / 13.5px が混在していたため、読ませる情報の
+     役割を「補足 / 本文 / 操作 / 見出し」に揃える。入力欄だけはiOSで拡大されない
+     16pxを維持する。個別の数値（距離・タイム）とロゴはこの共通スケールの対象外。 */
+  :root{
+    --type-meta:11px;
+    --type-caption:12px;
+    --type-body:14px;
+    --type-action:14px;
+    --type-section:17px;
+    --type-page:22px;
+    --leading-body:1.6;
+  }
+  body{ font-size:var(--type-body); line-height:var(--leading-body); }
+  .topbar-kicker,.topbar-title.topbar-section-title,
+  .quest-kicker,.home-section-head .eyebrow,.coach-daily-name{ font-size:var(--type-meta); }
+  .topbar-title{ font-size:var(--type-section); }
+  .tabs .tab-btn,.tab-btn,.btn-primary,.btn-secondary,.btn-danger,
+  .detail-link,.menu-consult-link,.menu-skip-link{ font-size:var(--type-action); }
+  .bottom-nav-btn{ font-size:var(--type-caption); }
+  .form-card h2,.workout-detail-title{ font-size:var(--type-page); line-height:1.35; }
+  .info-card h3,.policy-toggle,.home-section-head h3,.history-month-head h3,
+  .plan-review-card h3,.training-summary-card .runner-profile-head h3{ font-size:var(--type-section); }
+  .form-card .lede,.status-copy,.home-workout-guide,
+  .today-card .rest-banner,.todays-point .tp-text,.chat-bubble,
+  .option-summary,.risk-callout,.feedback-callout,.workout-reflection-row,
+  .plan-review-recommend{ font-size:var(--type-body); line-height:var(--leading-body); }
+  .field label,.field .hint,.form-note,.li-sub,.race-result small,
+  .race-selected-summary,.home-workout-date,.today-date,.week-progress-line,
+  .workout-row-date,.workout-row-note,.workout-row-values span,
+  .mypage-profile-sub,.mypage-goal .goal-date,.month-diff,
+  .connection-platform-note{ font-size:var(--type-caption); }
+  .race-picker-head label,.race-result strong,.item-title,.workout-row-title,
+  .mypage-menu-row .li-main,.list-row .li-main,.workout-detail-plan .li-main,
+  .plan-focus-bar strong,.plan-overview-copy strong{ font-size:var(--type-action); }
+  .item-desc,.info-card li,.training-summary-lines,.plan-review-card p,
+  .plan-evidence-card p,.forecast-confidence,.forecast-factors li{ font-size:var(--type-body); line-height:var(--leading-body); }
+  .chip,.log-btn,.log-summary-txt,.log-edit-btn,.log-share-btn,.segmented-opt,
+  .history-range button,.workout-text-link,.race-filter,.race-manual-toggle,
+  .share-template-tab,.share-status{ font-size:var(--type-caption); }
+  .field input[type=text],.field input[type=date],.field input[type=number],
+  .field select,.time-picker select,.log-form textarea,.adjust-card textarea,
+  .race-picker > input[type="search"],.chat-input-row textarea{ font-size:16px; }
+  @media (max-width:420px){
+    .form-card h2,.workout-detail-title{ font-size:20px; }
+    .info-card h3,.policy-toggle,.home-section-head h3,.history-month-head h3,
+    .plan-review-card h3,.training-summary-card .runner-profile-head h3{ font-size:16px; }
+  }
 </style>
 
 <div class="wrap" id="app">
