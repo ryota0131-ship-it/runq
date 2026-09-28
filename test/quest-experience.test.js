@@ -16,6 +16,12 @@ assert.ok(app.includes('function journeyMomentHTML(plan,today,placement)'), 'jou
 assert.ok(app.includes('assets/journey-dawn-v1.png'), 'journey moments use the local RUNQ scenic asset');
 assert.ok(fs.existsSync(path.join(__dirname, '..', 'app', 'assets', 'journey-dawn-v1.png')), 'the scenic asset is included with the app');
 assert.ok(app.includes("journeyMomentHTML(plan,today,'home')"), 'home only renders the scenic moment when its conditions are met');
+const homeFunction = app.slice(app.indexOf('function homeHTML(){'), app.indexOf('function coachTabHTML(){'));
+assert.ok(homeFunction.indexOf('homeGoalSummaryHTML(plan,today)') < homeFunction.indexOf('todayCardHTML(plan, today)'), 'home places the goal before today\'s menu');
+assert.ok(homeFunction.indexOf('todayCardHTML(plan, today)') < homeFunction.indexOf('thisWeekCardHTML(plan, today)'), 'home places today\'s menu before the weekly schedule');
+assert.ok(app.includes('page-section-tabs floating-section-tabs'), 'plan and mypage section tabs use the floating control');
+assert.ok(app.includes("document.body.classList.toggle('has-floating-section-tabs'"), 'floating controls reserve space above the bottom navigation');
+assert.ok(app.includes("document.body.classList.toggle('keyboard-open',keyboardOpen)"), 'floating controls hide while the software keyboard is visible');
 // ROAD TO GOAL: 5段階の抽象ステージ表示(quest-journey)は廃止し、週単位のノードを
 // 蛇行パスでつなぐ表示(quest-path / planPathHTML)に置き換えた(2026-09-18)。
 assert.ok(app.includes('class="quest-path"'), 'plan view renders the road-to-goal path');

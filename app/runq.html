@@ -134,6 +134,14 @@
   .tab-btn{ border:none; background:transparent; color:var(--text-muted); font-weight:600; font-size:13px; padding:9px 18px; border-radius:999px; cursor:pointer; white-space:nowrap; }
   .tab-btn.active{ background:var(--surface); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
   .tab-btn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+  /* プラン／マイページの区分は、本文を押し下げず下部ナビの少し上に浮かせる。
+     下部ナビよりは必ず背面に置き、キーボード入力中は隠して入力操作を邪魔しない。 */
+  .floating-section-tabs{ position:fixed; z-index:45; left:50%; bottom:calc(72px + env(safe-area-inset-bottom)); width:auto; max-width:calc(100vw - 32px); transform:translateX(-50%); padding:0; overflow:visible; }
+  .floating-section-tabs .tabs{ margin:0; max-width:100%; padding:5px; border-color:color-mix(in srgb,var(--border) 86%,transparent); background:color-mix(in srgb,var(--surface-2) 90%,transparent); box-shadow:0 8px 24px var(--shadow); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+  .floating-section-tabs .tab-btn{ min-height:44px; padding:10px 18px; }
+  body.has-floating-section-tabs{ padding-bottom:calc(194px + env(safe-area-inset-bottom)); }
+  body.keyboard-open .floating-section-tabs{ display:none; }
+  @media (max-width:360px){ .floating-section-tabs .tab-btn{ padding-inline:14px; } }
 
   /* ---------- bottom nav ---------- */
   .bottom-nav{ position:fixed; left:0; right:0; bottom:0; z-index:50; display:flex; background:var(--surface); border-top:1px solid var(--border); padding:6px 6px calc(6px + env(safe-area-inset-bottom)); box-shadow:0 -2px 12px var(--shadow); }
@@ -2424,6 +2432,7 @@
     // bodyにモード専用クラスを付け外しし、CSS側でこのタブの時だけレイアウトを切り替える
     document.body.classList.toggle('mode-coach', state.mode==='coach');
     document.body.classList.toggle('mode-onboarding', state.mode==='onboarding');
+    document.body.classList.toggle('has-floating-section-tabs', state.mode==='view' || (state.mode==='profile' && (state.mypageView||'main')==='main'));
     if(state.mode==='coach'){
       const thread = document.getElementById('coach-thread');
       if(thread) thread.scrollTop = thread.scrollHeight;
@@ -3339,7 +3348,7 @@
   function mypageTabsHTML(){
     const active=state.mypageTab||'workouts';
     const items=[['workouts','記録'],['profile','プロフィール'],['settings','設定']];
-    return '<nav class="page-section-tabs" aria-label="マイページの表示"><div class="tabs">'+items.map(function(item){return '<button type="button" class="tab-btn'+(active===item[0]?' active':'')+'" data-action="mypage-tab" data-tab="'+item[0]+'">'+item[1]+'</button>';}).join('')+'</div></nav>';
+    return '<nav class="page-section-tabs floating-section-tabs" aria-label="マイページの表示"><div class="tabs">'+items.map(function(item){return '<button type="button" class="tab-btn'+(active===item[0]?' active':'')+'" data-action="mypage-tab" data-tab="'+item[0]+'">'+item[1]+'</button>';}).join('')+'</div></nav>';
   }
   function mypageMainHTML(){
     const workouts=allWorkouts();
@@ -3921,7 +3930,7 @@
   function planTabsHTML(){
     const active=state.planTab||'current';
     const items=[['current','今のプラン'],['schedule','予定'],['create','作成']];
-    return '<nav class="page-section-tabs" aria-label="プランの表示"><div class="tabs">'+items.map(function(item){return '<button type="button" class="tab-btn'+(active===item[0]?' active':'')+'" data-action="plan-tab" data-tab="'+item[0]+'">'+item[1]+'</button>';}).join('')+'</div></nav>';
+    return '<nav class="page-section-tabs floating-section-tabs" aria-label="プランの表示"><div class="tabs">'+items.map(function(item){return '<button type="button" class="tab-btn'+(active===item[0]?' active':'')+'" data-action="plan-tab" data-tab="'+item[0]+'">'+item[1]+'</button>';}).join('')+'</div></nav>';
   }
 
   function compactHistoryText(value, limit){
@@ -4599,15 +4608,15 @@
     }
     if(plan.meta && plan.meta.questType && plan.meta.questType!=='race'){
       const today=todayLocal();
-      return '<main class="home-dashboard">'+healthImportNoticeHTML()+todayCardHTML(plan,today)+homeGoalSummaryHTML(plan,today)+journeyMomentHTML(plan,today,'home')+thisWeekCardHTML(plan,today)+planReviewCardHTML(plan)+homeProgressDisclosureHTML(plan,today)+'<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div></main>';
+      return '<main class="home-dashboard">'+healthImportNoticeHTML()+homeGoalSummaryHTML(plan,today)+todayCardHTML(plan,today)+thisWeekCardHTML(plan,today)+journeyMomentHTML(plan,today,'home')+planReviewCardHTML(plan)+homeProgressDisclosureHTML(plan,today)+'<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div></main>';
     }
     const today = todayLocal();
     let html = '<main class="home-dashboard">';
     html += healthImportNoticeHTML();
-    html += todayCardHTML(plan, today);
     html += homeGoalSummaryHTML(plan,today);
-    html += journeyMomentHTML(plan,today,'home');
+    html += todayCardHTML(plan, today);
     html += thisWeekCardHTML(plan, today);
+    html += journeyMomentHTML(plan,today,'home');
     html += planReviewCardHTML(plan);
     html += homeProgressDisclosureHTML(plan,today);
     html += '<div class="home-coach-link"><button type="button" class="btn-secondary" data-action="tab" data-tab="coach">コーチに相談する　›</button></div>';
@@ -6697,6 +6706,18 @@
   document.addEventListener('visibilitychange', function(){
     if(!document.hidden && state.adjust.busy) render();
   });
+
+  // iOS/Androidのソフトキーボード中は、下部に重なる区分切り替えを一時的に隠す。
+  // visualViewportがない環境では何もせず、通常の固定レイアウトを維持する。
+  function updateKeyboardVisibility(){
+    if(!window.visualViewport) return;
+    const keyboardOpen=(window.innerHeight-window.visualViewport.height)>120;
+    document.body.classList.toggle('keyboard-open',keyboardOpen);
+  }
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',updateKeyboardVisibility);
+    window.visualViewport.addEventListener('scroll',updateKeyboardVisibility);
+  }
 
   /* ============================================================
      boot
