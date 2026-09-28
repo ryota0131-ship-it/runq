@@ -4426,7 +4426,7 @@
     if(it.desc) html+='<details class="home-workout-details"><summary>詳しい走り方</summary><p>'+escapeHtml(it.desc)+'</p></details>';
     if(context==='today'){
       const workout=workoutForCompletion(plan,it,completion);
-      html+='<div class="home-workout-actions">'+(done?(workout?'<button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">今日の達成をシェア</button>':'<span class="complete-badge">✓ 完了</span>'):'<button type="button" class="btn-primary" data-action="open-log" data-date="'+it.date+'">結果を記録する</button>')
+      html+='<div class="home-workout-actions">'+(done?(workout?'<button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">今日の達成をシェア</button>':'<span class="complete-badge">✓ 完了</span>'):'<button type="button" class="btn-primary home-record-btn" data-action="open-log" data-home-open-log="true" data-date="'+it.date+'">結果を記録する</button>')
         + '<button type="button" class="detail-link" data-action="consult-item" data-date="'+it.date+'">コーチに相談</button>'+(done?'':'<button type="button" class="menu-skip-link" data-action="skip-item" data-date="'+it.date+'">今回は見送る</button>')+'</div>';
     }
     return html+'</div>';
@@ -5984,6 +5984,25 @@
   /* ============================================================
      event handling
   ============================================================ */
+  // iOS/WKWebViewでは、カード内の再描画やタップ判定の影響で click だけが
+  // 届かない端末がある。ホームの「結果を記録する」は pointerup でも明示的に
+  // 受け、通常の click と二重にフォームを開かないようにする。
+  let homeLogGestureAt=0;
+  function openHomeWorkoutLogFromGesture(target, event){
+    const button=target && target.closest && target.closest('[data-home-open-log="true"]');
+    if(!button) return false;
+    if(event && event.pointerType==='mouse' && event.button!==0) return false;
+    homeLogGestureAt=Date.now();
+    if(event && event.cancelable) event.preventDefault();
+    if(!openWorkoutLog(button.dataset.date)){
+      showMypageToast('記録するメニューを開けませんでした。画面を更新してもう一度お試しください');
+    }
+    return true;
+  }
+  document.getElementById('app').addEventListener('pointerup', function(e){
+    openHomeWorkoutLogFromGesture(e.target,e);
+  }, true);
+
   document.getElementById('app').addEventListener('click', function(e){
     const btn = e.target.closest('[data-action]');
     if(!btn) return;
@@ -6333,6 +6352,7 @@
       state.calendarSelected = (state.calendarSelected===d) ? null : d;
       render();
     } else if(action==='open-log'){
+      if(btn.dataset.homeOpenLog==='true' && Date.now()-homeLogGestureAt<900) return;
       openWorkoutLog(btn.dataset.date);
     } else if(action==='skip-item'){
       openWorkoutLog(btn.dataset.date,{values:{completionType:'skipped'}});
