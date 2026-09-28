@@ -78,7 +78,7 @@ Android Studioで開いたら、端末を接続して実行するか、**Build >
 
 - 必要環境: Android Studio、Android SDK、JDK 21、Android 8（API 26）以降の実機またはエミュレーター。Health Connect連携自体はAndroid 9以降で利用できます。
 - Health ConnectはAndroid 14以降ではOSに含まれます。Android 9〜13では、対応するHealth Connectアプリを端末に入れて更新してください。
-- RUNQ.では「マイページ > ヘルスデータ連携 > Health Connect」から連携します。初回は最大90日を確認し、以後は前回成功時刻以降を短く重ねて照合します。同じ外部記録は外部IDと指紋照合により増えません。
+- RUNQ.では「マイページ > ヘルスデータ連携 > Health Connect」から連携します。初回は最大90日を確認し、以後は前回成功時刻から2時間を重ねて照合します。取得0件・距離未確定だけの場合は成功カーソルを進めず、「過去90日を再確認」から安全に再試験できます。同じ外部記録は外部IDと指紋照合により増えません。
 - 読み取るのはランニングの運動セッション、距離、活動カロリー、心拍だけです。ウォーキング等はRUNQ.へ取り込みません。Health Connectへ書き込みは行いません。権限はいつでも端末設定またはHealth Connectから変更できます。
 
 Android Studioでビルドできない場合は、まずJDK 21が選択されているか（Settings > Build Tools > Gradle）、Android SDKが導入済みかを確認してください。Webブラウザ版ではHealth Connect連携は使えません。
