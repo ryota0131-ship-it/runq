@@ -1122,6 +1122,12 @@
     n = Math.round(n*2)/2;
     return (n%1===0 ? n.toFixed(0) : n.toFixed(1))+'km';
   }
+  // 予定メニューの距離は読みやすい0.5km刻みでよいが、実走記録では平均ペースと
+  // 同じ元データをユーザーが検算できるよう、保存済みメートル値を小数第2位まで表示する。
+  function workoutDistanceLabel(distanceMeters){
+    const km=Number(distanceMeters||0)/1000;
+    return km>0 ? km.toFixed(2)+'km' : '—';
+  }
   function gelSchedule(durationMin){
     if(durationMin < 68) return null;
     const times = [];
@@ -2560,7 +2566,7 @@
     const total=(allWorkouts()||[]).filter(function(w){return !plan || !plan.meta.startDate || workoutDate(w)>=parseISO(plan.meta.startDate);}).reduce(function(sum,w){return sum+Number(w.distance_meters||0);},0)/1000;
     const days=plan&&plan.meta.raceDate ? Math.max(0,daysBetween(todayLocal(),parseISO(plan.meta.raceDate))) : null;
     const feedback=String((workout.metadata||{}).feedback||'今日の積み上げが、次の一歩につながります。').replace(/\s+/g,' ').slice(0,58);
-    return {workout:workout,plan:plan,item:item,distance:distance,duration:duration,pace:workout.average_pace_seconds_per_km,date:date,total:total,completed:completed,days:days,feedback:feedback};
+    return {workout:workout,plan:plan,item:item,distance:distance,duration:duration,pace:workoutPaceSeconds(workout.average_pace_seconds_per_km,workout.distance_meters,workout.duration_seconds),date:date,total:total,completed:completed,days:days,feedback:feedback};
   }
   function drawShareText(ctx,text,x,y,size,weight,align){ ctx.font=(weight||'600')+' '+size+'px "Zen Kaku Gothic New", "Noto Sans JP", sans-serif'; ctx.textAlign=align||'left'; ctx.fillText(text,x,y); }
   function drawShareWrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines){
@@ -2586,10 +2592,10 @@
       drawShareText(ctx,'ROAD TO',72,300,32,'700'); drawShareWrapped(ctx,(data.plan&&data.plan.meta.name)||'NEXT QUEST',72,352,860,58,2);
       drawShareText(ctx,'DAY '+data.completed+' / '+Math.max(data.completed+1,(data.plan&&data.plan.weeks||[]).length*2),72,515,28,'700');
       ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(72,548,760,18);ctx.fillStyle='#fff';ctx.fillRect(72,548,Math.min(760,Math.max(60,data.completed*54)),18);
-      drawShareText(ctx,'TODAY',72,700,26,'700'); drawShareText(ctx,formatKm(data.distance),72,815,124,'900'); drawShareText(ctx,'TOTAL TRAINING '+formatKm(data.total),72,900,28,'700');
+      drawShareText(ctx,'TODAY',72,700,26,'700'); drawShareText(ctx,workoutDistanceLabel(data.workout.distance_meters),72,815,124,'900'); drawShareText(ctx,'TOTAL TRAINING '+formatKm(data.total),72,900,28,'700');
       drawShareText(ctx,data.days==null?'積み上げ中':'あと '+data.days+'日',72,1030,54,'900');
     } else {
-      drawShareText(ctx,template==='coach'?"TODAY'S RUN":'DISTANCE',72,340,28,'700'); drawShareText(ctx,formatKm(data.distance),72,490,144,'900');
+      drawShareText(ctx,template==='coach'?"TODAY'S RUN":'DISTANCE',72,340,28,'700'); drawShareText(ctx,workoutDistanceLabel(data.workout.distance_meters),72,490,144,'900');
       drawShareText(ctx,'TIME',72,600,26,'700'); drawShareText(ctx,workoutDurationLabel(data.duration),72,670,58,'800');
       drawShareText(ctx,'PACE',72,770,26,'700'); drawShareText(ctx,data.pace?paceSecToLabel(data.pace)+'/km':'—',72,840,58,'800');
       if(template==='coach'){
@@ -2636,12 +2642,20 @@
   ============================================================ */
   const WORKOUT_SOURCES = ['manual','screenshot','apple_health','health_connect','strava','garmin'];
   let workoutWriteQueue = Promise.resolve();
+  // ワークアウトの平均ペースは必ず保存済みの総距離・総時間から決める。
+  // 外部サービスや旧データのpace値は、距離または時間が無い場合だけの補助値にする。
   function workoutPaceSeconds(value, distanceMeters, durationSeconds){
+    const meters=Number(distanceMeters), seconds=Number(durationSeconds);
+    if(meters>0 && seconds>0) return Math.round(seconds/(meters/1000));
     if(value!=null && value!==''){
       const seconds = typeof value==='number' ? value : hmsToSeconds(String(value).replace('/km',''));
       if(seconds!=null && seconds>0) return Math.round(seconds);
     }
-    return distanceMeters>0 && durationSeconds>0 ? Math.round(durationSeconds/(distanceMeters/1000)) : null;
+    return null;
+  }
+  function workoutPaceLabel(workout){
+    const pace=workoutPaceSeconds(workout&&workout.average_pace_seconds_per_km,workout&&workout.distance_meters,workout&&workout.duration_seconds);
+    return pace ? paceSecToLabel(pace)+'/km' : 'ペース未記録';
   }
   function normalizeWorkout(raw){
     const now = new Date().toISOString();
@@ -2684,6 +2698,18 @@
       plan_refs: Array.isArray(raw.plan_refs) ? raw.plan_refs : (raw.plan_id ? [{plan_id:raw.plan_id,scheduled_item_ref:raw.scheduled_item_ref||null,scheduled_item_date:raw.scheduled_item_date||null}] : []),
       duplicate_candidate_ids: Array.isArray(raw.duplicate_candidate_ids) ? raw.duplicate_candidate_ids : []
     };
+  }
+  // 旧版で外部値や丸め前後の組み合わせから保存されたペースを、既存の距離・時間を
+  // 変えずに補正する。値が既に正しければ同じオブジェクトを返すため、起動ごとの書き込みはしない。
+  function reconcileWorkoutPaces(workouts){
+    let changed=false;
+    const entries=(workouts||[]).map(function(workout){
+      const pace=workoutPaceSeconds(workout.average_pace_seconds_per_km,workout.distance_meters,workout.duration_seconds);
+      if(pace===workout.average_pace_seconds_per_km) return workout;
+      changed=true;
+      return Object.assign({},workout,{average_pace_seconds_per_km:pace});
+    });
+    return { entries:entries, changed:changed };
   }
   function workoutRefKey(source, id){ return source&&id ? source+':'+id : null; }
   function workoutRefKeys(workout){
@@ -2937,9 +2963,8 @@
   }
   async function distanceForHealthWorkout(plugin, workout){
     const direct=Number(workout&&workout.totalDistance);
-    if(direct>0) return direct;
     const start=new Date(workout&&workout.startDate).getTime(), end=new Date(workout&&workout.endDate).getTime();
-    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start) return null;
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start) return direct>0 ? direct : null;
     try{
       const result=await plugin.readSamples({ dataType:'distance', startDate:workout.startDate, endDate:workout.endDate, limit:1000, ascending:true });
       const meters=(result.samples||[]).reduce(function(total,sample){
@@ -2948,8 +2973,10 @@
         const overlap=Math.max(0,Math.min(end,sampleEnd)-Math.max(start,sampleStart));
         return total+(overlap>0 ? value*(overlap/(sampleEnd-sampleStart)) : 0);
       },0);
-      return meters>0 ? meters : null;
-    }catch(e){ return null; }
+      // ExerciseSessionと同時間帯のDistanceRecordがある場合はこちらを正本にする。
+      // 集計値の丸めや境界差分によって、画面の距離とペースが食い違うことを防ぐ。
+      return meters>0 ? meters : (direct>0 ? direct : null);
+    }catch(e){ return direct>0 ? direct : null; }
   }
   async function healthWorkoutToRunq(plugin, workout, platform){
     const values=await Promise.all([heartRateForWorkout(plugin, workout),distanceForHealthWorkout(plugin, workout)]), heartRate=values[0], distance=values[1];
@@ -2977,7 +3004,7 @@
     const entries = Object.assign({}, state.logs);
     entries[workout.scheduled_item_date] = Object.assign({}, existing||{}, {
       distanceKm: workout.distance_meters ? Number((workout.distance_meters/1000).toFixed(2)) : null,
-      avgPace: workout.average_pace_seconds_per_km ? paceSecToLabel(workout.average_pace_seconds_per_km) : null,
+      avgPace: workoutPaceSeconds(workout.average_pace_seconds_per_km,workout.distance_meters,workout.duration_seconds) ? paceSecToLabel(workoutPaceSeconds(workout.average_pace_seconds_per_km,workout.distance_meters,workout.duration_seconds)) : null,
       avgHr: workout.average_heart_rate || null,
       durationMin: workout.duration_seconds ? Number((workout.duration_seconds/60).toFixed(1)) : null,
       calories: workout.calories || null,
@@ -3102,7 +3129,8 @@
   }
   function logValuesFromWorkout(workout, previous){
     const meta=workout.metadata||{};
-    return Object.assign({},previous||{}, { distanceKm:workout.distance_meters?Number((workout.distance_meters/1000).toFixed(2)):null, avgPace:workout.average_pace_seconds_per_km?paceSecToLabel(workout.average_pace_seconds_per_km):null, avgHr:workout.average_heart_rate||null, durationMin:workout.duration_seconds?Number((workout.duration_seconds/60).toFixed(1)):null, calories:workout.calories||null, note:meta.note||((previous||{}).note), rpe:meta.rpe||((previous||{}).rpe), pain:meta.pain||((previous||{}).pain) });
+    const pace=workoutPaceSeconds(workout.average_pace_seconds_per_km,workout.distance_meters,workout.duration_seconds);
+    return Object.assign({},previous||{}, { distanceKm:workout.distance_meters?Number((workout.distance_meters/1000).toFixed(2)):null, avgPace:pace?paceSecToLabel(pace):null, avgHr:workout.average_heart_rate||null, durationMin:workout.duration_seconds?Number((workout.duration_seconds/60).toFixed(1)):null, calories:workout.calories||null, note:meta.note||((previous||{}).note), rpe:meta.rpe||((previous||{}).rpe), pain:meta.pain||((previous||{}).pain) });
   }
 
   // シューズ累計距離に加え、マイページのRUNNER PROFILEサマリーに使う「最長RUN」も同じログ走査で
@@ -3356,7 +3384,7 @@
   }
   function workoutRowHTML(workout){
     const distance=Number(workout.distance_meters||0)/1000;
-    const pace=workout.average_pace_seconds_per_km ? paceSecToLabel(workout.average_pace_seconds_per_km)+'/km' : 'ペース未記録';
+    const pace=workoutPaceLabel(workout);
     const duration=workout.duration_seconds ? workoutDurationLabel(workout.duration_seconds) : '時間未記録';
     const info=workoutPlanInfo(workout);
     const title=info&&info.item ? info.item.title : (workout.title || 'ランニング');
@@ -3364,7 +3392,7 @@
     const candidateNote=(workout.duplicate_candidate_ids||[]).length ? '<div class="workout-row-note">同じランニングの可能性があります</div>' : '';
     return '<div class="workout-row-wrap"><button type="button" class="workout-row" data-action="open-workout-detail" data-id="'+escapeHtml(workout.id)+'">'
       + '<div class="workout-row-top"><span class="workout-row-date">'+workoutDateLabel(workout)+'</span><span class="workout-row-title">'+escapeHtml(title)+'</span></div>'
-      + '<div class="workout-row-values"><strong class="mono">'+formatKm(distance)+'</strong><span>'+duration+'　'+pace+'</span></div>'
+      + '<div class="workout-row-values"><strong class="mono">'+workoutDistanceLabel(workout.distance_meters)+'</strong><span>'+duration+'　'+pace+'</span></div>'
       + '<div class="workout-row-note'+(info&&info.item?' matched':'')+'">'+escapeHtml(relationship)+'</div>'+candidateNote+'</button>'
       + '<div class="workout-row-actions"><button type="button" class="workout-row-share" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェア</button></div></div>';
   }
@@ -3450,8 +3478,8 @@
   function workoutDetailHTML(){
     const workout=allWorkouts().find(function(w){ return w.id===state.workoutDetailId; });
     if(!workout) return '<div class="form-card">'+mypageBackHeaderHTML('ワークアウト詳細')+'<div class="workout-empty">この記録は見つかりませんでした。</div></div>';
-    const info=workoutPlanInfo(workout), distance=Number(workout.distance_meters||0)/1000;
-    const metrics=[['時間',workout.duration_seconds?workoutDurationLabel(workout.duration_seconds):'—'],['平均ペース',workout.average_pace_seconds_per_km?paceSecToLabel(workout.average_pace_seconds_per_km)+'/km':'—'],['平均心拍',workout.average_heart_rate?workout.average_heart_rate+' bpm':'—'],['最大心拍',workout.max_heart_rate?workout.max_heart_rate+' bpm':'—'],['消費カロリー',workout.calories?workout.calories+' kcal':'—']];
+    const info=workoutPlanInfo(workout);
+    const metrics=[['時間',workout.duration_seconds?workoutDurationLabel(workout.duration_seconds):'—'],['平均ペース',workoutPaceLabel(workout)],['平均心拍',workout.average_heart_rate?workout.average_heart_rate+' bpm':'—'],['最大心拍',workout.max_heart_rate?workout.max_heart_rate+' bpm':'—'],['消費カロリー',workout.calories?workout.calories+' kcal':'—']];
     const planHTML=info&&info.item ? '<div class="workout-detail-plan"><div class="li-main">予定：'+escapeHtml(info.item.title)+'</div><div class="li-sub">'+escapeHtml(workoutRelationship(workout))+(info.item.desc?'　'+escapeHtml(info.item.desc):'')+'</div></div>' : '<div class="workout-detail-plan"><div class="li-main">フリーラン</div><div class="li-sub">プランに紐付かないランニング記録です。</div></div>';
     const candidates=(workout.duplicate_candidate_ids||[]).map(function(id){return (state.workouts||[]).find(function(w){return w.id===id;});}).filter(Boolean);
     const metadata=workout.metadata||{}, feedback=metadata.feedback;
@@ -3468,7 +3496,7 @@
     const updatedHTML=updated?'<div class="workout-detail-updated">最終更新: '+escapeHtml(new Date(updated).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}))+'</div>':'';
     const actions='<div class="workout-detail-actions"><button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">シェアする</button></div>'
       + '<div class="workout-detail-delete"><p>この記録が不要な場合は、RUNQ.の集計と予定実績から削除できます。'+(['apple_health','health_connect'].indexOf(workout.source)>=0?'Appleヘルスケア／Health Connectの元データは削除しません。':'')+'</p><button type="button" class="btn-danger" data-action="request-workout-delete" data-id="'+escapeHtml(workout.id)+'">この記録を削除</button></div>';
-    return '<div class="form-card"><div class="mypage-subhead"><button type="button" class="mypage-back-btn" data-action="mypage-nav" data-view="workout-history">＜ これまでの記録</button><h2>ワークアウト詳細</h2></div><div class="workout-detail-hero"><div><div class="workout-detail-date">'+workoutDateLabel(workout)+'</div><div class="workout-detail-title">'+escapeHtml(info&&info.item?info.item.title:'ランニング')+'</div></div><div><div class="workout-detail-distance mono">'+formatKm(distance)+'</div><div class="workout-detail-source">'+escapeHtml(workoutSourceLabel(workout.source))+'</div></div></div><div class="workout-detail-grid">'+metrics.map(function(m){return '<div class="workout-detail-metric"><div class="label">'+m[0]+'</div><div class="value mono">'+m[1]+'</div></div>';}).join('')+'</div>'+planHTML+reflectionHTML+feedbackHTML+candidateHTML+actions+updatedHTML+'</div>';
+    return '<div class="form-card"><div class="mypage-subhead"><button type="button" class="mypage-back-btn" data-action="mypage-nav" data-view="workout-history">＜ これまでの記録</button><h2>ワークアウト詳細</h2></div><div class="workout-detail-hero"><div><div class="workout-detail-date">'+workoutDateLabel(workout)+'</div><div class="workout-detail-title">'+escapeHtml(info&&info.item?info.item.title:'ランニング')+'</div></div><div><div class="workout-detail-distance mono">'+workoutDistanceLabel(workout.distance_meters)+'</div><div class="workout-detail-source">'+escapeHtml(workoutSourceLabel(workout.source))+'</div></div></div><div class="workout-detail-grid">'+metrics.map(function(m){return '<div class="workout-detail-metric"><div class="label">'+m[0]+'</div><div class="value mono">'+m[1]+'</div></div>';}).join('')+'</div>'+planHTML+reflectionHTML+feedbackHTML+candidateHTML+actions+updatedHTML+'</div>';
   }
 
   function dataConnectionsHTML(){
@@ -3482,18 +3510,16 @@
     const row=function(label,data,platform){
       const enabled=!!(data&&data.enabled);
       const busy=state.healthSyncBusy;
-      const action=enabled ? '<button type="button" class="btn-secondary" data-action="health-sync" data-platform="'+platform+'" '+(busy?'disabled':'')+'>'+ (busy?'同期中…':'同期する') +'</button><button type="button" class="btn-secondary" data-action="health-resync" data-platform="'+platform+'" '+(busy?'disabled':'')+'>過去90日を再確認</button><button type="button" class="li-remove" data-action="health-disconnect" data-platform="'+platform+'" '+(busy?'disabled':'')+'>連携解除</button>' : '<button type="button" class="btn-secondary" data-action="health-connect" data-platform="'+platform+'" '+(busy?'disabled':'')+'>'+ (busy?'準備中…':'連携する') +'</button>';
+      const action=enabled ? '<button type="button" class="btn-secondary" data-action="health-sync" data-platform="'+platform+'" '+(busy?'disabled':'')+'>'+ (busy?'同期中…':'同期する') +'</button><button type="button" class="li-remove" data-action="health-disconnect" data-platform="'+platform+'" '+(busy?'disabled':'')+'>連携解除</button>' : '<button type="button" class="btn-secondary" data-action="health-connect" data-platform="'+platform+'" '+(busy?'disabled':'')+'>'+ (busy?'準備中…':'連携する') +'</button>';
       const status=data&&data.lastError ? '<div class="adjust-status error" style="margin-top:6px;">'+escapeHtml(data.lastError)+'</div><button type="button" class="li-remove" data-action="health-open-settings" data-platform="'+platform+'">設定を確認する</button>' : '';
       const stateText=enabled?syncLabel(data):(data&&data.status==='permission_denied'?'権限が許可されていません':data&&data.status==='unavailable'?'この端末では利用できません':'未連携');
-      const debug=state.healthSyncDiagnostics&&state.healthSyncDiagnostics.platform===(platform==='appleHealth'?'ios':'android') ? state.healthSyncDiagnostics : null;
-      const diagnostic=debug?'<details class="health-sync-diagnostics"><summary>同期の診断を表示</summary><div class="li-sub">対象: '+escapeHtml(debug.startDate)+' 〜 '+escapeHtml(debug.endDate)+'<br>取得: '+debug.summary.scanned+'件 / running: '+debug.summary.accepted+'件 / 距離なし: '+debug.summary.skippedMissingDistance+'件'+(debug.full?'（過去90日を再確認）':'')+'</div>'+debug.workouts.map(function(item){ return '<div class="li-sub">'+escapeHtml(item.type)+' ・ '+escapeHtml(item.startDate||'時刻なし')+' ・ '+(item.totalDistance!=null?escapeHtml(String(item.totalDistance))+'m':'距離なし')+(item.reason?'（'+escapeHtml(item.reason)+'）':'')+'</div>'; }).join('')+'</details>':'';
-      return '<div class="list-row"><div><div class="li-main">'+label+'</div><div class="li-sub">'+stateText+'</div>'+status+diagnostic+'</div><div class="shoe-row-actions">'+action+'</div></div>';
+      return '<div class="list-row"><div><div class="li-main">'+label+'</div><div class="li-sub">'+stateText+'</div>'+status+'</div><div class="shoe-row-actions">'+action+'</div></div>';
     };
     const native=window.Capacitor&&window.Capacitor.getPlatform&&window.Capacitor.getPlatform();
     const nativeRuntime=isNativeRuntime();
     // 起動直後などOS種別がまだ取れない場合だけは、選択肢を両方表示してHealthプラグイン側の実際のOS判定に委ねる。
     const connectionRows=native==='ios'?row('Appleヘルスケア',hc.appleHealth,'appleHealth'):native==='android'?row('Health Connect',hc.healthConnect,'healthConnect'):nativeRuntime?row('Appleヘルスケア',hc.appleHealth,'appleHealth')+row('Health Connect',hc.healthConnect,'healthConnect'):'';
-    const platformNote=nativeRuntime ? '<div class="connection-platform-note">初回は最大90日分、2回目以降は前回同期から2時間重ねて確認します。同期結果が0件でもカーソルを進めず、過去90日の再確認もできます。同じ記録は外部IDと指紋照合で重複追加しません。</div>' : '<div class="connection-platform-note">ヘルスデータ連携はRUNQ.のiPhone／Androidアプリで利用できます。このWeb版では、走った記録の確認・手動入力・画像からの読み取りを引き続き利用できます。</div>';
+    const platformNote=nativeRuntime ? '<div class="connection-platform-note">初回は最大90日分、2回目以降は前回同期から2時間重ねて確認します。同期結果が0件でもカーソルを進めず、同じ記録は外部IDと指紋照合で重複追加しません。</div>' : '<div class="connection-platform-note">ヘルスデータ連携はRUNQ.のiPhone／Androidアプリで利用できます。このWeb版では、走った記録の確認・手動入力・画像からの読み取りを引き続き利用できます。</div>';
     const autoControl=nativeRuntime?'<div class="switch-row" style="margin-top:12px;"><label><input type="checkbox" data-action="health-auto" '+(hc.autoImport!==false?'checked':'')+'> ランニング記録を自動登録する</label></div>':'';
     return '<div class="form-card">'+mypageBackHeaderHTML('ヘルスデータ連携')+mypageToastHTML()+'<div class="mypage-grid"><div class="info-card"><h3>ヘルスデータ連携</h3><div class="li-sub">ランニングのワークアウト、距離、心拍、消費カロリーだけを取り込みます。</div>'+connectionRows+platformNote+autoControl+'<div class="li-sub" style="margin-top:8px;">初回連携では過去90日を対象にします。連携解除後もRUNQ.へ保存済みの記録は残ります。</div></div></div></div>';
   }
@@ -3834,7 +3860,7 @@
     if(lf.syncMessage) html += '<span class="adjust-status'+(lf.syncError?' error':'')+'">'+escapeHtml(lf.syncMessage)+'</span>';
     html += '</div>';
     if(savedWorkouts.length){
-      html += '<div class="log-existing-workout">'+savedWorkouts.map(function(w){ const selected=lf.selectedWorkoutId===w.id; return '<button type="button" class="workout-text-link" data-action="use-health-workout" data-id="'+escapeHtml(w.id)+'">'+(selected?'選択中: ':'既存の記録を使う: ')+escapeHtml(workoutSourceLabel(w.source))+' '+formatKm(Number(w.distance_meters||0)/1000)+' '+workoutDurationLabel(w.duration_seconds)+'</button>'; }).join('<br>')+'<div class="li-sub" style="margin-top:5px;">保存すると、選んだ既存記録にメモや体感を追加します。新しいランニングは作りません。</div></div>';
+      html += '<div class="log-existing-workout">'+savedWorkouts.map(function(w){ const selected=lf.selectedWorkoutId===w.id; return '<button type="button" class="workout-text-link" data-action="use-health-workout" data-id="'+escapeHtml(w.id)+'">'+(selected?'選択中: ':'既存の記録を使う: ')+escapeHtml(workoutSourceLabel(w.source))+' '+workoutDistanceLabel(w.distance_meters)+' '+workoutDurationLabel(w.duration_seconds)+'</button>'; }).join('<br>')+'<div class="li-sub" style="margin-top:5px;">保存すると、選んだ既存記録にメモや体感を追加します。新しいランニングは作りません。</div></div>';
     }
     if(lf.imageImport){
       const imported = lf.imageImport;
@@ -3882,7 +3908,7 @@
     const skipped=log.completionType==='skipped';
     const feedback=log.feedback || (lf.feedbackBusy===dateStr ? null : null);
     const previewWorkout=(state.workouts||[]).find(function(w){ return w.id===lf.selectedWorkoutId || w.id===log.workoutId; });
-    const preview=previewWorkout?'<button type="button" class="share-preview" data-action="open-share" data-workout-id="'+escapeHtml(previewWorkout.id)+'"><div class="share-preview-kicker">RUNQ. TODAY\'S RUN</div><div class="share-preview-distance mono">'+formatKm(Number(previewWorkout.distance_meters||0)/1000)+'</div><div class="share-preview-sub">'+escapeHtml(workoutDurationLabel(previewWorkout.duration_seconds))+' ・ '+escapeHtml(previewWorkout.average_pace_seconds_per_km?paceSecToLabel(previewWorkout.average_pace_seconds_per_km)+'/km':'ペース未登録')+'</div><span class="share-preview-action">シェアする</span></button>':'';
+    const preview=previewWorkout?'<button type="button" class="share-preview" data-action="open-share" data-workout-id="'+escapeHtml(previewWorkout.id)+'"><div class="share-preview-kicker">RUNQ. TODAY\'S RUN</div><div class="share-preview-distance mono">'+workoutDistanceLabel(previewWorkout.distance_meters)+'</div><div class="share-preview-sub">'+escapeHtml(workoutDurationLabel(previewWorkout.duration_seconds))+' ・ '+escapeHtml(workoutPaceLabel(previewWorkout))+'</div><span class="share-preview-action">シェアする</span></button>':'';
     return '<div class="log-saved" id="log-saved-'+dateStr+'"><h4>'+ (skipped?'今回は見送りにしました':'おつかれさまでした！記録を保存しました') +'</h4><div class="log-summary-txt mono">'+escapeHtml(logSummaryLine(log))+'</div>'
       + '<div class="feedback-callout'+(lf.feedbackBusy===dateStr?' busy':'')+'">'+coachMascotHTML(log.feedbackCoachPersona||((state.profile||{}).coachPersona),lf.feedbackBusy===dateStr?'thinking':'cheer','small')+(lf.feedbackBusy===dateStr?'<span>コーチが振り返りを作成しています…</span>':feedback?'<span><strong>コーチからのフィードバック</strong><br>'+escapeHtml(feedback)+'</span>'+coachBasisHTML(log.feedbackBasis):lf.feedbackError?'<span>フィードバックを取得できませんでした。記録は保存されています。<button type="button" class="workout-text-link" data-action="retry-log-feedback" data-date="'+dateStr+'">再試行</button></span>':'<span>コーチからのフィードバックを準備しています。</span>')+'</div>'
       + preview + '<div class="log-saved-actions"><button type="button" class="btn-secondary" data-action="open-log" data-date="'+dateStr+'">記録を編集</button><button type="button" class="btn-secondary" data-action="consult-item" data-date="'+dateStr+'">コーチに相談する</button><button type="button" class="btn-secondary" data-action="close-log">閉じる</button></div></div>';
@@ -4863,8 +4889,8 @@
     const values=[];
     const distance=Number(workout.distance_meters||0)/1000;
     const duration=Number(workout.duration_seconds||0);
-    const pace=Number(workout.average_pace_seconds_per_km)||workoutPaceSeconds(null,Number(workout.distance_meters||0),duration);
-    if(distance>0) values.push(formatKm(distance));
+    const pace=workoutPaceSeconds(workout.average_pace_seconds_per_km,Number(workout.distance_meters||0),duration);
+    if(distance>0) values.push(workoutDistanceLabel(workout.distance_meters));
     if(duration>0) values.push(workoutDurationLabel(duration));
     if(pace>0) values.push(paceSecToLabel(pace)+'/km');
     if(workout.average_heart_rate) values.push('平均心拍 '+Math.round(Number(workout.average_heart_rate))+'bpm');
@@ -4903,7 +4929,7 @@
       const found=planItemForWorkout(workout), meta=workout.metadata||{};
       return {
         id:workout.id, date:workoutDateKey(workout), distanceKm:Number(workout.distance_meters||0)/1000,
-        durationSec:Number(workout.duration_seconds||0), paceSec:Number(workout.average_pace_seconds_per_km)||workoutPaceSeconds(null,Number(workout.distance_meters||0),Number(workout.duration_seconds||0)),
+        durationSec:Number(workout.duration_seconds||0), paceSec:workoutPaceSeconds(workout.average_pace_seconds_per_km,Number(workout.distance_meters||0),Number(workout.duration_seconds||0)),
         type:found&&found.it&&found.it.type||null, planId:workout.plan_id||null,
         rpe:meta.rpe||null, pain:meta.pain||null, source:workout.source, fromCommon:true
       };
@@ -6152,14 +6178,13 @@
     } else if(action==='close-info-modal'){
       state.infoModal = null;
       render();
-    } else if(action==='health-connect' || action==='health-sync' || action==='health-resync' || action==='log-health-sync'){
+    } else if(action==='health-connect' || action==='health-sync' || action==='log-health-sync'){
       if(state.healthSyncBusy) return;
       state.healthSyncBusy = true;
       render();
-      syncHealthWorkouts(btn.dataset.platform,{forceFull:action==='health-resync'}).then(function(result){
+      syncHealthWorkouts(btn.dataset.platform).then(function(result){
         const matchText = result.matched ? '、予定メニュー '+result.matched+'件に反映しました' : '';
-        const prefix=action==='health-resync'?'過去90日を再確認しました。':'';
-        const text=prefix+(result.imported ? '新しい記録を'+result.imported+'件取り込みました'+matchText : (result.merged?'既存の記録を確認しました。新しい記録はありません':result.skippedMissingDistance?'ランニングは見つかりましたが、距離を取得できませんでした。同期の診断を確認してください。':'新しい記録はありません'));
+        const text=result.imported ? '新しい記録を'+result.imported+'件取り込みました'+matchText : (result.merged?'既存の記録を確認しました。新しい記録はありません':result.skippedMissingDistance?'ランニングは見つかりましたが、距離を取得できませんでした。':'新しい記録はありません');
         if(action==='log-health-sync'){
           state.logForm.syncMessage=text+(result.possible?'。同じランニングの可能性がある記録を確認してください':'');
           state.logForm.syncError=false;
@@ -6843,10 +6868,11 @@
     try{ state.logs = await Store.getLogs(state.currentId); }catch(e){ state.logs = {}; }
     try{
       const loadedWorkouts=await Store.getWorkouts();
-      const annotated=annotateExistingDuplicateCandidates(loadedWorkouts);
+      const reconciled=reconcileWorkoutPaces(loadedWorkouts);
+      const annotated=annotateExistingDuplicateCandidates(reconciled.entries);
       state.workouts=annotated;
-      // 既存記録は自動削除せず、候補だけを保存して詳細画面で本人が確認・統合できるようにする。
-      if(JSON.stringify(loadedWorkouts)!==JSON.stringify(annotated)) await Store.setWorkouts(annotated);
+      // 既存記録は自動削除せず、ペース補正と候補だけを保存して詳細画面で本人が確認・統合できるようにする。
+      if(reconciled.changed || JSON.stringify(loadedWorkouts)!==JSON.stringify(annotated)) await Store.setWorkouts(annotated);
     }catch(e){ state.workouts = []; }
     try{
       const fdoc = await Store.getForecast(state.currentId);

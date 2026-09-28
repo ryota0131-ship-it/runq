@@ -29,10 +29,11 @@ assert.ok(app.includes('request-workout-delete'), 'workout detail offers a confi
 assert.ok(app.includes('この記録を削除'), 'workout detail makes the delete action visible independently from sharing');
 assert.ok(app.includes('rememberHealthConnectionError'), 'connection errors are persisted for a retry UI');
 assert.ok(app.includes('health-open-settings'), 'Health Connect settings can be opened after an error');
-assert.ok(app.includes("data-action=\"health-resync\""), 'a user can safely re-read the initial window after a missed import');
 assert.ok(app.includes('state.healthSyncDiagnostics'), 'Android sync exposes local diagnostics for emulator investigation');
 assert.ok(app.includes('lastScannedAt'), 'a zero-result scan is recorded separately from the import cursor');
 assert.ok(app.includes('distanceForHealthWorkout'), 'distance is retried from the time-matched distance samples when native aggregation is absent');
+assert.ok(!app.includes('>過去90日を再確認</button>'), 'the diagnostic full re-sync action is not shown in the normal mobile UI');
+assert.ok(app.includes('workoutDistanceLabel'), 'workout distances are shown without the plan-distance rounding used elsewhere');
 
 function extractFunction(name) {
   const marker = `function ${name}(`;
@@ -57,6 +58,8 @@ vm.runInContext(`
   const HEALTH_INITIAL_LOOKBACK_DAYS=90;
   const HEALTH_INCREMENTAL_OVERLAP_MS=2*60*60*1000;
   async function heartRateForWorkout(){ return { average:null, max:null }; }
+  ${extractFunction('hmsToSeconds')}
+  ${extractFunction('workoutPaceSeconds')}
   ${extractFunction('healthSyncWindow')}
   ${extractFunction('shouldAdvanceHealthCursor')}
   ${extractFunction('normalizedHealthWorkoutType')}
@@ -81,6 +84,10 @@ vm.runInContext(`
   assert.strictEqual(runq.distance_meters, 5000, 'the matching Distance sample is attached to the running session');
   assert.strictEqual(runq.duration_seconds, 1800, 'ExerciseSession duration is retained');
   assert.strictEqual(runq.source, 'health_connect', 'Android sessions retain their source');
+  assert.strictEqual(sandbox.workoutPaceSeconds(null, 5000, 1800), 360, '5.00km / 30:00 is always 6:00 per km');
+  assert.strictEqual(sandbox.workoutPaceSeconds(null, 3000, 1200), 400, '3.00km / 20:00 is always 6:40 per km');
+  assert.strictEqual(sandbox.workoutPaceSeconds(355, 5000, 1800), 360, 'saved distance and duration take precedence over an inconsistent external pace');
+  assert.strictEqual(sandbox.workoutPaceSeconds(355, 0, 0), 355, 'manual or Apple records without distance/time retain their supplied pace');
 
   const sameAgain = Object.assign({ source:'health_connect', source_workout_id:'toolbox-run-1', source_refs:[{source:'health_connect',source_workout_id:'toolbox-run-1'}], time_precision:'exact' }, runq);
   const existing = Object.assign({}, sameAgain, { id:'saved-run' });
