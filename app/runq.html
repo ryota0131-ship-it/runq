@@ -594,6 +594,14 @@
   .modal-card h3{ font-size:17px; margin-bottom:8px; }
   .modal-card p{ font-size:13.5px; color:var(--text-muted); line-height:1.6; margin:0 0 18px; }
   .modal-actions{ display:flex; gap:10px; justify-content:flex-end; }
+  /* 目標・大会の選択は、一覧と終了操作を離して誤タップを防ぐ。 */
+  .plan-switcher-modal{ max-height:min(76dvh,620px); display:flex; flex-direction:column; padding:26px 24px 20px; }
+  .plan-switcher-modal .option-list{ min-height:0; overflow-y:auto; gap:12px; padding:2px 1px; }
+  .plan-switcher-modal .option-card{ width:100%; text-align:left; color:var(--text); cursor:pointer; }
+  .plan-switcher-modal .option-summary{ margin-bottom:0; }
+  .plan-switcher-actions{ flex:0 0 auto; margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
+  .plan-switcher-actions .btn-secondary,.plan-switcher-actions .btn-primary{ flex:1 1 0; min-height:44px; padding-inline:12px; }
+  @media (max-width:360px){ .plan-switcher-modal{ padding-inline:20px; } }
   .btn-danger{ background:var(--mp); color:#fff; border:none; border-radius:999px; padding:9px 20px; font-weight:700; font-size:13.5px; cursor:pointer; }
   .btn-danger:hover{ filter:brightness(1.06); }
 
@@ -2504,7 +2512,7 @@
     if(state.planSwitchOpen){
       const plans=plansForManagement();
       const next=nextGoalPlan();
-      return '<div class="modal-backdrop" data-action="close-plan-switcher"><div class="modal-card" data-action="noop"><h3>目標・大会</h3><p>開催日が最も近い進行中の大会を、次のゴールとして自動表示します。</p><div class="option-list">'+plans.filter(function(plan){return planStatus(plan).key==='active';}).map(function(plan){return '<button type="button" class="option-card" data-action="open-plan-detail" data-id="'+escapeHtml(plan.id)+'"><div class="option-label">'+escapeHtml(plan.meta.name||'プラン')+(next&&plan.id===next.id?' <span class="chosen-tag">次のゴール</span>':'')+'</div><div class="option-summary">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(plan.meta.distanceLabel||'距離未設定')+'</div></button>';}).join('')+'</div><div class="modal-actions"><button type="button" class="btn-secondary" data-action="open-plan-manager">すべて管理する</button><button type="button" class="btn-primary" data-action="close-plan-switcher">閉じる</button></div></div></div>';
+      return '<div class="modal-backdrop" data-action="close-plan-switcher"><div class="modal-card plan-switcher-modal" data-action="noop"><h3>目標・大会</h3><p>開催日が最も近い進行中の大会を、次のゴールとして自動表示します。</p><div class="option-list">'+plans.filter(function(plan){return planStatus(plan).key==='active';}).map(function(plan){return '<button type="button" class="option-card" data-action="open-plan-detail" data-id="'+escapeHtml(plan.id)+'"><div class="option-label">'+escapeHtml(plan.meta.name||'プラン')+(next&&plan.id===next.id?' <span class="chosen-tag">次のゴール</span>':'')+'</div><div class="option-summary">'+escapeHtml(planDateLabel(plan))+' ・ '+escapeHtml(plan.meta.distanceLabel||'距離未設定')+'</div></button>';}).join('')+'</div><div class="modal-actions plan-switcher-actions"><button type="button" class="btn-secondary" data-action="open-plan-manager">すべて管理する</button><button type="button" class="btn-primary" data-action="close-plan-switcher">閉じる</button></div></div></div>';
     }
     if(state.infoModal==='forecast'){
       return '<div class="modal-backdrop" data-action="close-info-modal"><div class="modal-card" data-action="noop"><h3>レース予測の見方</h3><p><strong>走力の目安</strong>は、自己ベストと複数回のペース走など、再現性を確認できる実走から算出します。</p><p><strong>フルへの準備度</strong>は、最長走・週ごとの距離・体調記録を別に確認する指標です。走力があっても、長い距離への準備が十分とは限りません。</p><p><strong>データの確かさ</strong>は実走の件数と期間を表します。少ない間は幅のある参考値として表示し、目標達成を保証するものではありません。</p><div class="modal-actions"><button type="button" class="btn-primary" data-action="close-info-modal">閉じる</button></div></div></div>';
@@ -4585,7 +4593,7 @@
     const count=daysLeft===null?'進行中':(daysLeft>0?daysLeft+'日':daysLeft===0?'本日':'完了');
     const countLabel=daysLeft===null?'現在の目標':(daysLeft>0?'レースまで':daysLeft===0?'レース当日':'レース後');
     const detail=isRace?(plan.meta.distanceLabel+' ・ '+(raceDate?fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）':'')):(plan.meta.distanceLabel+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間');
-    return '<section class="home-goal-summary" aria-label="現在の目標"><div class="home-goal-summary-copy"><span class="home-goal-summary-kicker">CURRENT GOAL</span><strong>'+escapeHtml(plan.meta.name||'現在の目標')+'</strong><small>'+escapeHtml(detail)+'</small></div><div class="home-goal-count"><strong>'+escapeHtml(count)+'</strong><span>'+escapeHtml(countLabel)+'</span></div></section>';
+    return '<section class="home-goal-summary" aria-label="現在の目標"><div class="home-goal-summary-copy"><span class="home-goal-summary-kicker">GOAL</span><strong>'+escapeHtml(plan.meta.name||'現在の目標')+'</strong><small>'+escapeHtml(detail)+'</small></div><div class="home-goal-count"><strong>'+escapeHtml(count)+'</strong><span>'+escapeHtml(countLabel)+'</span></div></section>';
   }
 
   function homeProgressDisclosureHTML(plan, today){

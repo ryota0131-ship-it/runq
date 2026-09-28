@@ -22,6 +22,9 @@ assert.ok(homeFunction.indexOf('todayCardHTML(plan, today)') < homeFunction.inde
 assert.ok(app.includes('page-section-tabs floating-section-tabs'), 'plan and mypage section tabs use the floating control');
 assert.ok(app.includes("document.body.classList.toggle('has-floating-section-tabs'"), 'floating controls reserve space above the bottom navigation');
 assert.ok(app.includes("document.body.classList.toggle('keyboard-open',keyboardOpen)"), 'floating controls hide while the software keyboard is visible');
+assert.ok(app.includes('class="home-goal-summary-kicker">GOAL</span>'), 'home uses the concise GOAL label');
+assert.ok(app.includes('plan-switcher-modal'), 'the plan switcher has a dedicated modal layout');
+assert.ok(app.includes('plan-switcher-actions'), 'the plan switcher separates its close and management actions from the list');
 // ROAD TO GOAL: 5段階の抽象ステージ表示(quest-journey)は廃止し、週単位のノードを
 // 蛇行パスでつなぐ表示(quest-path / planPathHTML)に置き換えた(2026-09-18)。
 assert.ok(app.includes('class="quest-path"'), 'plan view renders the road-to-goal path');
