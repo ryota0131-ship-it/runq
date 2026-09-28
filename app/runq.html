@@ -780,14 +780,16 @@
 
   /* ---------- home dashboard ---------- */
   .home-dashboard{ display:flex; flex-direction:column; gap:18px; padding-bottom:4px; }
-  .home-goal-summary{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:2px 2px; }
-  .home-goal-summary-copy{ min-width:0; }
-  .home-goal-summary-kicker{ display:block; color:var(--text-faint); font-size:10px; font-weight:800; letter-spacing:.1em; }
-  .home-goal-summary strong{ display:block; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; }
-  .home-goal-summary small{ display:block; margin-top:2px; color:var(--text-muted); font-size:11.5px; }
-  .home-goal-count{ flex:0 0 auto; text-align:right; }
-  .home-goal-count strong{ color:var(--accent-strong); font-family:"Zen Kaku Gothic New",sans-serif; font-size:20px; }
-  .home-goal-count span{ display:block; color:var(--text-faint); font-size:10px; margin-top:1px; }
+  /* ホームの最初の目標は、日々の練習が向かう景色として見せる。大会公式素材は使わない。 */
+  .home-goal-summary{ position:relative; isolation:isolate; display:flex; align-items:flex-end; justify-content:space-between; min-height:148px; gap:14px; overflow:hidden; padding:18px; border:1px solid color-mix(in srgb,var(--accent) 28%,var(--border)); border-radius:20px; background:#244b60 var(--goal-image) center/cover no-repeat; color:#fff; box-shadow:0 10px 28px var(--shadow); }
+  .home-goal-summary::before{ content:""; position:absolute; z-index:-1; inset:0; background:linear-gradient(100deg,rgba(7,28,47,.86) 0%,rgba(7,28,47,.61) 55%,rgba(7,28,47,.24) 100%); }
+  .home-goal-summary-copy{ flex:1 1 auto; min-width:0; padding-bottom:1px; }
+  .home-goal-summary-kicker{ display:block; color:rgba(255,255,255,.78); font-size:10px; font-weight:800; letter-spacing:.12em; }
+  .home-goal-summary strong{ display:block; margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:20px; line-height:1.3; text-shadow:0 1px 10px rgba(0,0,0,.24); }
+  .home-goal-summary small{ display:block; margin-top:4px; color:rgba(255,255,255,.88); font-size:12px; }
+  .home-goal-count{ flex:0 0 auto; align-self:flex-start; min-width:68px; padding:8px 9px; border:1px solid rgba(255,255,255,.25); border-radius:13px; background:rgba(6,27,47,.26); text-align:right; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+  .home-goal-count strong{ color:#fff; font-family:"Zen Kaku Gothic New",sans-serif; font-size:24px; line-height:1; }
+  .home-goal-count span{ display:block; color:rgba(255,255,255,.83); font-size:10px; margin-top:4px; }
   .disclosure-card{ padding:0; overflow:hidden; }
   .disclosure-card > button{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 16px; border:0; background:transparent; color:var(--text); text-align:left; font:700 14px/1.35 "Zen Kaku Gothic New",sans-serif; cursor:pointer; }
   .disclosure-card > button small{ display:block; margin-top:3px; color:var(--text-muted); font:400 11.5px/1.45 inherit; }
@@ -4586,6 +4588,22 @@
     return '<section class="plan-review-card"><div class="plan-review-head">'+coachMascotHTML((state.profile||{}).coachPersona,'thinking','small')+'<div><h3>今週のプランを整えますか？</h3><p>'+escapeHtml(review.reason)+'</p></div></div><div class="plan-review-recommend"><strong>おすすめ</strong>未実施のイージー／ロング走を約10%軽くし、目標タイムはそのまま維持します。</div><div class="form-actions"><button type="button" class="btn-primary" data-action="apply-plan-review">この変更で進める</button><button type="button" class="btn-secondary" data-action="review-consult">別の案を相談</button><button type="button" class="btn-secondary" data-action="dismiss-plan-review">今回は変えない</button></div>'+(state.planReviewUndo?'<button type="button" class="workout-text-link" style="margin-top:10px" data-action="undo-plan-review">直前の見直しを取り消す</button>':'')+'</section>';
   }
 
+  // 目標の景色は毎回ランダムにせず、同じ目標では安定させる。4回ごとの完了を節目として次の景色へ進める。
+  const GOAL_VISUALS=[
+    'assets/goal-river-sunset-v1.png',
+    'assets/goal-coast-sunrise-v1.png',
+    'assets/goal-forest-morning-v1.png',
+    'assets/goal-city-bluehour-v1.png',
+    'assets/goal-mountain-sunset-v1.png'
+  ];
+  function goalVisualFor(plan){
+    const id=String((plan&&plan.id)||((plan&&plan.meta&&plan.meta.name)||'runq-goal'));
+    let hash=0;
+    for(let i=0;i<id.length;i++) hash=((hash<<5)-hash)+id.charCodeAt(i)|0;
+    const completed=plan?flattenPlanItems(plan).filter(function(item){ return isItemCompleted(plan,(plan.weeks[item.wi]||{items:[]}).items[item.ii]); }).length:0;
+    const milestone=Math.floor(completed/4);
+    return GOAL_VISUALS[Math.abs(hash+milestone)%GOAL_VISUALS.length];
+  }
   function homeGoalSummaryHTML(plan, today){
     const isRace=!(plan.meta&&plan.meta.questType&&plan.meta.questType!=='race');
     const raceDate=isRace&&plan.meta.raceDate?parseISO(plan.meta.raceDate):null;
@@ -4593,7 +4611,8 @@
     const count=daysLeft===null?'進行中':(daysLeft>0?daysLeft+'日':daysLeft===0?'本日':'完了');
     const countLabel=daysLeft===null?'現在の目標':(daysLeft>0?'レースまで':daysLeft===0?'レース当日':'レース後');
     const detail=isRace?(plan.meta.distanceLabel+' ・ '+(raceDate?fmtMD(raceDate)+'（'+WEEKDAY_JA[raceDate.getDay()]+'）':'')):(plan.meta.distanceLabel+' ・ '+(plan.meta.goalWeeks||plan.weeks.length)+'週間');
-    return '<section class="home-goal-summary" aria-label="現在の目標"><div class="home-goal-summary-copy"><span class="home-goal-summary-kicker">GOAL</span><strong>'+escapeHtml(plan.meta.name||'現在の目標')+'</strong><small>'+escapeHtml(detail)+'</small></div><div class="home-goal-count"><strong>'+escapeHtml(count)+'</strong><span>'+escapeHtml(countLabel)+'</span></div></section>';
+    const visual=goalVisualFor(plan);
+    return '<section class="home-goal-summary" aria-label="現在の目標" style="--goal-image:url(\''+escapeHtml(visual)+'\')"><div class="home-goal-summary-copy"><span class="home-goal-summary-kicker">GOAL</span><strong>'+escapeHtml(plan.meta.name||'現在の目標')+'</strong><small>'+escapeHtml(detail)+'</small></div><div class="home-goal-count"><strong>'+escapeHtml(count)+'</strong><span>'+escapeHtml(countLabel)+'</span></div></section>';
   }
 
   function homeProgressDisclosureHTML(plan, today){

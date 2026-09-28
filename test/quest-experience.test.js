@@ -15,6 +15,14 @@ assert.ok(app.includes('RECENT WIN'), 'home shows a recent achievement');
 assert.ok(app.includes('function journeyMomentHTML(plan,today,placement)'), 'journey moments are rendered from structured run and race context');
 assert.ok(app.includes('assets/journey-dawn-v1.png'), 'journey moments use the local RUNQ scenic asset');
 assert.ok(fs.existsSync(path.join(__dirname, '..', 'app', 'assets', 'journey-dawn-v1.png')), 'the scenic asset is included with the app');
+assert.ok(app.includes('assets/goal-river-sunset-v1.png'), 'the home goal uses a local RUNQ scenic asset');
+assert.ok(fs.existsSync(path.join(__dirname, '..', 'app', 'assets', 'goal-river-sunset-v1.png')), 'the home goal scenic asset is included with the app');
+assert.ok(app.includes('const GOAL_VISUALS=['), 'goal visuals are managed as a local catalog');
+assert.ok(app.includes('function goalVisualFor(plan)'), 'the goal visual is chosen deterministically per plan');
+assert.ok(app.includes('const milestone=Math.floor(completed/4)'), 'goal visuals only change at completion milestones');
+['goal-coast-sunrise-v1.png','goal-forest-morning-v1.png','goal-city-bluehour-v1.png','goal-mountain-sunset-v1.png'].forEach(function(asset){
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'app', 'assets', asset)), 'goal visual asset is included: '+asset);
+});
 assert.ok(app.includes("journeyMomentHTML(plan,today,'home')"), 'home only renders the scenic moment when its conditions are met');
 const homeFunction = app.slice(app.indexOf('function homeHTML(){'), app.indexOf('function coachTabHTML(){'));
 assert.ok(homeFunction.indexOf('homeGoalSummaryHTML(plan,today)') < homeFunction.indexOf('todayCardHTML(plan, today)'), 'home places the goal before today\'s menu');
