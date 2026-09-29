@@ -233,7 +233,7 @@ async function main() {
       await page.goto(baseUrl + '/', { waitUntil: 'load' });
       await page.waitForTimeout(500);
 
-      check('[1] アプリがAI無しでも起動する(CURRENT QUESTが表示される)', (await page.locator('text=CURRENT QUEST').count()) > 0);
+      check('[1] アプリがAI無しでも起動する(GOALが表示される)', (await page.locator('text=GOAL').count()) > 0);
       check('[1] window.claude が無い(=Claude Artifact外)環境であること', await page.evaluate(() => typeof window.claude === 'undefined'));
       await page.waitForFunction(() => (document.querySelector('.forecast-card') || {}).innerText && document.querySelector('.forecast-card').innerText.includes('直近4週の実走'));
       const forecastText = await page.locator('.forecast-card').innerText();

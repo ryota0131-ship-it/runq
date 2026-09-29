@@ -15,5 +15,9 @@ assert.match(app, /data-action="open-log" data-home-open-log="true" data-date="'
 assert.match(app, /data-action="skip-item" data-date="'\+it\.date\+'">今回は見送る/, '予定をこなせない日は見送りとして記録できる');
 assert.match(app, /values\.completionType!=='skipped' && !values\.distanceKm/, '見送りには走行数値を必須にしない');
 assert.match(app, /見送りは実走ではないため、ワークアウトを新規作成・更新しない/, '見送りで実走記録を増やさない');
+assert.match(app, /data-action="open-plan-schedule">予定を詳しく見る/, 'ホームの週間予定は予定タブへの専用導線を使う');
+assert.match(app, /action==='open-plan-schedule'\)\{[\s\S]{0,260}state\.planTab='schedule'/, '週間予定の導線はプラン画面の予定タブを選ぶ');
+assert.match(app, /action==='open-plan-schedule'\)\{[\s\S]{0,360}state\.viewMode='week'/, '週間予定の導線は週表示を選ぶ');
+assert.match(app, /action==='open-plan-schedule'\)\{[\s\S]{0,520}window\.scrollTo\(0,0\)/, '週間予定の導線はプラン画面の先頭へ戻す');
 
 console.log('home menu action checks: passed');

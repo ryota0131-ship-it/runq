@@ -76,6 +76,36 @@ async function main() {
     assert.ok(JSON.stringify(res.body).indexOf('test-key') === -1);
   });
 
+  await test('鮮度確認を指定した相談だけResponses APIのWeb検索ツールを有効化する', async () => {
+    let requestBody = null;
+    const req = makeReq({ prompt: '今年のかすみがうらマラソンの評判は？', webSearch: true });
+    const res = makeRes();
+    await coach.handler(req, res, {
+      apiKey: 'test-key',
+      fetchImpl: async (_url, options) => {
+        requestBody = JSON.parse(options.body);
+        return fakeOpenAIFetch()();
+      },
+    });
+    assert.strictEqual(res.statusCode, 200);
+    assert.deepStrictEqual(requestBody.tools, [{ type: 'web_search', search_context_size: 'medium' }]);
+  });
+
+  await test('通常の練習相談ではWeb検索ツールを付けない', async () => {
+    let requestBody = null;
+    const req = makeReq({ prompt: '明日のイージーはどう走ればいい？' });
+    const res = makeRes();
+    await coach.handler(req, res, {
+      apiKey: 'test-key',
+      fetchImpl: async (_url, options) => {
+        requestBody = JSON.parse(options.body);
+        return fakeOpenAIFetch()();
+      },
+    });
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(requestBody, 'tools'), false);
+  });
+
   await test('胸痛など緊急性を疑う相談はOpenAIを呼ばず固定の安全回答を返す', async () => {
     const req = makeReq({ prompt: '走っていたら胸が痛くて、めまいもします' });
     const res = makeRes();

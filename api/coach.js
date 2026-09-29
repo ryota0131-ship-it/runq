@@ -71,6 +71,9 @@ const SYSTEM_INSTRUCTION = [
   '一般的なトレーニング知識を尋ねられた場合も、可能な限り今のプラン・今日/次回の練習に結びつけて、',
   '「今日・次回に何をすればいいか」が具体的にわかる回答を優先し、長い一般論の解説は避けてください。',
   '相談への回答は原則として日本語2〜3文・400文字以内に収め、結論と次の行動を先に伝えてください。',
+  '大会の開催日・コース・天候・評判・口コミ・運営など、鮮度が重要な質問では、利用可能なWeb検索を使って確認してください。ユーザーがURLを送った場合も、そのURLを確認対象にしてください。',
+  'Web検索を使った回答では、公式情報と参加者の口コミ・感想を必ず区別してください。確認できない日付や大会情報を記憶だけで断定・補完しないでください。',
+  '会話に登場した大会を最優先の話題として維持してください。「それ」「今年」「さっきの大会」などは直近の会話で特定した大会を指します。次のゴールの大会へ勝手に置き換えないでください。',
   '# 絶対に守る安全ルール',
   ...SAFETY_RULES,
   '# 参照する要約済み知識（全文ではなく、判断の補助としてのみ使う）',
@@ -195,29 +198,33 @@ function readJsonBody(req) {
 /**
  * OpenAI Responses APIを実際に呼び出す部分。fetchをテストから差し替えられるよう引数で受け取る。
  */
-async function callOpenAI({ apiKey, model, prompt, fetchImpl }) {
+async function callOpenAI({ apiKey, model, prompt, webSearch, fetchImpl }) {
   const doFetch = fetchImpl || fetch;
+  const requestBody = {
+    model,
+    input: [
+      { role: 'system', content: SYSTEM_INSTRUCTION },
+      { role: 'user', content: prompt }
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'runq_coach_response',
+        schema: RESPONSE_SCHEMA,
+        strict: false
+      }
+    }
+  };
+  // Web検索は鮮度が必要な相談だけで明示的に有効化する。通常の練習相談では余計な
+  // 外部検索や遅延を発生させず、RUNQ.内の実績・予定を優先する。
+  if (webSearch) requestBody.tools = [{ type: 'web_search', search_context_size: 'medium' }];
   const openaiRes = await doFetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      model,
-      input: [
-        { role: 'system', content: SYSTEM_INSTRUCTION },
-        { role: 'user', content: prompt }
-      ],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'runq_coach_response',
-          schema: RESPONSE_SCHEMA,
-          strict: false
-        }
-      }
-    })
+    body: JSON.stringify(requestBody)
   });
   return openaiRes;
 }
@@ -278,7 +285,7 @@ async function handler(req, res, opts) {
 
   let openaiRes;
   try {
-    openaiRes = await callOpenAI({ apiKey, model, prompt, fetchImpl: opts.fetchImpl });
+    openaiRes = await callOpenAI({ apiKey, model, prompt, webSearch: body.webSearch === true, fetchImpl: opts.fetchImpl });
   } catch (networkErr) {
     res.status(502).json({ error: 'coach_unavailable' });
     return;

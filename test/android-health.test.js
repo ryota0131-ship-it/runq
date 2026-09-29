@@ -19,6 +19,7 @@ assert.ok(fs.existsSync(path.join(root, 'app', 'privacypolicy.html')), 'privacy 
 assert.ok(build.includes('PRIVACY_POLICY_SRC'), 'privacy explanation is copied into the Capacitor web bundle');
 assert.ok(app.includes('HEALTH_INITIAL_LOOKBACK_DAYS=90'), 'initial sync window is limited to 90 days');
 assert.ok(app.includes('HEALTH_INCREMENTAL_OVERLAP_MS'), 'later syncs use a bounded overlap window');
+assert.ok(app.includes('HEALTH_DISTANCE_SOURCE_VERSION=2'), 'iOS distance source correction is versioned for one safe repair sync');
 assert.ok(app.includes("for(const workoutType of ['running'])"), 'only running workouts are queried');
 assert.ok(!app.includes("for(const workoutType of ['running','walking'])"), 'walking workouts are not imported');
 assert.ok(app.includes('isRunningHealthWorkout(nativeWorkout,workoutType)'), 'returned workout types are also checked before saving');
@@ -84,6 +85,13 @@ vm.runInContext(`
   assert.strictEqual(runq.distance_meters, 5000, 'the matching Distance sample is attached to the running session');
   assert.strictEqual(runq.duration_seconds, 1800, 'ExerciseSession duration is retained');
   assert.strictEqual(runq.source, 'health_connect', 'Android sessions retain their source');
+  const appleDistance = await sandbox.distanceForHealthWorkout({
+    readSamples: async () => ({ samples:[
+      { value:4200, startDate:nativeWorkout.startDate, endDate:nativeWorkout.endDate },
+      { value:4500, startDate:nativeWorkout.startDate, endDate:nativeWorkout.endDate }
+    ] })
+  }, Object.assign({}, nativeWorkout,{ totalDistance:4200 }));
+  assert.strictEqual(appleDistance, 4200, 'HealthKit Workout totalDistance takes precedence over overlapping distance samples');
   assert.strictEqual(sandbox.workoutPaceSeconds(null, 5000, 1800), 360, '5.00km / 30:00 is always 6:00 per km');
   assert.strictEqual(sandbox.workoutPaceSeconds(null, 3000, 1200), 400, '3.00km / 20:00 is always 6:40 per km');
   assert.strictEqual(sandbox.workoutPaceSeconds(355, 5000, 1800), 360, 'saved distance and duration take precedence over an inconsistent external pace');

@@ -39,6 +39,13 @@ assert.ok(app.includes('class="quest-path"'), 'plan view renders the road-to-goa
 assert.ok(app.includes('function planPathHTML(plan)'), 'planPathHTML renders the week-by-week path');
 assert.ok(app.includes('function planChainNodes(plan)'), 'the path walks the linkedFromPlanId chain into one node list');
 assert.ok(app.includes('data-action="path-node"'), 'path nodes are tappable');
+assert.match(app, /const jumpToWeek=function\(\)\{[\s\S]{0,280}state\.planTab='schedule'/, '次の一歩をタップすると予定タブを開く');
+assert.match(app, /const jumpToWeek=function\(\)\{[\s\S]{0,360}state\.viewMode='week'/, '次の一歩をタップすると週表示を開く');
+assert.match(app, /const jumpToWeek=function\(\)\{[\s\S]{0,620}getElementById\('week-card-'/, '次の一歩は該当する週カードまでスクロールする');
+assert.match(app, /data-action="'\+\(isFuture\?'open-race-plan':'open-log'\)\+'"/, '未来のレースは専用のレースプラン導線を使う');
+assert.match(app, /action==='open-race-plan'\)\{[\s\S]{0,280}state\.planTab='current'/, 'レースプランは今のプランを開く');
+assert.match(app, /action==='open-race-plan'\)\{[\s\S]{0,360}state\.planGoalOpen=true/, 'レースプランは目標詳細を開く');
+assert.match(app, /action==='open-race-plan'\)\{[\s\S]{0,520}window\.scrollTo\(0,0\)/, 'レースプランは画面の先頭を開く');
 assert.ok(!app.includes('class="quest-journey"'), 'the old 5-stage abstract journey markup is removed');
 assert.ok(app.includes('class="coach-proposal"'), 'plan changes use a dedicated proposal card');
 assert.ok(app.includes('if(m.resolved) return \'\';'), 'resolved proposal cards collapse from the conversation');

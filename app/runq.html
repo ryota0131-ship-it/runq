@@ -1,6 +1,6 @@
 <!-- Artifact body only: no doctype/html/head/body wrapper -->
 <title>RUNQ.</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Noto+Sans+JP:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap">
 <style>
   :root{
     /* RUNQ. ブランドガイドラインに準拠したカラートークン(2026-09-08 リデザイン) */
@@ -94,14 +94,14 @@
     margin:0;
     background:var(--bg);
     color:var(--text);
-    font-family:"Noto Sans JP",-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    font-family:var(--font-sans);
     padding:calc(var(--app-header-height) + var(--runq-safe-top) + 16px) 16px calc(136px + env(safe-area-inset-bottom));
     -webkit-font-smoothing:antialiased;
     overflow-x:hidden;
   }
   .wrap{ width:100%; min-width:0; max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:22px; }
-  h1,h2,h3{ font-family:"Zen Kaku Gothic New",sans-serif; text-wrap:balance; margin:0; }
-  .mono{ font-family:"Zen Kaku Gothic New",sans-serif; font-variant-numeric:tabular-nums; }
+  h1,h2,h3{ font-family:var(--font-sans); font-weight:700; text-wrap:balance; margin:0; }
+  .mono{ font-family:var(--font-data); font-variant-numeric:tabular-nums; }
   a{ color:var(--accent); }
   button{ font-family:inherit; }
   input, select{ font-family:inherit; }
@@ -111,7 +111,7 @@
   .topbar-main{ display:flex; align-items:center; gap:10px; min-width:0; width:100%; max-width:980px; margin:0 auto; }
   .topbar-copy{ display:flex; flex-direction:column; justify-content:center; min-width:0; }
   .topbar-kicker{ color:var(--accent); font-size:10px; font-weight:800; letter-spacing:.1em; line-height:1.2; }
-  .topbar-title{ margin:2px 0 0; color:var(--text); font-family:"Zen Kaku Gothic New",sans-serif; font-size:17px; font-weight:800; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .topbar-title{ margin:2px 0 0; color:var(--text); font-family:var(--font-sans); font-size:17px; font-weight:700; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   /* プラン／マイページは画面名だけを青いセクションラベルとして扱う。 */
   .topbar-title.topbar-section-title{ margin:0; color:var(--accent); font-family:inherit; font-size:13px; font-weight:800; letter-spacing:.12em; line-height:1.2; }
   .topbar .coach-mascot-small{ width:24px; height:28px; }
@@ -236,13 +236,13 @@
 
   /* ---------- AIコーチ チャットUI(Phase7) ---------- */
   .coach-chat-card{ display:flex; flex-direction:column; gap:12px; }
-  .chat-thread{ display:flex; flex-direction:column; gap:10px; max-height:56vh; overflow-y:auto; padding:2px 2px 4px; }
+  .chat-thread{ display:flex; flex-direction:column; gap:10px; min-width:0; max-width:100%; max-height:56vh; overflow-y:auto; overflow-x:hidden; padding:2px 2px 4px; }
   .chat-empty{ font-size:13px; color:var(--text-faint); text-align:center; padding:26px 0; }
-  .chat-msg{ display:flex; }
+  .chat-msg{ display:flex; min-width:0; max-width:100%; }
   .chat-msg.chat-user{ justify-content:flex-end; }
   .chat-msg.chat-coach{ justify-content:flex-start; align-items:flex-end; gap:6px; }
   .chat-system-message{ align-self:center; max-width:92%; padding:5px 10px; border-radius:999px; background:var(--surface-2); color:var(--text-faint); font-size:11.5px; text-align:center; }
-  .chat-bubble{ max-width:85%; background:var(--surface-2); color:var(--text); border-radius:14px 14px 14px 4px; padding:10px 14px; font-size:13.5px; line-height:1.55; white-space:pre-wrap; }
+  .chat-bubble{ min-width:0; max-width:85%; background:var(--surface-2); color:var(--text); border-radius:14px 14px 14px 4px; padding:10px 14px; font-size:13.5px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; }
   .chat-msg.chat-user .chat-bubble{ background:var(--accent); color:#fff; border-radius:14px 14px 4px 14px; }
   .chat-bubble.chat-error{ background:var(--warn-soft); color:var(--warn); }
   .chat-bubble.chat-muted{ background:transparent; border:1px dashed var(--border); color:var(--text-faint); }
@@ -270,7 +270,8 @@
   .chat-bubble-options .option-list{ gap:8px; }
   .chat-stale-note{ font-size:11.5px; color:var(--text-faint); margin-top:8px; }
   .chat-bubble.chat-typing{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; color:var(--text-faint); background:var(--surface-2); }
-  .chat-typing-row{ display:flex; align-items:center; gap:8px; }
+  .chat-typing-row{ display:flex; min-width:0; align-items:center; gap:8px; }
+  .typing-txt{ min-width:0; flex:1 1 auto; overflow-wrap:anywhere; }
   /* 応答速度の体感改善: sample.jsonのonTextでストリーミングされてくる生JSONから
      summary/riskの値だけを抜き出して、確定前のプレビューとして薄く表示する */
   .chat-stream-preview{ font-size:12.5px; color:var(--text-muted); line-height:1.55; white-space:pre-wrap; }
@@ -801,7 +802,7 @@
   .coach-daily-brief .coach-mascot{ flex:0 0 auto; }
   .coach-daily-copy{ min-width:0; }
   .coach-daily-name{ color:var(--accent); font-size:10px; font-weight:800; letter-spacing:.1em; }
-  .coach-daily-message{ margin-top:3px; color:var(--text); font:700 15px/1.55 "Zen Kaku Gothic New",sans-serif; }
+  .coach-daily-message{ margin-top:3px; color:var(--text); font:500 15px/1.6 var(--font-sans); }
   .home-quest{
     background:transparent;
     border:none;
@@ -852,7 +853,7 @@
   .today-card .next-run-label{ color:var(--accent); }
   .home-workout{ position:relative; isolation:isolate; display:grid; gap:11px; padding:15px; border:1px solid var(--border); border-radius:15px; background:var(--surface); }
   .home-workout-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-  .home-workout-title{ font:800 19px/1.35 "Zen Kaku Gothic New",sans-serif; }
+  .home-workout-title{ font:700 19px/1.35 var(--font-sans); }
   .home-workout-date{ color:var(--text-muted); font-size:11px; white-space:nowrap; }
   .home-workout-metrics{ display:flex; flex-wrap:wrap; gap:7px; }
   .home-workout-metric{ padding:6px 10px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); font-size:12px; font-weight:800; }
@@ -877,7 +878,7 @@
   .this-week-card{ gap:10px; }
   .home-summary-toggle{ width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0; border:0; background:transparent; color:var(--text); text-align:left; cursor:pointer; }
   .home-summary-toggle .eyebrow{ display:block; }
-  .home-summary-toggle strong{ display:block; margin-top:2px; font:800 19px/1.3 "Zen Kaku Gothic New",sans-serif; }
+  .home-summary-toggle strong{ display:block; margin-top:2px; font:700 19px/1.3 var(--font-sans); }
   .home-summary-arrow{ color:var(--text-faint); font-size:22px; line-height:1; }
   .home-week-summary{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding-top:10px; color:var(--text-muted); font-size:13px; }
   .home-week-progress{ flex:0 0 auto; color:var(--text); font-weight:800; }
@@ -1022,6 +1023,8 @@
      役割を「補足 / 本文 / 操作 / 見出し」に揃える。入力欄だけはiOSで拡大されない
      16pxを維持する。個別の数値（距離・タイム）とロゴはこの共通スケールの対象外。 */
   :root{
+    --font-sans:"Noto Sans JP",-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    --font-data:"Inter","Noto Sans JP",-apple-system,BlinkMacSystemFont,sans-serif;
     --type-meta:11px;
     --type-caption:12px;
     --type-body:14px;
@@ -1031,6 +1034,17 @@
     --leading-body:1.6;
   }
   body{ font-size:var(--type-body); line-height:var(--leading-body); }
+  /* 日本語はNoto Sans JPを基本に、英字ラベルと数値はInterで揃える。太さの差だけで
+     情報を押し出しすぎず、ページをまたいでも同じ役割の文字が同じ表情になるようにする。 */
+  body [class]{ font-family:var(--font-sans); }
+  .topbar-kicker,.topbar-title.topbar-section-title,.quest-kicker,.home-section-head .eyebrow,
+  .coach-daily-name,.journey-scenery-kicker,.week-num,.week-range,.next-run-label,
+  .todays-point .tp-label{ font-family:var(--font-data); font-weight:600; letter-spacing:.1em; }
+  .home-workout-metric,.home-goal-count strong,.countdown .num,.monthly-stat .num,
+  .workout-detail-distance,.workout-detail-metric .value,.share-preview-distance{ font-family:var(--font-data); font-weight:700; }
+  .chat-bubble{ font-family:var(--font-sans); font-weight:500; }
+  h1,h2,h3,.topbar-title,.coach-daily-message,.home-workout-title,.home-summary-toggle strong{ font-family:var(--font-sans); }
+  .info-card h3,.policy-toggle,.home-section-head h3,.history-month-head h3,.plan-review-card h3{ font-weight:700; }
   .topbar-kicker,.topbar-title.topbar-section-title,
   .quest-kicker,.home-section-head .eyebrow,.coach-daily-name{ font-size:var(--type-meta); }
   .topbar-title{ font-size:var(--type-section); }
@@ -2928,6 +2942,9 @@
   }
   function healthConnectionKey(platform){ return platform==='ios' ? 'appleHealth' : 'healthConnect'; }
   const HEALTH_INITIAL_LOOKBACK_DAYS=90;
+  // iOSでWorkout合計と距離サンプルを二重集計していた旧版の補正バージョン。
+  // 更新後の最初の同期だけ90日を再照合し、同じ外部IDの値を安全に更新する。
+  const HEALTH_DISTANCE_SOURCE_VERSION=2;
   // Health Connectは記録の終了後に書き込まれることがあり、Toolboxも過去時刻の
   // レコードを追加する。短すぎる重なりは同期済みカーソルの境界で取りこぼすため2時間確保する。
   const HEALTH_INCREMENTAL_OVERLAP_MS=2*60*60*1000;
@@ -2963,8 +2980,13 @@
   }
   async function distanceForHealthWorkout(plugin, workout){
     const direct=Number(workout&&workout.totalDistance);
+    // HealthKitのWorkout合計距離は、そのワークアウトに紐づく距離の正本。
+    // Garmin等では同時間帯に複数のDistanceサンプルが存在し得るため、これがある
+    // iOS記録にサンプル合算を優先すると二重計上になる。Health Connectのように
+    // totalDistanceが無い実装だけ、下の時間帯一致サンプルをフォールバックにする。
+    if(direct>0) return direct;
     const start=new Date(workout&&workout.startDate).getTime(), end=new Date(workout&&workout.endDate).getTime();
-    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start) return direct>0 ? direct : null;
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start) return null;
     try{
       const result=await plugin.readSamples({ dataType:'distance', startDate:workout.startDate, endDate:workout.endDate, limit:1000, ascending:true });
       const meters=(result.samples||[]).reduce(function(total,sample){
@@ -2973,10 +2995,8 @@
         const overlap=Math.max(0,Math.min(end,sampleEnd)-Math.max(start,sampleStart));
         return total+(overlap>0 ? value*(overlap/(sampleEnd-sampleStart)) : 0);
       },0);
-      // ExerciseSessionと同時間帯のDistanceRecordがある場合はこちらを正本にする。
-      // 集計値の丸めや境界差分によって、画面の距離とペースが食い違うことを防ぐ。
-      return meters>0 ? meters : (direct>0 ? direct : null);
-    }catch(e){ return direct>0 ? direct : null; }
+      return meters>0 ? meters : null;
+    }catch(e){ return null; }
   }
   async function healthWorkoutToRunq(plugin, workout, platform){
     const values=await Promise.all([heartRateForWorkout(plugin, workout),distanceForHealthWorkout(plugin, workout)]), heartRate=values[0], distance=values[1];
@@ -3042,7 +3062,10 @@
     const previous=connections[connectionKey]||{};
     // 初回のみ90日。以後は直近成功時刻から2時間を重ねて取得し、端末側の遅延記録を拾いつつ
     // 外部ID / fingerprint の upsert で再取得分を増殖させない。
-    const window=healthSyncWindow(previous.lastSyncedAt,nowMs,options&&options.forceFull);
+    // 旧版はiOSでtotalDistanceと個別Distanceを重ねていた。修正版の最初の同期だけ
+    // 90日を読み直し、外部IDで既存Workoutを更新する（重複作成はしない）。
+    const repairAppleDistance=platform==='ios' && previous.distanceSourceVersion!==HEALTH_DISTANCE_SOURCE_VERSION;
+    const window=healthSyncWindow(previous.lastSyncedAt,nowMs,(options&&options.forceFull)||repairAppleDistance);
     const startDate=window.startDate, endDate=window.endDate;
     let imported = 0, matched = 0, merged = 0, possible = 0, pages = 0, scanned = 0, accepted = 0, skippedNonRunning = 0, skippedMissingDistance = 0;
     const diagnostics=[];
@@ -3088,6 +3111,7 @@
       lastSyncStartedAt:startDate,
       historyAccessAvailable:permission.historyAccessAvailable===true,
       historyAccessAuthorized:permission.historyAccessAuthorized===true,
+      distanceSourceVersion:platform==='ios' ? HEALTH_DISTANCE_SOURCE_VERSION : previous.distanceSourceVersion,
       missingReadScopes:(permission.readDenied||[]).filter(function(scope){ return scope!=='workouts'; })
     });
     state.profile.healthConnections = connections;
@@ -3961,7 +3985,7 @@
       } else {
         const isToday=it.date===toISO(today), isFuture=it.date>toISO(today);
         if(it.type==='race'){
-          html += '<div class="action-row"><button type="button" class="log-btn" data-action="'+(isFuture?'view-item':'open-log')+'" data-date="'+it.date+'">'+(isFuture?'レースプランを見る':'レース結果を記録する')+'</button></div>';
+          html += '<div class="action-row"><button type="button" class="log-btn" data-action="'+(isFuture?'open-race-plan':'open-log')+'" data-date="'+it.date+'">'+(isFuture?'レースプランを見る':'レース結果を記録する')+'</button></div>';
         } else {
           html += '<div class="action-row"><button type="button" class="log-btn" data-action="open-log" data-date="'+it.date+'">'+(isToday?'結果を記録する':'結果を記録する')+'</button><button type="button" class="menu-consult-link" data-action="consult-item" data-date="'+it.date+'">'+coachMascotHTML((state.profile||{}).coachPersona,'normal','tiny')+'<span>このメニューを相談する</span></button><button type="button" class="menu-skip-link" data-action="skip-item" data-date="'+it.date+'">今回は見送る</button></div>';
         }
@@ -4518,7 +4542,7 @@
         + '</div>');
     });
     html += '<div class="home-week-summary"><span class="home-week-progress mono">'+done+' / '+total+'回 完了</span><span class="home-week-next">'+escapeHtml(nextLabel)+'</span></div>';
-    if(open) html += '<div class="week-mini-list">'+rows.join('')+'</div><button type="button" class="btn-secondary" data-action="tab" data-tab="view">予定を詳しく見る</button>';
+    if(open) html += '<div class="week-mini-list">'+rows.join('')+'</div><button type="button" class="btn-secondary" data-action="open-plan-schedule">予定を詳しく見る</button>';
     html += '</section>';
     return html;
   }
@@ -4755,8 +4779,10 @@
     if(a.busy){
       const elapsed = a.startedAt ? Math.max(0, Math.floor((Date.now()-a.startedAt)/1000)) : 0;
       const previewText = a.streamPreview || '';
-      html += '<div class="chat-msg chat-coach"><div class="chat-bubble chat-typing">'
-        + '<div class="chat-typing-row">'+coachMascotHTML(a.personaKey,'thinking','small')+'<span class="typing-dots"><span></span><span></span><span></span></span><span class="typing-txt" id="adjust-elapsed-txt">'+adjustElapsedLabel(elapsed)+'</span></div>'
+      // 通常のコーチメッセージと同じく、マスコットは吹き出しの外側に置く。
+      // これで「考え中」の可変高さカードでも画像がpadding/overflowで切れない。
+      html += '<div class="chat-msg chat-coach">'+coachMascotHTML(a.personaKey,'thinking','small')+'<div class="chat-bubble chat-typing">'
+        + '<div class="chat-typing-row"><span class="typing-dots"><span></span><span></span><span></span></span><span class="typing-txt" id="adjust-elapsed-txt">'+adjustElapsedLabel(elapsed)+'</span></div>'
         + '<div class="chat-stream-preview" id="adjust-stream-preview"'+(previewText?'':' hidden')+'>'+escapeHtml(previewText)+'</div>'
         + '</div></div>';
     }
@@ -5055,7 +5081,7 @@
         httpRes = await fetch(apiEndpoint('/api/coach'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: prompt, safetyMessage: opts.safetyMessage || '', modelTier: opts.modelTier || 'default' }),
+          body: JSON.stringify({ prompt: prompt, safetyMessage: opts.safetyMessage || '', modelTier: opts.modelTier || 'default', webSearch: !!opts.webSearch }),
           signal: opts.signal
         });
       }catch(networkErr){
@@ -5079,13 +5105,16 @@
     }
   };
 
-  function selectCoachProvider(){
+  function selectCoachProvider(opts){
+    // ArtifactのsampleはWeb検索ツールを持たない。鮮度が必要な依頼だけは、同じ
+    // CoachServiceの窓口からOpenAI Responses APIへ明示的に切り替える。
+    if(opts && opts.webSearch) return OpenAIProvider;
     return ClaudeArtifactProvider.available() ? ClaudeArtifactProvider : OpenAIProvider;
   }
 
   const CoachService = {
     request(prompt, opts){
-      return selectCoachProvider().request(prompt, opts);
+      return selectCoachProvider(opts).request(prompt, opts);
     }
   };
 
@@ -5186,15 +5215,17 @@
     return summaries;
   }
 
-  function namedPlanDetailsForCoach(instruction, activePlan){
-    const text=String(instruction||'');
+  function namedPlanDetailsForCoach(instruction, activePlan, historyLines){
+    // 指示語の続きでも、直前の会話で名前が出た大会の詳細を渡す。
+    // next_goalの大会に勝手に読み替えないための最小限の補強。
+    const text=[String(instruction||'')].concat(historyLines||[]).join('\n');
     return (state.plans||[]).filter(function(plan){
       const name=String((plan.meta||{}).name||'');
       return plan.id!==activePlan.id && name.length>1 && text.indexOf(name)>=0;
     }).slice(0,2).map(function(plan){ return {plan_id:plan.id,meta:plan.meta,weeks:plan.weeks,extras:plan.extras}; });
   }
 
-  function buildAdjustPrompt(plan, instruction, todayStr, historyLines, personaKey, runningContext, allPlanSummaries, namedPlanDetails){
+  function buildAdjustPrompt(plan, instruction, todayStr, historyLines, personaKey, runningContext, allPlanSummaries, namedPlanDetails, webSearch){
     const payload = {meta:plan.meta, weeks:plan.weeks, extras:plan.extras};
     const context = planContextLines(plan);
     const condition=currentPainCondition();
@@ -5206,6 +5237,8 @@
       (allPlanSummaries&&allPlanSummaries.length) ? ('# 登録されている全目標・大会（次のゴールだけで判断範囲を狭めない）\n'+JSON.stringify(allPlanSummaries)) : '',
       (runningContext&&runningContext.length) ? ('# RUNQ.に保存されたランニング実績・予定\n'+runningContext.map(function(line){ return '- '+line; }).join('\n')) : '',
       (historyLines && historyLines.length) ? ('# これまでの会話の流れ(直近、参考情報。矛盾する場合は現在のプランと今回の依頼を優先する)\n- '+historyLines.join('\n- ')) : '',
+      '# 会話上の大会の特定ルール\n直近の会話で大会名が出ており、今回「今年」「それ」「この大会」「さっきの大会」などの指示語だけなら、その大会を現在の話題として扱う。next_goalの大会へ置き換えない。登録情報と外部情報が一致しない場合は断定せず確認する。',
+      webSearch ? '# 外部の最新情報\n今回の依頼は鮮度確認が必要です。Web検索または送付URLを確認し、公式情報と参加者の口コミ・感想を分けて短く回答する。検索で確認できない事実は推測しない。' : '',
       '',
       '# ランナーからの今回の依頼',
       instruction,
@@ -5227,7 +5260,7 @@
       '6. イベント衝突時の調整: 高負荷練習(ロング走・MP走)とイベント(大会、旅行、繁忙期など)の間隔が短い場合はリスクを明示し、間隔を空ける代替日程を提案する。',
       '7. 今日('+todayStr+')より前の日付の項目(実施済み)は内容を変更しない。日付がない項目(完全休養など)は今後分とみなしてよい。',
       '8. meta.raceDate(レース日)やmeta.targetLabel(目標タイム)など、依頼と無関係な値は変えない。',
-      '9. 通常の練習相談では next_goal:true の次のゴールを中心に扱う。大会名・プラン名が指定された場合は、そのプランを参照して回答する。変更対象が曖昧な場合は、どのプランか確認する。次のゴール以外のプランを勝手に変更しない。',
+      '9. 通常の練習相談では next_goal:true の次のゴールを中心に扱う。ただし会話で特定済みの大会名・プラン名・指示語がある場合は、その対象を優先して回答する。変更対象が曖昧な場合は、どのプランか確認する。次のゴール以外のプランを勝手に変更しない。',
       '',
       '# 対応フロー',
       '- まず、依頼が「相談・質問」(〜した方がいい?、〜は妥当?など、意見を求めるだけでスケジュール変更を伴わないもの。「速く走るコツは?」「フォームの改善点は?」のような、プランの日程と直接関係しない一般的なランニングの質問も含む)かどうかを判断する。',
@@ -5273,6 +5306,23 @@
       }
       return null;
     }).filter(Boolean);
+  }
+
+  // 検索は常時有効にせず、鮮度が重要な大会情報・口コミ・天候、またはURLがある時だけ使う。
+  // 通常の練習相談はRUNQ内の実績と予定を優先し、待ち時間も増やさない。
+  function coachNeedsWebSearch(instruction){
+    const text=String(instruction||'');
+    if(/https?:\/\//i.test(text)) return true;
+    return /(?:最新|今年|直近|評判|口コミ|クチコミ|レビュー|開催日|日程|コース|高低差|制限時間|エイド|給水|天気|天候|気温|公式(?:サイト|情報)?|大会運営)/.test(text);
+  }
+
+  function coachBasisForResponse(instruction, result, basis){
+    if(!basis) return null;
+    if(result && result.mode==='options') return basis;
+    const text=String(instruction||'');
+    // 事実確認や大会の評判への回答には「なぜ？」を機械的に付けない。
+    if(/(?:評判|口コミ|クチコミ|レビュー|開催日|日程|コース|高低差|制限時間|エイド|給水|天気|天候|気温|公式|https?:\/\/)/i.test(text)) return null;
+    return /(?:練習|メニュー|予定|プラン|走(?:る|り)|ペース|距離|休養|疲労|痛み|違和感|変更|調整|負荷|本数)/.test(text) ? basis : null;
   }
 
   // 永続化用にメッセージを軽量化する。優先セッション限定の情報(選択肢のplan本体・
@@ -5471,15 +5521,16 @@
     const normalizedPrev = normalizeAdjustedPlan(plan, {meta:prevPlan.meta, weeks:prevPlan.weeks, extras:prevPlan.extras});
     // 直前に追加したランナーの発言(=今回のinstruction)を除いた、それより前のやりとりだけを文脈として渡す
     const historyLines = recentCoachHistoryLines(state.coach.messages.slice(0, -1));
+    const webSearch=coachNeedsWebSearch(instruction);
     // リクエスト開始時のコーチを固定する。途中で設定を変更しても、この返答の文章と表示は一致する。
     const personaKey=coachPersonaKey((state.profile||{}).coachPersona);
     state.adjust.personaKey=personaKey;
     const planLogs=await loadRunningPlanLogs();
     const runningContext=coachRunningContextLines(plan,planLogs);
     const allPlanSummaries=await allPlansCoachContext(planLogs);
-    const namedPlanDetails=namedPlanDetailsForCoach(instruction,plan);
+    const namedPlanDetails=namedPlanDetailsForCoach(instruction,plan,historyLines);
     const decisionBasis=coachDecisionBasis(plan,runningContext);
-    const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey, runningContext, allPlanSummaries, namedPlanDetails);
+    const prompt = buildAdjustPrompt(plan, instruction, todayISO(), historyLines, personaKey, runningContext, allPlanSummaries, namedPlanDetails, webSearch);
     adjustController = new AbortController();
     const deadline = Date.now() + ADJUST_TIMEOUT_MS;
     let pendingDeadlineTimers = [];
@@ -5507,7 +5558,7 @@
       let result;
       resetAdjustStreamPreview();
       try{
-        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', safetyMessage:instruction, cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
+        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', safetyMessage:instruction, webSearch:webSearch, cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
         if(!result || typeof result!=='object') throw {code:'invalid_json'};
       }catch(firstErr){
         if(firstErr && firstErr.code==='timeout') throw firstErr;
@@ -5515,7 +5566,7 @@
         if(!retryableCode) throw firstErr;
         // リトライ時は前回の(失敗した)プレビューを引きずらないよう一旦クリアする
         resetAdjustStreamPreview();
-        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', safetyMessage:instruction, cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
+        result = await raceWithDeadline(CoachService.request(prompt, {modelTier:'complex', safetyMessage:instruction, webSearch:webSearch, cache:false, signal:adjustController.signal, onText:handleAdjustStreamText}));
         if(!result || typeof result!=='object') throw {code:'invalid_json'};
       }
 
@@ -5548,7 +5599,7 @@
           risk: (typeof result.risk==='string') ? result.risk : '',
           options: options,
           resolved:false, chosenOptionId:null, chosenLabel:null,
-          instruction: instruction, prevPlan: prevPlan, prevCompleted: prevCompleted, normalizedPrev: normalizedPrev, coachPersona:personaKey, basis:decisionBasis
+          instruction: instruction, prevPlan: prevPlan, prevCompleted: prevCompleted, normalizedPrev: normalizedPrev, coachPersona:personaKey, basis:coachBasisForResponse(instruction,result,decisionBasis)
         });
         render();
         return;
@@ -5557,7 +5608,7 @@
       // advice-only: no schedule change
       state.adjust.busy = false;
       state.adjust.error = null;
-      addCoachMessage({ role:'coach', kind:'advice', text: (result && typeof result.summary==='string') ? result.summary : '今のプランのままで大丈夫です', coachPersona:personaKey, basis:decisionBasis, safetyResponse:!!(result&&result.safety) });
+      addCoachMessage({ role:'coach', kind:'advice', text: (result && typeof result.summary==='string') ? result.summary : '今のプランのままで大丈夫です', coachPersona:personaKey, basis:coachBasisForResponse(instruction,result,decisionBasis), safetyResponse:!!(result&&result.safety) });
       render();
     }catch(e){
       state.adjust.busy = false;
@@ -6057,6 +6108,15 @@
       document.documentElement.dataset.theme=theme;
       Store.setProfile(state.profile);
       render();
+    } else if(action==='open-plan-schedule'){
+      // ホームの週間予定は、プラン画面の「予定」タブを先頭から開く。
+      state.mode='view';
+      state.planTab='schedule';
+      state.viewMode='week';
+      state.calendarSelected=null;
+      state.formError={};
+      render();
+      window.scrollTo(0,0);
     } else if(action==='tab'){
       // 「作成」はプラン画面の上タブへ集約する。古い導線もこの入口にそろえる。
       state.mode = btn.dataset.tab==='create' ? 'view' : btn.dataset.tab;
@@ -6116,6 +6176,16 @@
     } else if(action==='dismiss-health-notice'){
       state.healthImportNotice = null;
       render();
+    } else if(action==='open-race-plan'){
+      // 予定のレース本番からは、日付選択だけで終わらせず、レース条件と補足を読める
+      // 「今のプラン」へ遷移する。選択済みのカレンダー日付と同じ場合も確実に画面変化が起きる。
+      state.mode='view';
+      state.planTab='current';
+      state.planGoalOpen=true;
+      state.planExtrasOpen=true;
+      state.formError={};
+      render();
+      window.scrollTo(0,0);
     } else if(action==='view-item'){
       state.mode='view'; state.viewMode='calendar'; state.calendarSelected=btn.dataset.date; state.calendarMonth=btn.dataset.date.slice(0,7); render();
     } else if(action==='consult-item'){
@@ -6156,6 +6226,12 @@
       // 属する時は、先にプランタブを切り替えてから展開・スクロールする。
       const planId=btn.dataset.plan, wi=btn.dataset.week;
       const jumpToWeek=function(){
+        // 「次の一歩」は、そのメニューを含む予定タブを開く導線。
+        // 今のプランのままだと週カードがDOM上に無く、スクロール先を見つけられない。
+        state.mode='view';
+        state.planTab='schedule';
+        state.viewMode='week';
+        state.calendarSelected=null;
         state.expandedWeeks[planId+':'+wi]=true;
         render();
         requestAnimationFrame(function(){

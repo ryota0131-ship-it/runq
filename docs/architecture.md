@@ -178,11 +178,11 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
            api/coach.js が結果をそのままクライアントへ返す(新しい独自形式は作っていない)
 ```
 
-- **Provider選択は`selectCoachProvider()`の1箇所のみ**(`app/runq.html`)。`ClaudeArtifactProvider.available()`(=`window.claude.use('sample')`が使えるか)を優先し、使えない場合のみ`OpenAIProvider`にフォールバックする。Claude Artifactとして開いている限り、この移行前と挙動は変わらない。
+- **Provider選択は`selectCoachProvider()`の1箇所のみ**(`app/runq.html`)。通常は`ClaudeArtifactProvider.available()`(=`window.claude.use('sample')`が使えるか)を優先し、使えない場合は`OpenAIProvider`にフォールバックする。一方、大会の評判・開催情報・天候・URLなど鮮度確認が必要な相談は、`webSearch:true`でOpenAI Responses APIを選び、Web検索ツールを有効化する。UI側は引き続き`CoachService.request()`だけを呼ぶ。
 - **コーチの表示名と判断は分離**: 現在のコーチは`cheer`（カイ コーチ）に固定し、`profile/main.coachName`には利用者が変更できる呼び名だけを保存する。`buildAdjustPrompt()`は常にカイの口調指示を用い、判断ルール・コンテキスト・JSON形式は共通に保つ。チャット履歴とWorkoutの`metadata.feedback_coach_persona`は過去データとの表示互換のため残すが、新しい応答・フィードバックは`cheer`として保存する。呼び名を変えても過去の本文を再生成・書き換えしない。
 - `app/assets/coach/`には、提供された確定デザインから背景だけを透明化したコーチの静止PNG（通常・考え中・喜び）を置く。白いお腹や顔の白は透明化しない。画像は`aria-hidden`の装飾として扱い、テキストの状態表示を必ず併記する。
 - **実走・予定の共通コンテキスト**: `loadRunningPlanLogs()`と`runningEvidence()`が、重複統合済みの`workouts/main.entries[]`を正本として、直近90日の実走（距離・時間・ペース・心拍・RPE・痛み・メモ・取得元・予定との紐付け）、当日の予定、今後7日間の予定を要約して渡す。90日より前の実走は全体集計に留める。旧来の`logs/{planId}`は、`workoutId`または予定日で共通Workoutに紐付いていない記録だけを補完情報として渡すため、同じ走行を二重に判断しない。コーチ呼び出しの直前に全プランの予定日別ログを読み直し、画面を開いたまま記録・同期した内容も会話へ反映する。
-- **全プランの要約**: `allPlansCoachContext()`が、登録済みの各プランについてID、名称、種別、状態、次のゴールかどうか、大会日、開始日、距離、目標タイム、想定ペース、進捗、次回練習、大会までの日数、前後の大会を構造化して毎回渡す。次のゴールは進行中の大会のうち開催日が最も近いものを`nextGoalPlan()`で都度算出し、手動では固定しない。詳細JSONは次のゴールだけに絞り、今回の発言に大会・プラン名が明示された場合だけ`namedPlanDetailsForCoach()`が該当プランの詳細を追加する。これにより、コーチは通常は次のゴールを優先しつつ、名称を指定された他の大会や複数大会の関係も回答できる。対象が曖昧な変更は確認し、他のプランを自動変更しない。
+- **全プランの要約と会話上の対象**: `allPlansCoachContext()`が、登録済みの各プランについてID、名称、種別、状態、次のゴールかどうか、大会日、開始日、距離、目標タイム、想定ペース、進捗、次回練習、大会までの日数、前後の大会を構造化して毎回渡す。次のゴールは進行中の大会のうち開催日が最も近いものを`nextGoalPlan()`で都度算出し、手動では固定しない。`namedPlanDetailsForCoach()`は今回の発言だけでなく直近の会話にも現れた大会名の詳細を追加するため、「それ」「今年」「さっきの大会」も会話中の対象を維持できる。対象が曖昧な変更は確認し、他のプランを自動変更しない。
 - **Race Forecastも同じ実走を使用**: `recomputeAndSaveForecast()`は`runningEvidence()`を使い、Health同期・画像・手動登録を含む直近4週の合計、実走日数、最長実走、MP走を共通の根拠として算出する。PBなどから見る走力の目安と、ロング走・週間走行量・痛みから見るフルへの準備度を別フィールドで保存する。痛みは走力タイムの自動減点には使わず、現在の申告がある場合だけ負荷調整の注意として扱う。直近の記録だけで現在症状を断定せず、未確認なら確認事項として表示する。データ量に応じて表示を丸め、少ない場合は秒単位や好調時／安全目安を表示しない。
 - **レスポンス形式は既存のまま**: `{mode:'advice'|'options', summary, risk, options[].{label,summary,plan}}`。新しい独自スキーマを作るのではなく、Claude Artifact版が既に返していた形式をOpenAI側にも合わせている。下流(`buildAdjustPrompt`の解釈・`applyPlanChange`等)は無変更で動く。
 - **画像解析はCoachとは分離**: `extractFromImage`はClaude Artifactでは従来の`sampleFn`を使い、通常Web/Vercelでは`/api/run-extract`を使う。コーチ相談の`CoachService`に画像を混在させないため、既存のコーチ応答形式・プラン変更フローには影響しない。
@@ -194,7 +194,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 `app/runq.html`内、`planContextLines()`の直前に配置。主要なオブジェクト:
 
 - `ClaudeArtifactProvider` — `sampleFn.json(prompt, opts)`をそのままラップ。
-- `OpenAIProvider` — Web/Vercelでは`fetch('/api/coach', {method:'POST', body:{prompt, modelTier}})`、Capacitorでは`RUNQ_NATIVE_API_ORIGIN`（現在のVercel本番URL）を先頭に付けたHTTPS URLを呼ぶ。Vercel FunctionsはCapacitor WebViewからのJSON POST/OPTIONSにCORS応答する。ネットワークエラー・非200・不正JSONをそれぞれ`{code:'coach_unreachable'|'rate_limited'|'invalid_json'|'cancelled'}`という例外に正規化し、呼び出し元(`runAdjust`/`runLogFeedback`)の既存のcatch節・`adjustErrorMessage(code)`にそのまま渡せるようにしている。
+- `OpenAIProvider` — Web/Vercelでは`fetch('/api/coach', {method:'POST', body:{prompt, modelTier, webSearch}})`、Capacitorでは`RUNQ_NATIVE_API_ORIGIN`（現在のVercel本番URL）を先頭に付けたHTTPS URLを呼ぶ。Vercel FunctionsはCapacitor WebViewからのJSON POST/OPTIONSにCORS応答する。`webSearch`は大会の最新情報・口コミ・URL確認などの必要時だけtrueになる。ネットワークエラー・非200・不正JSONをそれぞれ`{code:'coach_unreachable'|'rate_limited'|'invalid_json'|'cancelled'}`という例外に正規化し、呼び出し元(`runAdjust`/`runLogFeedback`)の既存のcatch節・`adjustErrorMessage(code)`にそのまま渡せるようにしている。
 - `selectCoachProvider()` — 上記2つからどちらを使うか決定する唯一の箇所。
 - `CoachService.request(prompt, opts)` — UI側の唯一の呼び出し口。
 
@@ -204,7 +204,7 @@ selectCoachProvider()   … Provider選択ロジックを1箇所に集約(app/ru
 
 `api/coach.js`(Vercel Serverless Function規約。フレームワーク・追加依存パッケージなし、Node18+のグローバル`fetch`のみ使用):
 
-- リクエスト: `POST { prompt: string, modelTier?: string }`。`prompt`が空・非文字列・上限(60,000文字)超過の場合は400/413を返す。
+- リクエスト: `POST { prompt: string, modelTier?: string, webSearch?: boolean }`。`webSearch:true`の場合のみResponses APIの`web_search`ツールを追加し、公式情報と参加者の口コミを区別するようシステム指示する。`prompt`が空・非文字列・上限(60,000文字)超過の場合は400/413を返す。
 - 環境変数: `OPENAI_API_KEY`(必須。未設定時は500 `coach_unavailable`)、`OPENAI_MODEL`(省略可。デフォルト値`api/coach.js`内の`DEFAULT_MODEL`定数の1箇所のみで管理)。
 - OpenAI呼び出し: Responses API (`POST https://api.openai.com/v1/responses`)。`text.format`にJSON Schema(`RESPONSE_SCHEMA`、既存の`{mode,summary,risk,options[]}`形式)を指定し、Structured Outputsとして構造化された応答を要求(`strict:false`。`options[].plan`はトレーニングプラン全体を含む複雑な構造のため、既存のクライアント側`normalizeAdjustedPlan()`による正規化・検証を安全網としている)。
 - OpenAI APIキーはレスポンスにもエラーメッセージにも一切含めない。OpenAI側のエラー詳細(内部メッセージ等)もクライアントへそのまま流さず、`{error:'coach_unavailable'|'rate_limited'|'invalid_request'|'prompt_too_large'|'invalid_json'|'method_not_allowed'}`という限られたコードのみ返す。
@@ -249,7 +249,7 @@ Androidは`android/`のCapacitorプロジェクトで、Application IDは`com.as
 - 認証未導入のため`user_id`はプロフィール内の端末ローカルID(`workoutUserId`)を使う。将来認証を導入する際は、既存の共通Workoutを保持したままAuthのIDへ移行する。
 - マイページの「データ連携」でAppleヘルスケア／Health Connectの連携状態、最終同期日時、自動登録設定を管理する。接続済み、権限不足、利用不可、同期中、成功・失敗を`profile.healthConnections`の接続状態として表示し、失敗時は設定画面への再試行導線を出す。
 - マイページの振り返り表示・月別履歴・ワークアウト詳細は、追加の保存先を作らず`workouts/main.entries[]`を読み取り専用で集計する。予定との関係は、共通Workoutの`plan_id`と`scheduled_item_date`から既存プランのメニューを参照する。距離差は予定説明文に明示された距離がある場合だけ表示し、推測で評価しない。
-- `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、ランニングWorkoutだけを取り込む。ウォーキング・ハイキング等はRUNQ.の実績・集計へ含めない。初回だけ最大90日をページング取得し、成功後は前回成功時刻から2時間を重ねた増分同期に切り替える。取得0件・距離未確定の記録だけの場合は成功カーソルを進めない。重なった取得分は外部IDとfingerprintの`upsertWorkout()`で照合するため、連打・遅延書き込み・アプリ起動時の再同期でも増殖しない。利用者が削除した同期記録は`profile.deletedWorkoutRefs[]`で外部IDを保持し、再同期でも復活させない。平均ペースは取得元の個別値ではなく、保存済みの総距離と総時間から再計算する。iOSではHealthKit、AndroidではHealth Connectを同じ正規化モデルで扱う。
+- `nativeHealthPlugin()` → `syncHealthWorkouts()`がCapacitorのHealthプラグインを呼び、ランニングWorkoutだけを取り込む。ウォーキング・ハイキング等はRUNQ.の実績・集計へ含めない。初回だけ最大90日をページング取得し、成功後は前回成功時刻から2時間を重ねた増分同期に切り替える。取得0件・距離未確定の記録だけの場合は成功カーソルを進めない。重なった取得分は外部IDとfingerprintの`upsertWorkout()`で照合するため、連打・遅延書き込み・アプリ起動時の再同期でも増殖しない。利用者が削除した同期記録は`profile.deletedWorkoutRefs[]`で外部IDを保持し、再同期でも復活させない。iOSはHealthKit Workoutの`totalDistance`を距離の正本とし、合計値がないHealth Connectだけ時間帯一致のDistanceサンプルをフォールバックにする。平均ペースは取得元の個別値ではなく、保存済みの総距離と総時間から再計算する。距離ソース修正時はiOSだけ一度90日を再照合して、同一外部IDの既存記録を更新する。iOSではHealthKit、AndroidではHealth Connectを同じ正規化モデルで扱う。
 - 初回連携・手動同期では、ワークアウト・心拍・距離・消費カロリーの読み取り権限だけを要求する。Android Manifestでも不要な健康種別と全書き込み権限を除外する。心拍は各Workoutの時間範囲でサンプルを読み、平均・最大を決定論的に算出する。GPSルート・ケイデンス・標高・心拍ゾーンは未取得。
 - 自動登録ON時、同日の予定メニューに一致したWorkoutだけを既存の予定日別ログと完了状態にも反映する。ユーザーが手動／スクショで保存済みのログは端末連携で上書きしない。予定の完了チェックだけではCommon Workoutを作らず、実際のWorkoutへの紐付けだけを行う。
 - 記録入力では画像解析は入力欄への反映まで、Health同期はCommon Workoutへの保存までを担う。同期済みWorkoutを選んで保存すると、既存Workoutへメモ・RPE・痛みを追記し、新しい走行記録は作らない。記録後のAIフィードバックは`metadata.feedback`にも保存する。
