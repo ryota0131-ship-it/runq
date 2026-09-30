@@ -866,8 +866,9 @@
   .home-workout-details p{ margin:8px 0 0; color:var(--text-muted); font-size:12.5px; line-height:1.65; }
   /* 今日の記録操作は、カード内の装飾や展開領域より必ず前面で受ける。
      iOS/WKWebViewでも44px以上の独立したタップ領域として扱う。 */
-  .home-workout-actions{ position:relative; z-index:1; display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-height:44px; pointer-events:auto; }
-  .home-workout-actions .btn-primary{ position:relative; z-index:1; min-height:44px; padding:9px 15px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  .home-workout-actions{ position:relative; z-index:2; display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-height:44px; pointer-events:auto; }
+  .home-workout-actions button{ position:relative; z-index:2; pointer-events:auto; touch-action:manipulation; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
+  .home-workout-actions .btn-primary{ min-height:44px; padding:9px 15px; }
   .home-workout-actions .detail-link{ padding:7px 2px; min-height:36px; font-size:12px; }
   .todays-point{ background:var(--surface); border:1px solid var(--border); padding:11px 13px; }
   .todays-point .tp-label{ color:var(--accent-strong); }
@@ -2457,6 +2458,7 @@
     // ロゴは起動・オンボーディング・共有カード等のブランド接点に限定する。
     // 下部ナビゲーションは既存のまま維持するため、画面遷移や情報構造は変えない。
     app.innerHTML = (state.mode==='onboarding' ? '' : topbarHTML()) + body + (state.mode==='onboarding' ? '' : bottomNavHTML()) + modalHTML();
+    bindHomeWorkoutActions(app);
     if(state.share && state.share.open) requestAnimationFrame(renderShareCardPreview);
     // コーチタブはカード型のボックスに収めず全画面表示にする(操作性・可読性の向上要望)。
     // bodyにモード専用クラスを付け外しし、CSS側でこのタブの時だけレイアウトを切り替える
@@ -4450,8 +4452,8 @@
     if(it.desc) html+='<details class="home-workout-details"><summary>詳しい走り方</summary><p>'+escapeHtml(it.desc)+'</p></details>';
     if(context==='today'){
       const workout=workoutForCompletion(plan,it,completion);
-      html+='<div class="home-workout-actions">'+(done?(workout?'<button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">今日の達成をシェア</button>':'<span class="complete-badge">✓ 完了</span>'):'<button type="button" class="btn-primary home-record-btn" data-action="open-log" data-home-open-log="true" data-date="'+it.date+'">結果を記録する</button>')
-        + '<button type="button" class="detail-link" data-action="consult-item" data-date="'+it.date+'">コーチに相談</button>'+(done?'':'<button type="button" class="menu-skip-link" data-action="skip-item" data-date="'+it.date+'">今回は見送る</button>')+'</div>';
+      html+='<div class="home-workout-actions">'+(done?(workout?'<button type="button" class="btn-primary" data-action="open-share" data-workout-id="'+escapeHtml(workout.id)+'">今日の達成をシェア</button>':'<span class="complete-badge">✓ 完了</span>'):'<button type="button" class="btn-primary home-record-btn" data-action="open-log" data-home-open-log="true" data-home-action="record" data-date="'+it.date+'">結果を記録する</button>')
+        + '<button type="button" class="detail-link" data-action="consult-item" data-date="'+it.date+'">コーチに相談</button>'+(done?'':'<button type="button" class="menu-skip-link" data-action="skip-item" data-home-action="skip" data-date="'+it.date+'">今回は見送る</button>')+'</div>';
     }
     return html+'</div>';
   }
@@ -6039,6 +6041,27 @@
   // 届かない端末がある。ホームの「結果を記録する」は pointerup でも明示的に
   // 受け、通常の click と二重にフォームを開かないようにする。
   let homeLogGestureAt=0;
+  let homeWorkoutActionAt=0;
+  function bindHomeWorkoutActions(root){
+    // WebKitで親へのイベント委譲が届かないケースに備え、ホームの2操作だけは
+    // 描画直後にボタン自身へも登録する。touchendとclickのどちらでも同じ遷移を使う。
+    (root||document).querySelectorAll('[data-home-action]').forEach(function(button){
+      const activate=function(event){
+        const now=Date.now();
+        if(now-homeWorkoutActionAt<700) return;
+        homeWorkoutActionAt=now;
+        if(event && event.type==='touchend' && event.cancelable) event.preventDefault();
+        if(button.dataset.homeAction==='record'){
+          homeLogGestureAt=now;
+          openWorkoutLog(button.dataset.date);
+        } else if(button.dataset.homeAction==='skip'){
+          openWorkoutLog(button.dataset.date,{values:{completionType:'skipped'}});
+        }
+      };
+      button.addEventListener('click',activate);
+      button.addEventListener('touchend',activate,{passive:false});
+    });
+  }
   function openHomeWorkoutLogFromGesture(target, event){
     const button=target && target.closest && target.closest('[data-home-open-log="true"]');
     if(!button) return false;
@@ -6058,6 +6081,7 @@
     const btn = e.target.closest('[data-action]');
     if(!btn) return;
     const action = btn.dataset.action;
+    if(btn.dataset.homeAction && Date.now()-homeWorkoutActionAt<900) return;
     if(action==='open-share'){
       state.share={open:true,workoutId:btn.dataset.workoutId,template:'photo',photoDataUrl:null,busy:false,error:null};
       render();
