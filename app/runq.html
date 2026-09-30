@@ -5312,9 +5312,15 @@
 
   // 検索は常時有効にせず、鮮度が重要な大会情報・口コミ・天候、またはURLがある時だけ使う。
   // 通常の練習相談はRUNQ内の実績と予定を優先し、待ち時間も増やさない。
-  function coachNeedsWebSearch(instruction){
+  function coachNeedsWebSearch(instruction, historyLines){
     const text=String(instruction||'');
     if(/https?:\/\//i.test(text)) return true;
+    // 「12月のハーフを探せる？」「大会を調べて」のような候補探し自体も検索対象。
+    // 続く「探してくれないの？」「それを調べて」も、直近会話の大会文脈を見て検索する。
+    const searchIntent=/(?:ネット|ウェブ|Web)?検索|探(?:す|して|せ|し)|調べ|候補/;
+    const raceTopic=/(?:大会|マラソン|ハーフ|フル|10km|5km|レース|開催)/;
+    const history=(historyLines||[]).join('\n');
+    if(searchIntent.test(text) && (raceTopic.test(text) || raceTopic.test(history))) return true;
     return /(?:最新|今年|直近|評判|口コミ|クチコミ|レビュー|開催日|日程|コース|高低差|制限時間|エイド|給水|天気|天候|気温|公式(?:サイト|情報)?|大会運営)/.test(text);
   }
 
@@ -5523,7 +5529,7 @@
     const normalizedPrev = normalizeAdjustedPlan(plan, {meta:prevPlan.meta, weeks:prevPlan.weeks, extras:prevPlan.extras});
     // 直前に追加したランナーの発言(=今回のinstruction)を除いた、それより前のやりとりだけを文脈として渡す
     const historyLines = recentCoachHistoryLines(state.coach.messages.slice(0, -1));
-    const webSearch=coachNeedsWebSearch(instruction);
+    const webSearch=coachNeedsWebSearch(instruction,historyLines);
     // リクエスト開始時のコーチを固定する。途中で設定を変更しても、この返答の文章と表示は一致する。
     const personaKey=coachPersonaKey((state.profile||{}).coachPersona);
     state.adjust.personaKey=personaKey;
